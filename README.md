@@ -3,7 +3,7 @@
 A complete cross-platform social posting pipeline — **shipped in one hour**, driven
 entirely from the terminal with the [Zernio](https://zernio.com) CLI.
 
-![Shipped in one hour](assets/ship-card.png)
+![A full social posting pipeline, shipped in one hour](assets/og-card.png)
 
 ## What this is
 
@@ -11,15 +11,18 @@ One CLI, one API, five connected accounts (Facebook Page, LinkedIn personal +
 company, Instagram, YouTube). The launch announcement went out to four platforms
 at once, straight from a shell — these are the actual live posts:
 
-- Facebook: <https://www.facebook.com/1218437048021839_122107642599415959>
-- LinkedIn: <https://www.linkedin.com/feed/update/urn:li:share:7494043502444535808/>
-- Instagram: <https://www.instagram.com/p/DcBkopZiGdj/>
+- Facebook: <https://www.facebook.com/1218437048021839_122107644951415959>
+- LinkedIn: <https://www.linkedin.com/feed/update/urn:li:share:7494047885701853184/>
+- Instagram: <https://www.instagram.com/p/DcBmp3tCNXN/>
 - YouTube: <https://www.youtube.com/watch?v=57AbTXfNguQ>
 
 ## What's inside
 
-- `assets/` — the announcement card (1080×1080), wide/OG version (1920×1080) and
-  the 10s launch video, all generated locally with ImageMagick + ffmpeg.
+- `assets/og-card.png` — the AI-rendered launch card (1200×630), generated with
+  [mwk-og-image-generator](https://github.com/matewishkey/mwk-og-image-generator)
+  and branded by code.
+- `assets/` — also holds the ImageMagick announcement card (1080×1080), wide
+  version (1920×1080) and the 10s launch video.
 - `scripts/generate-assets.sh` — regenerates all three assets from scratch.
 - `scripts/post-everywhere.sh` — uploads media and posts to any set of connected
   accounts in one go.
