@@ -1,5 +1,14 @@
 # mwk-social — Zernio social-media integration
 
+## Cross-repo
+
+- **mwk-marketing-research** (mergodon) — strategy source. Awareness strategy + capability map:
+  https://work.l/mer-mwk-marketing-research/2026-08-15_awareness-strategy (filed as its issue #1).
+- **Clipping project** (name TBD, started 2026-08-16) — self-hosted OpenShorts
+  (github.com/mutonby/openshorts, Docker, Gemini key from ~/.secrets) turning show VODs into
+  9:16 clips. Contract: it produces clips; THIS repo posts them via the Zernio CLI to the
+  account IDs below. File issues here when the handoff format needs changing.
+
 Zernio (zernio.com) is the social API layer: one REST API + CLI for posting/scheduling,
 inbox, analytics and ads across the matewishkey social accounts.
 
