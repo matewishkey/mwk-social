@@ -1,38 +1,40 @@
 # mwk-social — Zernio social-media integration
 
-## Cross-repo
+Agent notes for working in this repo. (This repo is public — keep this file free of account
+IDs, billing details, and internal URLs; that state lives outside the repo.)
 
-- **mwk-marketing-research** (mergodon) — strategy source. Awareness strategy + capability map:
-  https://work.l/mer-mwk-marketing-research/2026-08-15_awareness-strategy (filed as its issue #1).
-- **Clipping project** (name TBD, started 2026-08-16) — self-hosted OpenShorts
-  (github.com/mutonby/openshorts, Docker, Gemini key from ~/.secrets) turning show VODs into
-  9:16 clips. Contract: it produces clips; THIS repo posts them via the Zernio CLI to the
-  account IDs below. File issues here when the handoff format needs changing.
-
-Zernio (zernio.com) is the social API layer: one REST API + CLI for posting/scheduling,
-inbox, analytics and ads across the matewishkey social accounts.
-
-## Setup on this box
+## Setup
 
 - CLI: `./node_modules/.bin/zernio` (`@zernio/cli`, local dev dependency; node pinned via `mise.toml`).
-- Auth: the CLI reads `~/.zernio/config.json` (created by `zernio auth:login`, device flow).
-  Durable backup of the API key: `td-sops/apps/mwk-social.enc.env` (`ZERNIO_API_KEY`) —
-  restore recipe is in the comment above its rule in td-sops/.sops.yaml.
-- `zernio auth:check` verifies auth; `zernio accounts:health` verifies connections.
+- Auth: the CLI reads `~/.zernio/config.json`, created by `zernio auth:login` (device flow).
+- `zernio auth:check` verifies auth; `zernio accounts:health` verifies connections;
+  `zernio accounts:list` is the source of truth for connected account IDs.
+- zsh gotcha (bit twice): inline `node -e '...'` inside `$(...)` loses its closing paren —
+  put the JS in a script file instead.
 
-## Connected accounts (Zernio profile "Default", 6a7f217c643243f9674de5f5)
+## Proven mechanics (all exercised live)
 
-| Platform | Account ID | Connected as |
-|----------|------------|--------------|
-| facebook | `6a7f237977555aae01bcf08f` | Page "Mate Wish Key" (can switch to Anzscofinder / My Poker Fantasy / Tasman Visa via `connect:update-facebook-page`) |
-| linkedin | `6a7f23c577555aae01bd07b4` | personal profile "Mate Visky" |
-
-Free tier covers exactly these 2 accounts; adding Instagram/X starts billing ($6/account/mo tier).
+- Multi-account publish in one `posts:create --accounts id1,id2,...`; `media:upload <file>` first.
+- **First comment** (the links-out-of-body strategy): `inbox:reply <postId> --accountId <acc>
+  --message "..."` with NO `--commentId` posts a top-level comment. Works on FB, LI, IG.
+- Image swap on a published post = `posts:unpublish --platform <p>` + recreate (`posts:edit`
+  is text-only). **Instagram cannot delete or edit via API at all** — manual only.
+- YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
+  --accountId <acc> --description/--title/--tags/--thumbnailUrl/--playlistId`
+  (`--videoId` on non-Zernio videos documented but NOT yet tested).
+- Native/past posts: `analytics:posts --source external` (analytics layer, ~2-week lookback,
+  no YouTube coverage — YT gets channel-level analytics commands instead).
 
 ## Platform gotchas (verified against docs.zernio.com)
 
-- **Facebook posts to Pages only** — personal timelines are impossible via API (Meta restriction).
-  Tokens expire (~60 days); watch `accounts:health` / the `account.disconnected` webhook.
-- **LinkedIn**: 3,000-char limit; duplicate content → 422; external links suppress reach.
-- Safe pipeline test pattern (never publishes): `posts:create --scheduledAt <far future>` →
-  verify with `posts:get` → `posts:delete`.
+- **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).
+  Tokens ~60 days; watch `accounts:health`.
+- **LinkedIn**: 3,000-char limit; duplicate content → 422; external links suppress reach
+  (−40–50%) — hence the first-comment mechanic. Reshare/quote-repost an existing post via REST
+  `platformSpecificData.reshareUrl` (not exposed as a `posts:create` flag).
+- **Instagram**: business account required; media mandatory; caption folds at ~125 chars;
+  no delete/edit via API.
+- **TikTok**: API posts have their own strict daily cap (separate from the app); consent flags
+  required per post; no comments/DMs/FYP analytics via API; 9:16 video 3s–10min or carousels.
+- **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails
+  (regular videos do); impressions/CTR exist only in Studio's UI, not in any API.

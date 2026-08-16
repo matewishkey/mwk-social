@@ -7,8 +7,8 @@ entirely from the terminal with the [Zernio](https://zernio.com) CLI.
 
 ## What this is
 
-One CLI, one API, five connected accounts (Facebook Page, LinkedIn personal +
-company, Instagram, YouTube). The launch announcement went out to four platforms
+One CLI, one API, five connected accounts at launch (Facebook Page, LinkedIn
+personal + company, Instagram, YouTube — TikTok joined since). The launch announcement went out to four platforms
 at once, straight from a shell — these are the actual live posts:
 
 - Facebook: <https://www.facebook.com/1218437048021839_122107644951415959>
@@ -23,7 +23,8 @@ at once, straight from a shell — these are the actual live posts:
   and branded by code.
 - `assets/` — also holds the ImageMagick announcement card (1080×1080), wide
   version (1920×1080) and the 10s launch video.
-- `scripts/generate-assets.sh` — regenerates all three assets from scratch.
+- `scripts/generate-assets.sh` — regenerates the three ImageMagick/ffmpeg assets
+  (the AI og-card comes from mwk-og-image-generator).
 - `scripts/post-everywhere.sh` — uploads media and posts to any set of connected
   accounts in one go.
 
