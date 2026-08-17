@@ -40,7 +40,9 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   quote-reshare from the personal account with a thought on top** — never native-post to
   personal. Goal: build company-page engagement/followers to unlock LinkedIn Live there.
 - **Instagram**: business account required; media mandatory; caption folds at ~125 chars;
-  no delete/edit via API.
+  no delete/edit via API. Image aspect must be 0.75–1.91:1 and an image at *exactly* 1.91:1
+  gets rejected (float edge, bitten live) — pad wide screenshots to ~1.78:1 with the
+  screenshot's own bg color instead of cropping.
 - **TikTok**: API posts have their own strict daily cap (separate from the app); consent flags
   required per post; no comments/DMs/FYP analytics via API; 9:16 video 3s–10min or carousels.
 - **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails
