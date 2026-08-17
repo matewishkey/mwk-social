@@ -35,7 +35,10 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   Tokens ~60 days; watch `accounts:health`.
 - **LinkedIn**: 3,000-char limit; duplicate content → 422; external links suppress reach
   (−40–50%) — hence the first-comment mechanic. Reshare/quote-repost an existing post via REST
-  `platformSpecificData.reshareUrl` (not exposed as a `posts:create` flag).
+  `platformSpecificData.reshareUrl` + `content` (not exposed as a `posts:create` flag;
+  exercised live 2026-08-17). **Posting playbook: post natively to the COMPANY page, then
+  quote-reshare from the personal account with a thought on top** — never native-post to
+  personal. Goal: build company-page engagement/followers to unlock LinkedIn Live there.
 - **Instagram**: business account required; media mandatory; caption folds at ~125 chars;
   no delete/edit via API.
 - **TikTok**: API posts have their own strict daily cap (separate from the app); consent flags
