@@ -22,8 +22,12 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
   --accountId <acc> --description/--title/--tags/--thumbnailUrl/--playlistId`
   (`--videoId` on non-Zernio videos documented but NOT yet tested).
-- Native/past posts: `analytics:posts --source external` (analytics layer, ~2-week lookback,
-  no YouTube coverage — YT gets channel-level analytics commands instead).
+- Native/past posts: `analytics:posts --source external` — background sync every ~90 min per
+  account picks up posts made manually in the apps (IG/FB/TikTok/YT covered; ~12 months of
+  history kept per account; sync reads via the account token, so keep `accounts:health` green).
+- Stories: postable via API (`contentType: story`) but API stories get no stickers/links/music
+  (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
+  (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
 ## Platform gotchas (verified against docs.zernio.com)
 
