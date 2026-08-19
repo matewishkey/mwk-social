@@ -30,20 +30,42 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   **Every `inbox:*` command wants the PLATFORM's native post ID** (`platforms[].platformPostId`)
   — the Zernio `_id` that `analytics:posts` returns 404s ("Use a valid Zernio post ID or the
   platform's native post ID"). Bitten on an app-posted reel; verified live 2026-08-19.
-- **Auto first-comment on new reels**: `scripts/reel-first-comment.js`, run every 15 min by the
-  `mwk-reel-comment.timer` systemd --user unit (install/refresh:
-  `scripts/install-reel-comment-timer.sh`, logs: `journalctl --user -u mwk-reel-comment`).
-  A reel is anything whose `platformPostUrl` matches `/reel/`, so app-posted and pipeline posts
-  are handled the same way — app-posted ones just arrive with the external sync's ~90 min lag.
-  IG + FB only (TikTok has no comments API). Double-guarded against duplicates: a state file
-  outside the repo (`~/.local/state/mwk-social/reel-first-comments.json`) plus a live
-  `inbox:post-comments` scan for the CTA URL, so a lost state file can't double-post.
-  `--dry-run`, `--hours N`, `--all`, `--message`.
+- **Native first comment on publish**: `platforms[].platformSpecificData.firstComment` — Zernio
+  posts it itself, seconds after the post goes live. FB (feed + Reels, not Stories), IG (feed +
+  carousels per the docs; Reels not stated), LinkedIn, YouTube (posted *and* pinned, 10k chars).
+  **No TikTok.** Skipped on drafts. **The CLI has no flag for it**, same as `reshareUrl` — so
+  `scripts/post.js` talks to `POST /v1/posts` directly; `posts:create` cannot do this.
+  Verified live 2026-08-19 on YouTube.
+- **The standard first comment lives in `first-comment.txt`** — one file, read by both paths.
+  It must contain `matewishkey.com/show`: the dedupe guard keys off that string.
+- **Catch-all first-comment watcher**: `scripts/first-comment.js`, run every 15 min by the
+  `mwk-first-comment.timer` systemd --user unit (install/refresh:
+  `scripts/install-first-comment-timer.sh`, logs: `journalctl --user -u mwk-first-comment`).
+  Covers what the publish-time field cannot: posts made in the apps, live-event videos, anything
+  created straight on the platform. IG/FB/LI/YT, any post type; **TikTok is impossible** (no
+  comments API at all). Skips a post that already carries the CTA link, whoever put it there, so
+  it composes with the native field instead of double-posting. State lives outside the repo at
+  `~/.local/state/mwk-social/first-comments.json`. `--dry-run`, `--seed` (mark in-window posts
+  done without commenting — used when widening scope, to avoid a burst of backfill), `--hours N`,
+  `--all`, `--platforms`, `--message`. To backfill later, drop the `"note": "seeded…"` entries
+  from the state file and re-run.
+- **Two sources, and you need both**: `posts:list` carries a pipeline post the instant it
+  publishes, while `analytics:posts` lags several minutes behind it — but `analytics:posts` is
+  the only place natively-authored posts ever appear. `first-comment.js` reads both.
+- **YouTube blocks comments on private videos** — `inbox:post-comments` 403s
+  ("Failed to fetch comments") and `firstComment` silently never lands. Unlisted is fine.
+  The watcher treats a 403 as permanent and stops retrying that post.
+- **`platformSpecificData` stores any key you send it**, invented ones included — so an echo in
+  the create response proves storage, never support. Check the platform guide, don't infer.
 - Image swap on a published post = `posts:unpublish --platform <p>` + recreate (`posts:edit`
   is text-only). **Instagram cannot delete or edit via API at all** — manual only.
 - YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
   --accountId <acc> --description/--title/--tags/--thumbnailUrl/--playlistId`
   (`--videoId` on non-Zernio videos documented but NOT yet tested).
+- Webhooks exist and would replace the 15-min poll (`post.external.created` fires when a
+  natively-authored post is first detected, `post.platform.published` per platform target) — not
+  used: they need a public HTTPS endpoint, and detection still waits on the same ~90 min sync,
+  so the only thing gained would be fewer API calls.
 - Native/past posts: `analytics:posts --source external` — background sync every ~90 min per
   account picks up posts made manually in the apps (IG/FB/TikTok/YT covered; ~12 months of
   history kept per account; sync reads via the account token, so keep `accounts:health` green).

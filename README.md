@@ -25,13 +25,16 @@ at once, straight from a shell — these are the actual live posts:
   version (1920×1080) and the 10s launch video.
 - `scripts/generate-assets.sh` — regenerates the three ImageMagick/ffmpeg assets
   (the AI og-card comes from mwk-og-image-generator).
-- `scripts/post-everywhere.sh` — uploads media and posts to any set of connected
-  accounts in one go.
-- `scripts/reel-first-comment.js` — watches for new reels (Instagram + Facebook,
-  whether posted from the phone or through the pipeline) and drops the standard
-  first comment on each one. Links live in the first comment, not the caption.
-- `scripts/install-reel-comment-timer.sh` — installs the systemd `--user` timer
-  that runs the watcher every 15 minutes.
+- `scripts/post.js` — publishes to any set of connected accounts and attaches the
+  standard first comment natively, so it lands seconds after the post does.
+- `scripts/post-everywhere.sh` — the original one-liner entry point, now a thin
+  wrapper over `post.js`.
+- `first-comment.txt` — the first comment itself. One file, used by both paths.
+- `scripts/first-comment.js` — the catch-all: finds posts that went out without
+  the comment (phone-app posts, live-event videos, anything created straight on
+  the platform) and adds it. Skips anything that already has it.
+- `scripts/install-first-comment-timer.sh` — installs the systemd `--user` timer
+  that runs the catch-all every 15 minutes.
 
 ## Reproduce it
 
@@ -59,5 +62,10 @@ scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
 - **YouTube** posts are video uploads — `--title` + `--media <video url>`.
 - **Comment APIs take the platform's native post ID**, not the Zernio one — read
   it from `platforms[].platformPostId`, or every `inbox:*` call 404s.
-- **Reels posted from the app show up on a delay** — the external-post sync runs
-  roughly every 90 minutes, so the auto first comment lands within about that.
+- **First comments are a native field**, `platformSpecificData.firstComment`, on
+  Facebook, Instagram, LinkedIn and YouTube — but not TikTok, and not from the
+  CLI, so `post.js` calls the REST API directly.
+- **Posts made in the apps show up on a delay** — the external-post sync runs
+  roughly every 90 minutes, so the catch-all comment lands within about that.
+- **YouTube won't take comments on a private video** — the API 403s and a
+  `firstComment` never appears. Unlisted works fine.
