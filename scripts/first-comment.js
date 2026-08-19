@@ -99,6 +99,8 @@ function loadState() {
   try { return JSON.parse(fs.readFileSync(statePath(), 'utf8')); } catch { return {}; }
 }
 
+// Written after every single decision, not once at the end: a long backfill
+// that gets interrupted must not lose the record of what it already posted.
 function saveState(state) {
   const p = statePath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
@@ -204,11 +206,13 @@ function main() {
       }
       if (closed) {
         state[target.key] = { commentedAt: null, note: 'comments unavailable (403)', url: target.url };
+        saveState(state);
         console.log(`skip  ${target.key} — comments closed on this post (${target.url})`);
         continue;
       }
       if (done) {
         state[target.key] = { commentedAt: null, note: 'comment already on the post', url: target.url };
+        saveState(state);
         console.log(`skip  ${target.key} — first comment already there (${target.url})`);
         continue;
       }
@@ -222,14 +226,13 @@ function main() {
         commentId: (res.comment && res.comment.id) || res.commentId || null,
         url: target.url,
       };
+      saveState(state);
       console.log(`post  ${target.key} — commented (${target.url})`);
     } catch (err) {
       failures++;
       console.error(`FAIL  ${target.key} — ${err.message}`);
     }
   }
-
-  if (!opts.dryRun) saveState(state);
 
   const hc = process.env.MWK_COMMENT_HC_URL; // optional Healthchecks.io ping
   if (hc && !opts.dryRun) {
