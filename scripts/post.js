@@ -34,6 +34,10 @@ const FIRST_COMMENT_PLATFORMS = new Set(['facebook', 'instagram', 'linkedin', 'y
 
 const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 
+// On every post, same as the watcher's comments. Topic tags are not derived here
+// yet — the clip would have to be transcribed before publishing (see repo issues).
+const IDENTITY_TAG = '#PromptItYourself';
+
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
     firstComment: true, draft: false, schedule: null, wait: true, dryRun: false };
@@ -126,7 +130,7 @@ function resolveMedia(items) {
 function template() {
   const text = fs.readFileSync(TEMPLATE, 'utf8').trim();
   if (!text) throw new Error(`${TEMPLATE} is empty`);
-  return text;
+  return `${text}\n\n${IDENTITY_TAG}`;
 }
 
 async function waitForResults(postId) {

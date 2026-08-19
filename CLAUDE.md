@@ -38,7 +38,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   Verified live 2026-08-19 on YouTube.
 - **The standard first comment lives in `first-comment.txt`** — one file, read by both paths.
   It must contain `matewishkey.com/show`: the dedupe guard keys off that string.
-- **Catch-all first-comment watcher**: `scripts/first-comment.js`, run every 15 min by the
+- **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
   `mwk-first-comment.timer` systemd --user unit (install/refresh:
   `scripts/install-first-comment-timer.sh`, logs: `journalctl --user -u mwk-first-comment`).
   Covers what the publish-time field cannot: posts made in the apps, live-event videos, anything
@@ -49,6 +49,25 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   done without commenting — used when widening scope, to avoid a burst of backfill), `--hours N`,
   `--all`, `--platforms`, `--message`. To backfill later, drop the `"note": "seeded…"` entries
   from the state file and re-run.
+- **The comment's hashtags describe the video**: `scripts/lib/topic-tags.js` downloads the clip,
+  strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
+  (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that
+  file hard-stops the mainstream AI/creator/hype tags whatever the model returns.
+  `#PromptItYourself` leads every comment, then ≤4 topic tags. **Keys come from `~/.secrets`,
+  which is why the systemd unit runs through `zsh -c 'source ~/.secrets && …'`** — systemd's
+  `EnvironmentFile` cannot parse shell syntax. No keys → plain CTA, never a failed comment.
+- **Cache the transcript, and process promptly**: the media URLs Zernio returns are signed and
+  expire, so a reel that isn't fetched soon after the sync sees it can never be transcribed.
+  Results are cached per post in `~/.local/state/mwk-social/topics/` — transcription costs money
+  and a post must only ever be processed once.
+- **Instagram's 5-hashtag cap counts caption AND comments together** (enforced since
+  2025-12-18; over the cap = no Explore, no hashtag pages, no Reels recommendations). Tags in the
+  first comment buy no extra slots. So a reel posted from the app with tags already in its caption
+  must not also get tags in its comment — and captions cannot be edited after publishing on IG.
+- **`accounts:health` reporting `warning` is routine, not a fault** — Zernio refreshes tokens
+  lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
+  (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
+  **Alerting must key on `needsReconnect: true` or `status: error`**, never on `warning`.
 - **Two sources, and you need both**: `posts:list` carries a pipeline post the instant it
   publishes, while `analytics:posts` lags several minutes behind it — but `analytics:posts` is
   the only place natively-authored posts ever appear. `first-comment.js` reads both.
