@@ -38,6 +38,10 @@ const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 // yet — the clip would have to be transcribed before publishing (see repo issues).
 const IDENTITY_TAG = '#PromptItYourself';
 
+// first-comment.js keys its duplicate guard off this string. A template that
+// lost it would have the watcher comment again on top of the native one.
+const MARKER = 'matewishkey.com/show';
+
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
     firstComment: true, draft: false, schedule: null, wait: true, dryRun: false };
@@ -130,6 +134,7 @@ function resolveMedia(items) {
 function template() {
   const text = fs.readFileSync(TEMPLATE, 'utf8').trim();
   if (!text) throw new Error(`${TEMPLATE} is empty`);
+  if (!text.includes(MARKER)) throw new Error(`${TEMPLATE} must contain ${MARKER} — the dedupe guard keys off it`);
   return `${text}\n\n${IDENTITY_TAG}`;
 }
 

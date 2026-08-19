@@ -37,7 +37,11 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `scripts/post.js` talks to `POST /v1/posts` directly; `posts:create` cannot do this.
   Verified live 2026-08-19 on YouTube.
 - **The standard first comment lives in `first-comment.txt`** — one file, read by both paths.
-  It must contain `matewishkey.com/show`: the dedupe guard keys off that string.
+  It must contain `matewishkey.com/show`: the dedupe guard keys off that string, so a template
+  edited to drop the URL would have the watcher duplicate every natively-posted comment. Both
+  `first-comment.js` and `post.js` refuse to run without it.
+- **`matewishkey.com/show` is the guest SIGN-UP page, not the stream** — the show goes out live on
+  youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
 - **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
   `mwk-first-comment.timer` systemd --user unit (install/refresh:
   `scripts/install-first-comment-timer.sh`, logs: `journalctl --user -u mwk-first-comment`).
@@ -47,7 +51,9 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   it composes with the native field instead of double-posting. State lives outside the repo at
   `~/.local/state/mwk-social/first-comments.json`. `--dry-run`, `--seed` (mark in-window posts
   done without commenting — used when widening scope, to avoid a burst of backfill), `--hours N`,
-  `--all`, `--platforms`, `--message`. To backfill later, drop the `"note": "seeded…"` entries
+  `--all`, `--platforms`, `--limit N`, `--no-topics` (skip transcription, plain CTA), `--message`.
+  Pings `$MWK_COMMENT_HC_URL` (and `/fail`) when that env var is set — the hook exists, no check
+  is provisioned yet. To backfill later, drop the `"note": "seeded…"` entries
   from the state file and re-run.
 - **The comment's hashtags describe the video**: `scripts/lib/topic-tags.js` downloads the clip,
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
@@ -81,7 +87,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
   --accountId <acc> --description/--title/--tags/--thumbnailUrl/--playlistId`
   (`--videoId` on non-Zernio videos documented but NOT yet tested).
-- Webhooks exist and would replace the 15-min poll (`post.external.created` fires when a
+- Webhooks exist and would replace the hourly poll (`post.external.created` fires when a
   natively-authored post is first detected, `post.platform.published` per platform target) — not
   used: they need a public HTTPS endpoint, and detection still waits on the same ~90 min sync,
   so the only thing gained would be fewer API calls.

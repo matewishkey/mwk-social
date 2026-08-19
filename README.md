@@ -34,13 +34,19 @@ at once, straight from a shell — these are the actual live posts:
   the comment (phone-app posts, live-event videos, anything created straight on
   the platform) and adds it. Skips anything that already has it.
 - `scripts/install-first-comment-timer.sh` — installs the systemd `--user` timer
-  that runs the catch-all every 15 minutes.
+  that runs the catch-all hourly.
+- `scripts/lib/topic-tags.js` — works out what a video was about so the comment
+  can say so. Downloads the clip, strips the audio with ffmpeg, transcribes it,
+  and names the subjects it covers — `#Debugging`, `#Trading`, whatever the clip
+  is actually about, never audience or marketing tags. Needs `OPENAI_API_KEY`
+  and `GEMINI_API_KEY`; without them the comment still goes out, just untagged.
+  Results are cached per post under `~/.local/state/mwk-social/topics/`.
 
 ## Reproduce it
 
 ```bash
 npm install                      # installs @zernio/cli locally
-./node_modules/.bin/zernio auth:login    # device flow, free for 2 accounts
+./node_modules/.bin/zernio auth:login    # device flow
 ./node_modules/.bin/zernio connect:get-url facebook --profileId <your-profile-id>
 ./node_modules/.bin/zernio connect:get-url linkedin --profileId <your-profile-id>
 # open the printed URLs, authorize, then:
