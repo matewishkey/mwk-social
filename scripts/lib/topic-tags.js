@@ -59,7 +59,11 @@ async function transcribe(videoUrl) {
   const mp4 = path.join(tmp, 'v.mp4');
   const wav = path.join(tmp, 'a.wav');
   try {
-    sh('curl', ['-sL', '--max-time', '180', '-A', 'Mozilla/5.0', '-o', mp4, videoUrl]);
+    // The URL comes from Zernio's response, so it is not ours to trust: `--`
+    // stops one that begins with a dash being read as a curl flag, and the
+    // scheme check stops file:// or scp:// being handed to curl at all.
+    if (!/^https:\/\//i.test(videoUrl)) throw new Error(`refusing non-https media url: ${videoUrl.slice(0, 40)}`);
+    sh('curl', ['-sL', '--max-time', '180', '-A', 'Mozilla/5.0', '-o', mp4, '--', videoUrl]);
     if (!fs.existsSync(mp4) || fs.statSync(mp4).size < 1024) throw new Error('video download was empty (signed URL probably expired)');
     sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', mp4, '-vn', '-ac', '1', '-ar', '16000',
       '-t', String(MAX_AUDIO_SECONDS), '-y', wav]);
