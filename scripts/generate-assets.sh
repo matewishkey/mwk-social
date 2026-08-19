@@ -2,6 +2,10 @@
 # Generate the announcement card (1080x1080), wide card (1920x1080) and a 10s
 # 1080p video from the wide card. Requires ImageMagick (`convert`) and ffmpeg.
 # Usage: scripts/generate-assets.sh [output-dir]
+# NOTE: the counts baked into the cards below ("5 accounts", the platform list) are the
+# LAUNCH-DAY figures, deliberately frozen — this script reproduces the 2026-08-14 announcement
+# assets, it is not a live status card. TikTok connected after launch; don't "correct" the text
+# here unless you actually want a new, differently-worded card.
 set -euo pipefail
 out="${1:-assets}"
 mkdir -p "$out"
