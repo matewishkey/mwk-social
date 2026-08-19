@@ -77,6 +77,9 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **Two sources, and you need both**: `posts:list` carries a pipeline post the instant it
   publishes, while `analytics:posts` lags several minutes behind it — but `analytics:posts` is
   the only place natively-authored posts ever appear. `first-comment.js` reads both.
+- **A comment read for a video the account doesn't own returns `success` with an empty list**,
+  not an error — confirmed 2026-08-19 against a Short on the unconnected @matewishkey channel.
+  So "no comments" never proves "not yet commented"; only go by posts the API actually lists.
 - **YouTube blocks comments on private videos** — `inbox:post-comments` 403s
   ("Failed to fetch comments") and `firstComment` silently never lands. Unlisted is fine.
   The watcher treats a 403 as permanent and stops retrying that post.
