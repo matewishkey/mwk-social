@@ -51,7 +51,10 @@ function writeCache(key, value) {
   fs.writeFileSync(cachePath(key), JSON.stringify(value, null, 2) + '\n');
 }
 
-function transcribe(videoUrl) {
+// The two API calls go through node's own fetch, never curl: a secret passed as
+// a curl argument is visible in `ps` to every user on the box. Only the video
+// download — which carries no credential — still shells out.
+async function transcribe(videoUrl) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-reel-'));
   const mp4 = path.join(tmp, 'v.mp4');
   const wav = path.join(tmp, 'a.wav');
@@ -60,10 +63,17 @@ function transcribe(videoUrl) {
     if (!fs.existsSync(mp4) || fs.statSync(mp4).size < 1024) throw new Error('video download was empty (signed URL probably expired)');
     sh('ffmpeg', ['-hide_banner', '-loglevel', 'error', '-i', mp4, '-vn', '-ac', '1', '-ar', '16000',
       '-t', String(MAX_AUDIO_SECONDS), '-y', wav]);
-    const out = sh('curl', ['-s', '--max-time', '300', 'https://api.openai.com/v1/audio/transcriptions',
-      '-H', `Authorization: Bearer ${process.env.OPENAI_API_KEY}`,
-      '-F', `file=@${wav}`, '-F', 'model=whisper-1', '-F', 'response_format=json']).toString();
-    const json = JSON.parse(out);
+    const form = new FormData();
+    form.append('file', await fs.openAsBlob(wav), 'audio.wav');
+    form.append('model', 'whisper-1');
+    form.append('response_format', 'json');
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+      body: form,
+      signal: AbortSignal.timeout(300000),
+    });
+    const json = await res.json();
     if (json.error) throw new Error(`whisper: ${json.error.message}`);
     return (json.text || '').trim();
   } finally {
@@ -71,16 +81,19 @@ function transcribe(videoUrl) {
   }
 }
 
-function callModel(transcript) {
-  const body = JSON.stringify({
-    contents: [{ parts: [{ text: nameSubjectsPrompt(transcript) }] }],
-    generationConfig: { responseMimeType: 'application/json' },
+async function callModel(transcript) {
+  // Key goes in the documented header, not the query string — a URL with a
+  // credential in it leaks into argv, logs and proxies alike.
+  const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': process.env.GEMINI_API_KEY },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: nameSubjectsPrompt(transcript) }] }],
+      generationConfig: { responseMimeType: 'application/json' },
+    }),
+    signal: AbortSignal.timeout(120000),
   });
-  const res = execFileSync('curl', ['-s', '--max-time', '120',
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
-    '-H', 'Content-Type: application/json', '--data-binary', '@-'],
-    { input: body, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: 1 << 24 });
-  const json = JSON.parse(res);
+  const json = await res.json();
   if (json.error) throw new Error(`gemini: ${json.error.message}`);
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   return JSON.parse(text);
@@ -122,15 +135,15 @@ function clean(tags) {
  *   null when the post has no video, the keys are missing, or anything fails —
  *   the caller then posts the plain CTA rather than nothing at all.
  */
-function topicsFor(key, videoUrl) {
+async function topicsFor(key, videoUrl) {
   const cached = readCache(key);
   if (cached) return cached;
   if (!videoUrl) return null;
   if (!process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY) return null;
 
-  const transcript = transcribe(videoUrl);
+  const transcript = await transcribe(videoUrl);
   if (!transcript) throw new Error('transcript came back empty');
-  const named = callModel(transcript);
+  const named = await callModel(transcript);
   const result = {
     tags: clean(named.tags),
     summary: String(named.summary || '').slice(0, 300),

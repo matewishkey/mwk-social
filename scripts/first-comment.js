@@ -181,7 +181,7 @@ function alreadyCommented(target) {
   return (res.comments || []).some((c) => String(c.text || c.message || c.content || '').includes(MARKER));
 }
 
-function main() {
+async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const message = opts.message || process.env.MWK_FIRST_COMMENT || template();
   const state = loadState();
@@ -231,7 +231,7 @@ function main() {
       let summary = '';
       if (!opts.noTopics) {
         try {
-          const topics = topicsFor(target.key, target.videoUrl);
+          const topics = await topicsFor(target.key, target.videoUrl);
           if (topics) {
             tags = tags.concat(topics.tags.map((t) => `#${t}`));
             summary = topics.summary;
@@ -270,4 +270,4 @@ function main() {
   process.exit(failures ? 1 : 0);
 }
 
-main();
+main().catch((err) => { console.error(err.message); process.exit(1); });
