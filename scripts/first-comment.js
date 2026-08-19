@@ -32,6 +32,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
+const { topicsFor } = require('./lib/topic-tags');
+
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
 const TEMPLATE = path.join(REPO, 'first-comment.txt');
@@ -40,15 +42,19 @@ const TEMPLATE = path.join(REPO, 'first-comment.txt');
 // including the one Zernio itself posted at publish time.
 const MARKER = 'matewishkey.com/show';
 
+// Goes on every post, always. The topic tags derived from the video follow it.
+const IDENTITY_TAG = '#PromptItYourself';
+
 // TikTok is absent on purpose: its API exposes no comments at all.
 const ALL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'youtube'];
 
 function parseArgs(argv) {
-  const opts = { hours: 48, all: false, dryRun: false, seed: false, message: null, limit: 50, platforms: ALL_PLATFORMS };
+  const opts = { hours: 48, all: false, dryRun: false, seed: false, noTopics: false, message: null, limit: 50, platforms: ALL_PLATFORMS };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--dry-run') opts.dryRun = true;
     else if (a === '--seed') opts.seed = true;
+    else if (a === '--no-topics') opts.noTopics = true;
     else if (a === '--all') opts.all = true;
     else if (a === '--hours') opts.hours = Number(argv[++i]);
     else if (a === '--limit') opts.limit = Number(argv[++i]);
@@ -65,6 +71,7 @@ function parseArgs(argv) {
 
 function usage() {
   console.log('usage: first-comment.js [--dry-run] [--seed] [--all] [--hours N] [--limit N]');
+  console.log('                        [--no-topics]  (skip transcription, plain CTA only)');
   console.log('                        [--platforms p1,p2] [--message TEXT]');
 }
 
@@ -151,12 +158,14 @@ function collectPosts(opts) {
         const key = `${pf.platform}:${pf.platformPostId}`;
         if (seen.has(key)) continue;
         seen.add(key);
+        const video = (post.mediaItems || []).find((m) => m.type === 'video');
         found.push({
           key,
           platform: pf.platform,
           postId: pf.platformPostId,
           accountId,
           url: pf.platformPostUrl || post.platformPostUrl || '',
+          videoUrl: video ? video.url : null,
           publishedAt: new Date(publishedAt).toISOString(),
         });
       }
@@ -216,18 +225,37 @@ function main() {
         console.log(`skip  ${target.key} — first comment already there (${target.url})`);
         continue;
       }
+      // Work out what the video was about, and tag it with that. A failure here
+      // must never cost the post its comment — fall back to the plain CTA.
+      let tags = [IDENTITY_TAG];
+      let summary = '';
+      if (!opts.noTopics) {
+        try {
+          const topics = topicsFor(target.key, target.videoUrl);
+          if (topics) {
+            tags = tags.concat(topics.tags.map((t) => `#${t}`));
+            summary = topics.summary;
+          }
+        } catch (err) {
+          console.error(`warn  ${target.key} — topic tags unavailable (${err.message}); posting the plain CTA`);
+        }
+      }
+      const body = `${message}\n\n${tags.join(' ')}`;
+
       if (opts.dryRun) {
-        console.log(`DRY   ${target.key} — would comment (${target.url})`);
+        console.log(`DRY   ${target.key} — would comment ${tags.join(' ')} (${target.url})`);
+        if (summary) console.log(`      about: ${summary}`);
         continue;
       }
-      const res = zernio(['inbox:reply', target.postId, '--accountId', target.accountId, '--message', message]);
+      const res = zernio(['inbox:reply', target.postId, '--accountId', target.accountId, '--message', body]);
       state[target.key] = {
         commentedAt: new Date().toISOString(),
         commentId: (res.comment && res.comment.id) || res.commentId || null,
+        tags,
         url: target.url,
       };
       saveState(state);
-      console.log(`post  ${target.key} — commented (${target.url})`);
+      console.log(`post  ${target.key} — commented ${tags.join(' ')} (${target.url})`);
     } catch (err) {
       failures++;
       console.error(`FAIL  ${target.key} — ${err.message}`);

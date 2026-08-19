@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Install (or refresh) the systemd --user timer that runs first-comment.js.
 #
-#   scripts/install-first-comment-timer.sh            # every 15 minutes
+#   scripts/install-first-comment-timer.sh            # hourly
 #   INTERVAL=30min scripts/install-first-comment-timer.sh
 #
 # Logs: journalctl --user -u mwk-first-comment -f
 set -euo pipefail
-interval="${INTERVAL:-15min}"
+interval="${INTERVAL:-1h}"
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 mkdir -p "$unit_dir"
@@ -21,7 +21,9 @@ Type=oneshot
 # mise owns node; systemd gets no login shell, so spell the PATH out.
 Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=$repo
-ExecStart=$repo/scripts/first-comment.js
+# Sourced through zsh because the transcription keys live in ~/.secrets, which is
+# shell syntax systemd's EnvironmentFile cannot parse. Same pattern as the crontab.
+ExecStart=/usr/bin/zsh -c 'source ~/.secrets && exec $repo/scripts/first-comment.js'
 UNIT
 
 cat > "$unit_dir/mwk-first-comment.timer" <<UNIT
