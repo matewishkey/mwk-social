@@ -21,6 +21,7 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
+const { api } = require('./lib/api');
 const fs = require('fs');
 const path = require('path');
 
@@ -83,29 +84,6 @@ function zernio(args) {
   }
   const json = JSON.parse(out);
   if (json && json.error) throw new Error(`zernio ${args[0]}: ${json.message || 'error'}`);
-  return json;
-}
-
-function apiKey() {
-  if (process.env.ZERNIO_API_KEY) return process.env.ZERNIO_API_KEY;
-  const cfg = path.join(process.env.HOME, '.zernio', 'config.json');
-  const key = JSON.parse(fs.readFileSync(cfg, 'utf8')).apiKey;
-  if (!key) throw new Error(`no apiKey in ${cfg} and no ZERNIO_API_KEY set`);
-  return key;
-}
-
-const apiBase = () => (process.env.ZERNIO_API_URL || 'https://zernio.com/api').replace(/\/$/, '');
-
-async function api(method, endpoint, body) {
-  const res = await fetch(`${apiBase()}/v1${endpoint}`, {
-    method,
-    headers: { Authorization: `Bearer ${apiKey()}`, 'Content-Type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  let json;
-  try { json = JSON.parse(text); } catch { throw new Error(`${method} ${endpoint} → ${res.status}: ${text.slice(0, 300)}`); }
-  if (!res.ok) throw new Error(`${method} ${endpoint} → ${res.status}: ${json.message || text.slice(0, 300)}`);
   return json;
 }
 
@@ -179,7 +157,7 @@ async function main() {
     return;
   }
 
-  const { post } = await api('POST', '/posts', body);
+  const { post } = await api('POST', '/posts', { body });
   console.log(`post ${post._id} — ${post.status}`);
   if (!opts.wait || opts.draft || opts.schedule) return;
 

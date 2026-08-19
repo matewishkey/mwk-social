@@ -62,6 +62,18 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `#PromptItYourself` leads every comment, then ≤4 topic tags. **Keys come from `~/.secrets`,
   which is why the systemd unit runs through `zsh -c 'source ~/.secrets && …'`** — systemd's
   `EnvironmentFile` cannot parse shell syntax. No keys → plain CTA, never a failed comment.
+- **YouTube needs a different transcript source**: `analytics:posts` returns a video mediaItem
+  with an **empty url** for YouTube, so there is nothing to download. `yt-dlp --write-auto-subs`
+  fetches the auto-captions instead — free, seconds, and it covers the whole video rather than
+  the first 15 minutes of audio. `--download-sections` segfaults this box's ffmpeg build; don't
+  reach for it. Auto-captions take hours to appear on a long stream, so a video with no
+  transcript yet is deferred and retried (`MWK_CAPTION_GRACE_HOURS`, default 24) rather than
+  spending its one un-editable comment on an untagged one.
+- **Never pass a post ID to the CLI as a positional** — a YouTube video ID may start with `-`
+  (`-Lf97N091NI`), which yargs reads as a flag: the command prints its help and the script sees a
+  failure. There is no `--` escape that works. `scripts/lib/api.js` calls
+  `GET/POST /v1/inbox/comments/{postId}` directly instead; verified against hyphenated YouTube
+  IDs, LinkedIn `urn:li:share:…` and Facebook composite IDs.
 - **Cache the transcript, and process promptly**: the media URLs Zernio returns are signed and
   expire, so a reel that isn't fetched soon after the sync sees it can never be transcribed.
   Results are cached per post in `~/.local/state/mwk-social/topics/` — transcription costs money

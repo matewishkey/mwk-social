@@ -33,6 +33,7 @@ const os = require('os');
 const path = require('path');
 
 const { topicsFor } = require('./lib/topic-tags');
+const { getComments, replyToPost } = require('./lib/api');
 
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
@@ -44,6 +45,13 @@ const MARKER = 'matewishkey.com/show';
 
 // Goes on every post, always. The topic tags derived from the video follow it.
 const IDENTITY_TAG = '#PromptItYourself';
+
+// YouTube takes a while to auto-caption a fresh upload — hours for a long live
+// stream — and a comment cannot be edited once posted. So a recent video with no
+// transcript yet is left alone and retried next run; past this age it gets the
+// plain CTA. Waiting costs nothing for content that captions quickly: the grace
+// is only an upper bound, and the next hourly run picks it up the moment it can.
+const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
 
 // TikTok is absent on purpose: its API exposes no comments at all.
 const ALL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'youtube'];
@@ -158,14 +166,15 @@ function collectPosts(opts) {
         const key = `${pf.platform}:${pf.platformPostId}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        const video = (post.mediaItems || []).find((m) => m.type === 'video');
+        const video = (post.mediaItems || []).find((m) => m && m.type === 'video');
         found.push({
           key,
           platform: pf.platform,
           postId: pf.platformPostId,
           accountId,
           url: pf.platformPostUrl || post.platformPostUrl || '',
-          videoUrl: video ? video.url : null,
+          videoUrl: (video && video.url) || null,
+          isVideo: Boolean(video) || pf.platform === 'youtube',
           publishedAt: new Date(publishedAt).toISOString(),
         });
       }
@@ -176,8 +185,8 @@ function collectPosts(opts) {
 
 // Second guard, so a lost state file can't double-comment — and so a post that
 // already got the comment natively at publish time is left alone.
-function alreadyCommented(target) {
-  const res = zernio(['inbox:post-comments', target.postId, '--accountId', target.accountId]);
+async function alreadyCommented(target) {
+  const res = await getComments(target.postId, target.accountId);
   return (res.comments || []).some((c) => String(c.text || c.message || c.content || '').includes(MARKER));
 }
 
@@ -208,7 +217,7 @@ async function main() {
       let closed = false;
       let done;
       try {
-        done = alreadyCommented(target);
+        done = await alreadyCommented(target);
       } catch (err) {
         if (!/\b403\b/.test(err.message)) throw err;
         closed = true;
@@ -229,16 +238,29 @@ async function main() {
       // must never cost the post its comment — fall back to the plain CTA.
       let tags = [IDENTITY_TAG];
       let summary = '';
+      let gotTopics = false;
       if (!opts.noTopics) {
         try {
-          const topics = await topicsFor(target.key, target.videoUrl);
+          const topics = await topicsFor(target.key, {
+            videoUrl: target.videoUrl,
+            youtubeId: target.platform === 'youtube' ? target.postId : null,
+          });
           if (topics) {
             tags = tags.concat(topics.tags.map((t) => `#${t}`));
             summary = topics.summary;
+            gotTopics = true;
           }
         } catch (err) {
           console.error(`warn  ${target.key} — topic tags unavailable (${err.message}); posting the plain CTA`);
         }
+      }
+
+      // Nothing to transcribe yet on a fresh video — come back next run rather
+      // than spend the one comment we get on an untagged one.
+      const ageHours = (Date.now() - Date.parse(target.publishedAt)) / 3600000;
+      if (!opts.noTopics && target.isVideo && !gotTopics && ageHours < CAPTION_GRACE_HOURS) {
+        console.log(`wait  ${target.key} — no transcript yet, ${ageHours.toFixed(1)}h old, retrying next run (${target.url})`);
+        continue;
       }
       const body = `${message}\n\n${tags.join(' ')}`;
 
@@ -247,7 +269,7 @@ async function main() {
         if (summary) console.log(`      about: ${summary}`);
         continue;
       }
-      const res = zernio(['inbox:reply', target.postId, '--accountId', target.accountId, '--message', body]);
+      const res = await replyToPost(target.postId, target.accountId, body);
       state[target.key] = {
         commentedAt: new Date().toISOString(),
         commentId: (res.comment && res.comment.id) || res.commentId || null,

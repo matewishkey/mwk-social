@@ -51,6 +51,41 @@ function writeCache(key, value) {
   fs.writeFileSync(cachePath(key), JSON.stringify(value, null, 2) + '\n');
 }
 
+// YouTube publishes auto-captions, so a video there needs no download and no
+// transcription spend at all — and unlike the audio path it covers the whole
+// video, which matters when a live show runs for four hours.
+function transcribeYouTube(videoId) {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-subs-'));
+  try {
+    sh('yt-dlp', ['-q', '--no-warnings', '--skip-download', '--write-auto-subs',
+      '--sub-langs', 'en.*', '--sub-format', 'vtt', '-o', path.join(tmp, 's'),
+      '--', `https://www.youtube.com/watch?v=${videoId}`]);
+    const vtt = fs.readdirSync(tmp).find((f) => f.endsWith('.vtt'));
+    if (!vtt) return null;
+    return cleanVtt(fs.readFileSync(path.join(tmp, vtt), 'utf8'));
+  } catch {
+    return null;               // no captions, private, or yt-dlp unhappy — fall back
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
+// Auto-caption VTT is a rolling window: each cue repeats the previous line and
+// carries per-word timing tags. Strip both, keep first sight of each line.
+function cleanVtt(vtt) {
+  const seen = new Set();
+  const lines = [];
+  for (let line of vtt.split('\n')) {
+    if (!line.trim() || line.startsWith('WEBVTT') || line.includes('-->')) continue;
+    if (/^(Kind|Language):/.test(line)) continue;
+    line = line.replace(/<[^>]*>/g, '').trim();
+    if (!line || seen.has(line)) continue;
+    seen.add(line);
+    lines.push(line);
+  }
+  return lines.join(' ').replace(/\s+/g, ' ').trim();
+}
+
 // The two API calls go through node's own fetch, never curl: a secret passed as
 // a curl argument is visible in `ps` to every user on the box. Only the video
 // download — which carries no credential — still shells out.
@@ -139,13 +174,19 @@ function clean(tags) {
  *   null when the post has no video, the keys are missing, or anything fails —
  *   the caller then posts the plain CTA rather than nothing at all.
  */
-async function topicsFor(key, videoUrl) {
+async function topicsFor(key, source) {
+  const { videoUrl, youtubeId } = source || {};
   const cached = readCache(key);
   if (cached) return cached;
-  if (!videoUrl) return null;
-  if (!process.env.OPENAI_API_KEY || !process.env.GEMINI_API_KEY) return null;
+  if (!videoUrl && !youtubeId) return null;
+  if (!process.env.GEMINI_API_KEY) return null;
 
-  const transcript = await transcribe(videoUrl);
+  // Captions first — free and complete. Whisper only when there are none.
+  let transcript = youtubeId ? transcribeYouTube(youtubeId) : null;
+  if (!transcript) {
+    if (!videoUrl || !process.env.OPENAI_API_KEY) return null;
+    transcript = await transcribe(videoUrl);
+  }
   if (!transcript) throw new Error('transcript came back empty');
   const named = await callModel(transcript);
   const result = {
@@ -158,4 +199,4 @@ async function topicsFor(key, videoUrl) {
   return result;
 }
 
-module.exports = { topicsFor, clean, BLOCKED, MAX_TAGS };
+module.exports = { topicsFor, clean, cleanVtt, BLOCKED, MAX_TAGS };
