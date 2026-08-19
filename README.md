@@ -27,6 +27,11 @@ at once, straight from a shell — these are the actual live posts:
   (the AI og-card comes from mwk-og-image-generator).
 - `scripts/post-everywhere.sh` — uploads media and posts to any set of connected
   accounts in one go.
+- `scripts/reel-first-comment.js` — watches for new reels (Instagram + Facebook,
+  whether posted from the phone or through the pipeline) and drops the standard
+  first comment on each one. Links live in the first comment, not the caption.
+- `scripts/install-reel-comment-timer.sh` — installs the systemd `--user` timer
+  that runs the watcher every 15 minutes.
 
 ## Reproduce it
 
@@ -52,3 +57,7 @@ scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
   Reshare an existing post via `platformSpecificData.reshareUrl` (quote-repost
   when you add text).
 - **YouTube** posts are video uploads — `--title` + `--media <video url>`.
+- **Comment APIs take the platform's native post ID**, not the Zernio one — read
+  it from `platforms[].platformPostId`, or every `inbox:*` call 404s.
+- **Reels posted from the app show up on a delay** — the external-post sync runs
+  roughly every 90 minutes, so the auto first comment lands within about that.

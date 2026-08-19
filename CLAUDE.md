@@ -27,6 +27,18 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   check aspect with `identify` before upload.
 - **First comment** (the links-out-of-body strategy): `inbox:reply <postId> --accountId <acc>
   --message "..."` with NO `--commentId` posts a top-level comment. Works on FB, LI, IG.
+  **Every `inbox:*` command wants the PLATFORM's native post ID** (`platforms[].platformPostId`)
+  — the Zernio `_id` that `analytics:posts` returns 404s ("Use a valid Zernio post ID or the
+  platform's native post ID"). Bitten on an app-posted reel; verified live 2026-08-19.
+- **Auto first-comment on new reels**: `scripts/reel-first-comment.js`, run every 15 min by the
+  `mwk-reel-comment.timer` systemd --user unit (install/refresh:
+  `scripts/install-reel-comment-timer.sh`, logs: `journalctl --user -u mwk-reel-comment`).
+  A reel is anything whose `platformPostUrl` matches `/reel/`, so app-posted and pipeline posts
+  are handled the same way — app-posted ones just arrive with the external sync's ~90 min lag.
+  IG + FB only (TikTok has no comments API). Double-guarded against duplicates: a state file
+  outside the repo (`~/.local/state/mwk-social/reel-first-comments.json`) plus a live
+  `inbox:post-comments` scan for the CTA URL, so a lost state file can't double-post.
+  `--dry-run`, `--hours N`, `--all`, `--message`.
 - Image swap on a published post = `posts:unpublish --platform <p>` + recreate (`posts:edit`
   is text-only). **Instagram cannot delete or edit via API at all** — manual only.
 - YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
