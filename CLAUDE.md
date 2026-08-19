@@ -86,6 +86,21 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
   (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
   **Alerting must key on `needsReconnect: true` or `status: error`**, never on `warning`.
+- **X: the link goes in the post, not a comment.** Its comment endpoints 403 on this plan (read
+  *and* reply, verified 2026-08-19), so the first-comment mechanic is impossible there. Two ways
+  to get a link out — `platformSpecificData.threadItems` publishes a root tweet plus replies in
+  one call, or just put the link in the post. **The post is cheaper**: X bills
+  `content_create_with_url` at **$0.20** against $0.015 for a post without one, and the fee lands
+  on whichever tweet holds the URL — so a thread pays the $0.20 *plus* $0.015 for the extra
+  tweet. Measured, not inferred: 2 × $0.015 + 1 × $0.20 = the 23c on `usage:stats.spend.xSpendCents`.
+  (Zernio's `usage:x-pricing` lists `content_create_with_url` with an empty `triggeredBy`; that
+  metadata is wrong — the operation does fire.)
+- **X link suppression is a non-Premium problem** — Premium accounts post links normally, so with
+  the subscription live there is no reason to keep links out of the post.
+- **Threads works like Instagram**: connected through the same Meta auth, comments readable and
+  repliable, 500-char cap, video to 5 minutes. It is in the watcher's platform list.
+- **A caption that already carries the CTA link is left alone** — the watcher skips it rather than
+  posting a comment repeating the same URL.
 - **Two sources, and you need both**: `posts:list` carries a pipeline post the instant it
   publishes, while `analytics:posts` lags several minutes behind it — but `analytics:posts` is
   the only place natively-authored posts ever appear. `first-comment.js` reads both.

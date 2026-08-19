@@ -53,8 +53,10 @@ const IDENTITY_TAG = '#PromptItYourself';
 // is only an upper bound, and the next hourly run picks it up the moment it can.
 const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
 
-// TikTok is absent on purpose: its API exposes no comments at all.
-const ALL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'youtube'];
+// TikTok is absent because its API exposes no comments at all, and X because
+// its comment endpoints 403 on this plan — both take their link in the caption
+// instead (on X that is also the cheaper way round; see CLAUDE.md).
+const ALL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'youtube', 'threads'];
 
 function parseArgs(argv) {
   const opts = { hours: 48, all: false, dryRun: false, seed: false, noTopics: false, message: null, limit: 50, platforms: ALL_PLATFORMS };
@@ -173,6 +175,7 @@ function collectPosts(opts) {
           postId: pf.platformPostId,
           accountId,
           url: pf.platformPostUrl || post.platformPostUrl || '',
+          content: post.content || '',
           videoUrl: (video && video.url) || null,
           isVideo: Boolean(video) || pf.platform === 'youtube',
           publishedAt: new Date(publishedAt).toISOString(),
@@ -212,6 +215,14 @@ async function main() {
   let failures = 0;
   for (const target of pending) {
     try {
+      // The link is already in the caption — a comment repeating it is noise.
+      if (target.content.includes(MARKER)) {
+        state[target.key] = { commentedAt: null, note: 'link already in the caption', url: target.url };
+        saveState(state);
+        console.log(`skip  ${target.key} — link already in the post itself (${target.url})`);
+        continue;
+      }
+
       // A 403 on the read means the platform has comments closed on this post
       // (YouTube does that for private videos) — permanent, so stop retrying it.
       let closed = false;
