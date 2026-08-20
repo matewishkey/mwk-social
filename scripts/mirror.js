@@ -56,17 +56,10 @@ const READ = [SOURCE, ...TARGETS, FALLBACK];
  * 07:00 in Brisbane — the whole window overnight, which is the opposite of what
  * a posting window is for. Override with MWK_TZ if the audience moves.
  */
-const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
-const DEFAULTS = { perDay: 6, startHour: 9, endHour: 21, minGapMinutes: 90, tz: TZ };
-
-/** The calendar day and hour at an instant, as the audience sees them. */
-function zoned(date) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
-    timeZone: TZ, hourCycle: 'h23',
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
-  }).formatToParts(date).map((p) => [p.type, p.value]));
-  return { day: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
-}
+// The pace — window, daily cap, minimum gap — lives in lib/pace.js because the
+// queue obeys the same one. Two schedulers would eventually disagree about what
+// today already holds, and the audience sees one feed.
+const { TZ, DEFAULTS, zoned, whyNotNow } = require('./lib/pace');
 
 const offsetMinutes = (date) => {
   const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
@@ -643,33 +636,9 @@ async function waitFor(postId) {
  *
  * @returns {string|null} why not, or null if it is
  */
-function whyNotNow(ledger, opts, now = new Date()) {
-  const here = zoned(now);
-  if (here.hour < DEFAULTS.startHour || here.hour > DEFAULTS.endHour) {
-    return `${here.hour}:00 ${TZ} is outside the ${DEFAULTS.startHour}:00-${DEFAULTS.endHour}:00 window`;
-  }
-  const mirrored = [];
-  for (const clip of Object.values(ledger.clips || {})) {
-    for (const t of Object.values(clip.targets || {})) {
-      if (t.note === 'mirrored' && t.at) mirrored.push(t.at);
-    }
-  }
-  const todays = mirrored.filter((at) => zoned(new Date(at)).day === here.day);
-  if (todays.length >= opts.perDay) return `${todays.length} already went out today`;
-
-  const last = mirrored.sort().pop();
-  if (last) {
-    const gap = (now - new Date(last)) / 60000;
-    if (gap < DEFAULTS.minGapMinutes) {
-      return `only ${Math.round(gap)} min since the last one (${DEFAULTS.minGapMinutes} min minimum)`;
-    }
-  }
-  return null;
-}
-
 async function applyAll(assessment, plan, universe, ledger, opts) {
   if (opts.scheduled) {
-    const why = whyNotNow(ledger, opts);
+    const why = whyNotNow(ledger, opts, new Date(), events.read());
     if (why) { console.log(`not this run — ${why}`); return; }
   }
   const byPlatform = accountsByPlatform();
