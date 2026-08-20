@@ -94,6 +94,10 @@ function voiceSnapshot() {
     caps: cfg.tags.caps,
     maxTopic: cfg.tags.maxTopic,
     variants: (cfg.firstComment.plain || []).length + (cfg.firstComment.episode || []).length,
+    plainVariants: (cfg.firstComment.plain || []).length,
+    episodeVariants: (cfg.firstComment.episode || []).length,
+    shortLinkHost: (cfg.shortLink && cfg.shortLink.enabled) ? cfg.shortLink.host : null,
+    maxTopic: cfg.tags.maxTopic,
     episodeMixRatio: cfg.firstComment.episodeMixRatio,
     // The blurb goes at the bottom of every YouTube description. While it is
     // still a paraphrase rather than his own words, auto-fill stays paused —

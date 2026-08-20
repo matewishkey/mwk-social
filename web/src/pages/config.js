@@ -59,6 +59,59 @@ function flowCards(flows) {
   }).join('');
 }
 
+
+function explainers(flows, voice) {
+  const by = (kind) => flows.filter((f) => (f.steps.find((s) => s.step === 'first comment') || {}).by === kind)
+    .map((f) => f.platform);
+  const native = by('native');
+  const watched = by('watcher');
+  const never = by('none');
+  const resharing = {
+    api: flows.filter((f) => (f.capabilities || {}).reshare === 'api').map((f) => f.platform),
+    manual: flows.filter((f) => (f.capabilities || {}).reshare === 'manual').map((f) => f.platform),
+  };
+  const list = (xs) => xs.length ? xs.join(', ') : 'nothing';
+  const v = voice || {};
+
+  return `
+${card('How the first comment works', `
+<p>The sign-up link goes in a <b>comment</b> rather than in the post itself. On LinkedIn a link in
+the body cuts reach by 40–50%, and the same habit keeps every other caption clean.</p>
+<p>Two mechanisms put it there, and which one applies is a platform limit, not a choice:</p>
+<ul class="plain">
+  <li><b class="ok">Natively</b> on ${esc(list(native))} — the comment is sent <i>with</i> the post,
+      so it lands seconds after it goes live. YouTube also pins it.</li>
+  <li><b class="warn">By the watcher</b> on ${esc(list(watched))} — no native field exists there, so
+      an hourly job adds it. It also catches any post whose native comment silently failed.</li>
+  <li><b class="bad">Not at all</b> on ${esc(list(never))} — there is no comments API we can use, so
+      for those the link goes in the post itself. On X that costs 20c a post; there is no way round it.</li>
+</ul>
+<p>The wording <b>rotates</b>${v.variants ? ` across ${v.variants} variants` : ''}${
+  v.episodeMixRatio ? `, and roughly ${Math.round(v.episodeMixRatio * 100)}% of them quote a real guest
+  wish pulled from the show's feed and link that episode` : ''}. The same post always renders the
+  same comment, which is what stops it being posted twice.</p>
+${v.shortLinkHost ? `<p>Every comment carries a <b>${esc(v.shortLinkHost)}</b> link with its own code —
+  one per platform per post — so a click tells you which channel and which video earned it. Only
+  Facebook reports clicks natively; everywhere else this is the only way to know.</p>` : ''}
+<p>Tags: <code>${esc((v.always || []).join(' '))}</code> on every comment, then up to
+  ${esc(v.maxTopic ?? 4)} describing what the video is actually about, worked out from its transcript.
+  <b>Instagram's cap of 5 counts the caption and the comments together</b>, so there the two fixed
+  tags leave exactly three.</p>
+`)}
+
+${card('How resharing works', `
+<p>Resharing is possible on <b>${esc(list(resharing.api))}</b> and nowhere else.</p>
+<p>The pattern is deliberate: the post goes out natively on the <b>company page</b>, and your
+  <b>personal account</b> quote-reshares it with a thought on top. The personal account is the one
+  with an audience, and the point is to move that engagement onto the page — so it never
+  native-posts. Write the thought in the queue form and it happens automatically; leave it empty and
+  nothing is reshared. <b>It is never generated for you.</b></p>
+<p>On <b>${esc(list(resharing.manual))}</b> a personal timeline cannot be posted to through any API
+  — that is a Meta rule rather than something missing here. So a live post files an item under
+  <b>Your turn</b> on the Overview with a direct link: one click, share it yourself, tick it off.</p>
+`)}`;
+}
+
 export function configPage({ email, tz, snapshots }) {
   const snap = snapshots.platforms;
   const flows = (snap && snap.body && snap.body.flows) || [];
@@ -69,6 +122,9 @@ export function configPage({ email, tz, snapshots }) {
 <p class="lede">What happens to a post on each platform, and who does each step.
 Rendered from the table the publish path reads, so it cannot drift.</p>
 
+${flows.length ? explainers(flows, voice) : ''}
+
+<h2 class="sec">Platform by platform</h2>
 ${flows.length ? `<div class="flowgrid">${flowCards(flows)}</div>` : `
   <div class="card"><div class="card-body empty">
     The box has not shipped the platform table yet. It goes with the hourly metrics run.
@@ -91,6 +147,12 @@ ${voice ? card('What every post says', `
 ${snap ? `<p class="note">Shipped ${esc(ago(snap.updatedAt))}.</p>` : ''}
 
 <style>
+.sec { font-size:.82rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:1.6rem 0 .8rem; }
+.card-body p { margin:0 0 .7rem; font-size:.9rem; }
+.card-body p:last-child { margin-bottom:0; }
+ul.plain { list-style:none; margin:0 0 .7rem; padding:0; }
+ul.plain li { padding:.35rem 0 .35rem .9rem; border-left:2px solid var(--line); margin-bottom:.3rem; font-size:.88rem; }
+ul.plain b.ok { color:var(--ok); } ul.plain b.warn { color:var(--warn); } ul.plain b.bad { color:var(--bad); }
 .flowgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:1.1rem; }
 .flowgrid .card { margin:0; }
 .flow { list-style:none; margin:0; padding:0; counter-reset:s; }

@@ -98,6 +98,41 @@ test('the workflow page names who does each step, including nobody', async () =>
   assert.match(html, /watcher/, 'Threads gets its comment from the watcher');
 });
 
+/*
+ * The page has to EXPLAIN the two mechanisms, not just badge each platform —
+ * it is the answer to "how does the first comment actually work?", and the
+ * lists in it are derived so they cannot drift from the platform table.
+ */
+test('the workflow page explains the first comment, and derives who does it', async () => {
+  const { configPage } = await src('pages/config.js');
+  const { flows } = require('../scripts/lib/platforms.js');
+  const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
+    platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() },
+    voice: { body: { always: ['#MWKShow', '#PIY'], maxTopic: 4, variants: 10,
+      episodeMixRatio: 0.4, shortLinkHost: 'mwkshow.com', caps: { instagram: 5 } } } } });
+
+  assert.match(html, /How the first comment works/);
+  assert.match(html, /Natively<\/b> on [^<]*youtube/, 'youtube takes it natively');
+  assert.match(html, /By the watcher<\/b> on [^<]*threads/, 'threads needs the watcher');
+  assert.match(html, /Not at all<\/b> on [^<]*tiktok/, 'tiktok cannot have one');
+  assert.match(html, /10 variants/);
+  assert.match(html, /mwkshow\.com/);
+  assert.match(html, /#MWKShow #PIY/);
+});
+
+test('the workflow page explains resharing, and who has to do it', async () => {
+  const { configPage } = await src('pages/config.js');
+  const { flows } = require('../scripts/lib/platforms.js');
+  const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
+    platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() } } });
+
+  assert.match(html, /How resharing works/);
+  assert.match(html, /possible on <b>linkedin<\/b> and nowhere else/);
+  assert.match(html, /never generated for you/, 'the commentary is his, not ours');
+  assert.match(html, /company page/);
+  assert.match(html, /Your turn/, 'facebook resharing lands on the overview');
+});
+
 test('the workflow page survives the box never having shipped the table', async () => {
   const { configPage } = await src('pages/config.js');
   const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {} });
