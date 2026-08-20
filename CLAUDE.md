@@ -164,7 +164,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `~/.local/state/mwk-social/media/`. Facebook URL first, **YouTube via `yt-dlp` when it 403s** —
   which is also the better copy (1080x1920 against Facebook's 720x1280). All 7 reels resolve;
   2 of them only through YouTube. `ffprobe` is required and now installed in `~/.local/bin`
-  (dotfiles-cz#13 asks for it in the baseline). Two yt-dlp traps: it **appends its own extension
+  (dotfiles-cz#36 asks for it, and yt-dlp, in the baseline). Two yt-dlp traps: it **appends its own extension
   to `-o`** (ask for `x`, get `x.mp4`, read it as "downloaded nothing"), and it **serves AV1 by
   default** — force `[vcodec^=avc1]` because IG and TikTok want H.264.
 - **Node's `fetch` cannot reach a Meta CDN from this box — and it looks exactly like an expired
