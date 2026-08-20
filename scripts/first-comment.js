@@ -35,6 +35,7 @@ const path = require('path');
 const { topicsFor } = require('./lib/topic-tags');
 const { getComments, replyToPost } = require('./lib/api');
 const voice = require('./lib/voice');
+const events = require('./lib/events');
 
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
@@ -189,6 +190,7 @@ async function main() {
   const state = loadState();
   const stamp = new Date().toISOString();
 
+  events.initRun({ source: 'first-comment' });
   const posts = collectPosts(opts);
   const pending = posts.filter((p) => !state[p.key]);
   console.log(`[${stamp}] ${posts.length} post(s) in window across ${opts.platforms.join(', ')}, ${pending.length} without a recorded first comment`);
@@ -209,6 +211,9 @@ async function main() {
       if (target.content.includes(MARKER)) {
         state[target.key] = { commentedAt: null, note: 'link already in the caption', url: target.url };
         saveState(state);
+        events.emit('comment.skipped', { message: 'link already in the caption', platform: target.platform,
+          postKey: target.key, url: target.url, accountId: target.accountId,
+          dedupeKey: `comment.skipped|${target.key}`, data: { reason: 'link-in-caption' } });
         console.log(`skip  ${target.key} — link already in the post itself (${target.url})`);
         continue;
       }
@@ -226,12 +231,18 @@ async function main() {
       if (closed) {
         state[target.key] = { commentedAt: null, note: 'comments unavailable (403)', url: target.url };
         saveState(state);
+        events.emit('comment.skipped', { message: 'comments closed on this post', level: 'warn',
+          platform: target.platform, postKey: target.key, url: target.url, accountId: target.accountId,
+          dedupeKey: `comment.skipped|${target.key}`, data: { reason: 'comments-closed-403' } });
         console.log(`skip  ${target.key} — comments closed on this post (${target.url})`);
         continue;
       }
       if (done) {
         state[target.key] = { commentedAt: null, note: 'comment already on the post', url: target.url };
         saveState(state);
+        events.emit('comment.skipped', { message: 'first comment already there', platform: target.platform,
+          postKey: target.key, url: target.url, accountId: target.accountId,
+          dedupeKey: `comment.skipped|${target.key}`, data: { reason: 'already-commented' } });
         console.log(`skip  ${target.key} — first comment already there (${target.url})`);
         continue;
       }
@@ -260,6 +271,8 @@ async function main() {
       // than spend the one comment we get on an untagged one.
       const ageHours = (Date.now() - Date.parse(target.publishedAt)) / 3600000;
       if (!opts.noTopics && target.isVideo && !gotTopics && ageHours < CAPTION_GRACE_HOURS) {
+        events.emit('comment.deferred', { message: 'no transcript yet', platform: target.platform,
+          postKey: target.key, url: target.url, data: { ageHours: Number(ageHours.toFixed(1)) } });
         console.log(`wait  ${target.key} — no transcript yet, ${ageHours.toFixed(1)}h old, retrying next run (${target.url})`);
         continue;
       }
@@ -291,12 +304,20 @@ async function main() {
       };
       state.__lastVariant = { ...(state.__lastVariant || {}), [target.platform]: composed.index };
       saveState(state);
+      events.emit('comment.posted', { message: `commented [${composed.variant}/${composed.index}]`,
+        platform: target.platform, postKey: target.key, url: target.url, accountId: target.accountId,
+        dedupeKey: `comment.posted|${target.key}`,
+        data: { variant: composed.variant, index: composed.index, tags: topicTags } });
       console.log(`post  ${target.key} — commented [${composed.variant}/${composed.index}] (${target.url})`);
     } catch (err) {
       failures++;
+      events.emit('comment.failed', { message: err.message, level: 'error', platform: target.platform,
+        postKey: target.key, url: target.url, dedupeKey: `comment.failed|${target.key}` });
       console.error(`FAIL  ${target.key} — ${err.message}`);
     }
   }
+
+  events.finishRun({ inWindow: posts.length, pending: pending.length, failures });
 
   const hc = process.env.MWK_COMMENT_HC_URL; // optional Healthchecks.io ping
   if (hc && !opts.dryRun) {
