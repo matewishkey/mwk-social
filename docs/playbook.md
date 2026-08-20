@@ -77,6 +77,45 @@ So a mirrored Instagram caption carries *zero* hashtags and the comment spends t
 post holds the link, so a thread pays the $0.20 *plus* $0.015 for the second post — the link goes
 in the post itself, never in a reply. Measured against real billing, not the price list.
 
+## Telling a mirror from a new clip
+
+The mirror only ever publishes something it can prove is missing. `scripts/lib/matcher.js` is
+where that proof is made, and it is the answer to the one real incident: a clip went to TikTok
+twice, once by hand at 10:59 and once from here at 20:29 the same day.
+
+**The caption is the only cross-platform signal that exists.** Measured over the whole corpus:
+`videoDurationSeconds` is populated on Instagram alone and only on some posts, and TikTok and X
+withhold media entirely. So the caption scores decisively on its own and everything else is
+corroboration around it. A balanced multi-signal score built from fields that are mostly `null`
+would look rigorous and be theatre.
+
+Three things the corpus taught that a reasonable-looking rule would have got wrong:
+
+- **Compare on the shorter caption's length, not a fixed 64 characters.** The manual TikTok
+  caption normalises to 45 characters — just the hook — where ours carries the hook plus the body.
+  A fixed-length key comparison misses the very duplicate it was written for.
+- **"Published before the source" needs a tolerance window.** That manual TikTok predates its own
+  Facebook source by one minute. Penalising anything earlier than the source would have republished
+  it.
+- **The mirror universe is Facebook *video* posts.** Seven of eighteen. The rest are image and text
+  posts, and are not reels.
+
+Four verdicts, and only one of them publishes:
+
+| | Means | Publishes |
+|---|---|---|
+| `duplicate` | a copy is already there | no |
+| `review` | the signals disagree | no |
+| `unknown` | we could not see clearly — no caption to match on, or the platform read failed | no |
+| `none` | genuinely missing | **yes** |
+
+**It fails closed.** A false duplicate costs one missed mirror, visible in the next `--plan`. A
+false new costs an Instagram post that no API can delete. Everything above follows from that.
+
+Threads is the one exception worth stating: it never appears in `analytics:posts`, so absence
+there only proves *we* have not mirrored it. That is still the thing we need to know, the ledger
+records it, and Threads posts can be deleted — so it publishes, flagged `weak`.
+
 ## Media
 
 - Facebook's media URLs are **signed and expire** — two of seven were already dead within a

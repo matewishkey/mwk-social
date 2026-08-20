@@ -143,6 +143,23 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
   (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
+- **The mirror** (`scripts/mirror.js`, read-only so far: `--plan`, `--seed`) reposts Facebook
+  reels to what Restream misses. **Its universe is Facebook posts with `mediaType: 'video'`** —
+  7 of the 18 Facebook posts; the rest are image/text and are not reels. Ledger lives outside the
+  repo at `~/.local/state/mwk-social/mirror-ledger.json`; seeded 2026-08-20 as 9 already-live and
+  19 queued. `test/fixtures/corpus.json` is the live corpus at that date and the regression gate.
+- **Dedupe is caption-only, because nothing else exists across platforms.** `videoDurationSeconds`
+  sits at `analytics.videoDurationSeconds` (on the post *and* on `platforms[]`) and **only
+  Instagram populates it**, on some posts; TikTok and X return `url:null`/`platform_withheld`.
+  Two rules the 2026-08-19 TikTok duplicate taught: compare captions on the **shorter** one's
+  length (the manual post's caption normalises to 45 chars against our 64 — a fixed 64-char key
+  never matches it), and any "published before the source" penalty needs a **tolerance window**,
+  because that manual TikTok predates its own Facebook source by a minute.
+- **The matcher fails closed**: `duplicate`, `review` and `unknown` all mean *do not publish*; only
+  `none` publishes. Threads is `verifiable: 'none'` — invisible to `analytics:posts` — so absence
+  there proves only that *we* have not mirrored it; it publishes flagged `weak`, backed by the
+  ledger, because Threads posts can be deleted.
+
 ## Platform gotchas (verified against docs.zernio.com)
 
 - **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).

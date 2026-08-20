@@ -6,6 +6,7 @@
  */
 'use strict';
 
+const { execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -45,4 +46,24 @@ const getComments = (postId, accountId) =>
 const replyToPost = (postId, accountId, message) =>
   api('POST', `/inbox/comments/${seg(postId)}`, { body: { accountId, message } });
 
-module.exports = { api, apiKey, apiBase, getComments, replyToPost, seg };
+// The CLI, for the read commands that have no REST equivalent worth writing out
+// (posts:list, analytics:posts). stderr is piped rather than inherited: the CLI
+// echoes its JSON error bodies there and they would litter the journal.
+const CLI = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'zernio');
+
+function cli(args) {
+  let out;
+  try {
+    out = execFileSync(CLI, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    // It prints its JSON error body on stdout even when it exits non-zero.
+    out = (err.stdout || '').toString();
+    if (!out.trim()) throw new Error(`zernio ${args[0]} failed: ${err.message}`);
+  }
+  let json;
+  try { json = JSON.parse(out); } catch { throw new Error(`zernio ${args[0]} returned non-JSON: ${out.slice(0, 200)}`); }
+  if (json && json.error) throw new Error(`zernio ${args[0]}: ${json.message || 'error'}`);
+  return json;
+}
+
+module.exports = { api, apiKey, apiBase, getComments, replyToPost, seg, cli, CLI };

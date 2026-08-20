@@ -33,12 +33,9 @@ const os = require('os');
 const path = require('path');
 
 const { topicsFor } = require('./lib/topic-tags');
-const { getComments, replyToPost } = require('./lib/api');
+const { getComments, replyToPost, cli: zernio } = require('./lib/api');
 const voice = require('./lib/voice');
 const events = require('./lib/events');
-
-const REPO = path.join(__dirname, '..');
-const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
 
 // Anything already carrying this string counts as "first comment done" —
 // including the one Zernio itself posted at publish time. It and the wording,
@@ -82,27 +79,6 @@ function usage() {
   console.log('usage: first-comment.js [--dry-run] [--seed] [--all] [--hours N] [--limit N]');
   console.log('                        [--no-topics]  (skip transcription, plain CTA only)');
   console.log('                        [--platforms p1,p2] [--message TEXT]');
-}
-
-function zernio(args) {
-  let out;
-  try {
-    // stderr is piped, not inherited: the CLI echoes its JSON error bodies there
-    // and they would otherwise litter the journal alongside our own log lines.
-    out = execFileSync(CLI, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (err) {
-    // The CLI prints its JSON error body on stdout even when it exits non-zero.
-    out = (err.stdout || '').toString();
-    if (!out.trim()) throw new Error(`zernio ${args[0]} failed: ${err.message}`);
-  }
-  let json;
-  try {
-    json = JSON.parse(out);
-  } catch {
-    throw new Error(`zernio ${args[0]} returned non-JSON: ${out.slice(0, 200)}`);
-  }
-  if (json && json.error) throw new Error(`zernio ${args[0]}: ${json.message || 'error'}`);
-  return json;
 }
 
 function statePath() {
