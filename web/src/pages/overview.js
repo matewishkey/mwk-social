@@ -4,6 +4,10 @@
  * The "your turn" list is first on purpose. Everything else on this page is
  * something the pipeline did by itself; that list is the only part that stops
  * unless someone acts, so it goes above the things that look after themselves.
+ *
+ * This used to lead with a clip-by-platform matrix built from the mirror's
+ * ledger. Everything publishes through the queue now, so that ledger has no
+ * writer — and a frozen table is worse than no table.
  */
 import { esc, card, tile, layout, when, ago } from '../lib/html.js';
 
@@ -19,42 +23,10 @@ export async function overviewAction(request, env, email) {
   return Response.redirect(new URL('/', request.url).toString(), 303);
 }
 
-function matrix(ledger, tz) {
-  if (!ledger || !ledger.body || !ledger.body.clips) {
-    return '<p class="empty">No mirror ledger has been shipped yet.</p>';
-  }
-  const clips = Object.entries(ledger.body.clips)
-    .sort((a, b) => String(b[1].publishedAt).localeCompare(String(a[1].publishedAt)));
-  const targets = ['threads', 'twitter', 'tiktok', 'instagram'];
-  const cell = (t) => {
-    if (!t) return '<td class="s-none">—</td>';
-    const label = { posted: '●', pending: '○', failed: '✕', blocked: '▲', inflight: '◐' }[t.status] || '?';
-    const title = esc(`${t.status}${t.note ? ': ' + t.note : ''}`);
-    const inner = t.url ? `<a href="${esc(t.url)}" target="_blank" rel="noopener">${label}</a>` : label;
-    return `<td class="s-${esc(t.status)}" title="${title}">${inner}</td>`;
-  };
-  return `<div class="wrap"><table class="matrix">
-    <thead><tr><th>clip</th>${targets.map((t) => `<th>${t}</th>`).join('')}<th>published</th></tr></thead>
-    <tbody>${clips.map(([, c]) => `<tr>
-      <td class="trunc">${esc(c.caption || '(no caption)')}</td>
-      ${targets.map((t) => cell((c.targets || {})[t])).join('')}
-      <td class="faint nowrap">${when(c.publishedAt, tz)}</td>
-    </tr>`).join('')}</tbody></table></div>
-  <p class="note">● posted &nbsp; ○ queued &nbsp; ◐ in flight &nbsp; ✕ failed &nbsp; ▲ held back</p>`;
-}
-
-export function overviewPage({ email, tz, beat, snapshots, events, counts, kind, level, actions }) {
+export function overviewPage({ email, tz, beat, snapshots, events, counts, kind, level, actions, queue }) {
   const stale = !beat || Date.now() - new Date(beat.at).getTime() > HEARTBEAT_STALE_MS;
-  const ledger = snapshots['mirror-ledger'];
-
-  const totals = { posted: 0, pending: 0, other: 0 };
-  for (const c of Object.values((ledger && ledger.body && ledger.body.clips) || {})) {
-    for (const t of Object.values(c.targets || {})) {
-      if (t.status === 'posted') totals.posted++;
-      else if (t.status === 'pending') totals.pending++;
-      else totals.other++;
-    }
-  }
+  const pace = ((snapshots.pace || {}).body) || {};
+  const q = queue || { waiting: 0, failed: 0 };
 
   const yourTurn = actions.length ? `<ul class="todo">${actions.map((a) => `<li>
       <div><b>${esc(a.label || a.kind)}</b>
@@ -73,16 +45,13 @@ export function overviewPage({ email, tz, beat, snapshots, events, counts, kind,
 <div class="tiles">
   ${tile(stale ? 'stale' : 'live', 'the box', stale ? 'bad' : 'ok',
     beat ? `heartbeat ${ago(beat.at)}` : 'never checked in')}
-  ${tile(totals.posted, 'mirrored', 'plain')}
-  ${tile(totals.pending, 'still queued', 'plain')}
+  ${tile(q.waiting, 'waiting to go out', 'plain')}
+  ${tile(`${pace.today ?? '—'}/${pace.perDay ?? '—'}`, 'sent today', 'plain', pace.nextAt ? `next ${pace.nextAt}` : '')}
   ${actions.length ? tile(actions.length, 'need you', 'warn') : tile(0, 'need you', 'ok')}
-  ${totals.other ? tile(totals.other, 'held or failed', 'bad') : ''}
+  ${q.failed ? tile(q.failed, 'failed', 'bad') : ''}
 </div>
 
 ${card('Your turn', yourTurn)}
-
-${card('Clips', matrix(ledger, tz)
-  + (ledger ? `<p class="note">Ledger shipped ${esc(ago(ledger.updatedAt))}.</p>` : ''))}
 
 ${card('Events', `
 <div class="filters">
@@ -105,10 +74,6 @@ ${card('Events', `
 when idle, so "stale" means the box, not the pipeline.</p>`)}
 
 <style>
-.matrix td:not(.trunc):not(.faint) { text-align:center; font-size:1.05rem; }
-.s-posted { color:var(--ok); } .s-failed { color:var(--bad); }
-.s-blocked, .s-inflight { color:var(--warn); } .s-pending, .s-none { color:var(--faint); }
-.matrix a { text-decoration:none; color:inherit; }
 .lvl-error { color:var(--bad); } .lvl-warn { color:var(--warn); }
 .todo { list-style:none; margin:0; padding:0; }
 .todo li { display:flex; align-items:center; justify-content:space-between; gap:1rem;

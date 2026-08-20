@@ -21,7 +21,7 @@ const have = (cmd) => {
 const REEL = { durationSec: 20, width: 720, height: 1280, aspect: 0.5625, bytes: 1 << 20, codec: 'h264', hasAudio: true };
 
 test('a normal reel passes on every target', () => {
-  for (const platform of require('../scripts/lib/platforms').MIRROR_TARGETS) {
+  for (const platform of ['threads', 'twitter', 'tiktok', 'instagram']) {
     assert.deepEqual(media.check(platform, REEL), [], platform);
   }
 });

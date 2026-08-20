@@ -37,10 +37,6 @@ const events = require('./lib/events');
 
 const DEFAULT_DAYS = 45;
 
-const ledgerPath = () => process.env.MWK_MIRROR_LEDGER ||
-  path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
-    'mwk-social', 'mirror-ledger.json');
-
 const load = (file, fallback) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
 };
@@ -85,8 +81,7 @@ async function followers() {
  * so the page and the publish path read the same table.
  */
 function platformSnapshot() {
-  return { flows: platforms.flows(), mirrorTargets: platforms.MIRROR_TARGETS,
-    source: platforms.SOURCE_PLATFORM };
+  return { flows: platforms.flows() };
 }
 
 /** The public half of voice.json — what we say, never how it is composed. */
@@ -121,11 +116,10 @@ async function main() {
   const origin = new URL(base).origin;
 
   const [rows, folk] = await Promise.all([daily(days), followers()]);
-  const ledger = load(ledgerPath(), {});
   const snapshots = {
     platforms: platformSnapshot(),
     voice: voiceSnapshot(),
-    pace: pace.status(ledger, {}, new Date(), events.read()),
+    pace: pace.status(events.read()),
   };
 
   if (dryRun) {

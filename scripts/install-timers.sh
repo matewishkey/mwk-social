@@ -5,7 +5,6 @@
 #   scripts/install-timers.sh first-comment   # just one
 #
 # Logs:  journalctl --user -u mwk-first-comment -f
-#        journalctl --user -u mwk-mirror -f
 #        journalctl --user -u mwk-ship-events -f
 set -euo pipefail
 
@@ -55,18 +54,6 @@ if [[ "$want" == all || "$want" == first-comment ]]; then
     'Check for new MWK posts needing their first comment'
 fi
 
-if [[ "$want" == all || "$want" == mirror ]]; then
-  # At :10, ten minutes behind the comment run, so a clip this mirror publishes
-  # has settled before the watcher looks for it. --scheduled is what makes an
-  # hourly timer produce "a few a day": the pace lives in the script, so a hand
-  # run obeys it too, and the timer stays a dumb heartbeat.
-  unit mwk-mirror \
-    'Mirror new MWK reels to the platforms Restream misses' \
-    "$repo/scripts/mirror.js --apply --scheduled" \
-    '*:10' \
-    'Check whether a reel is due to be mirrored'
-fi
-
 if [[ "$want" == all || "$want" == ship-events ]]; then
   # Every two minutes. It is cheap, it sends an empty batch when idle, and that
   # heartbeat is the only thing that stops "nothing happened" and "the box is
@@ -79,9 +66,9 @@ if [[ "$want" == all || "$want" == ship-events ]]; then
 fi
 
 if [[ "$want" == all || "$want" == queue ]]; then
-  # At :20, ten minutes behind the mirror. Both obey the same pace module, so
-  # whichever runs first takes the slot and the other's whyNotNow() says no —
-  # the ordering only decides who gets first refusal, never how many go out.
+  # At :20, well clear of the comment run at :00 so a post has settled before
+  # the watcher looks for it. The pace lives in lib/pace.js, not here: this is a
+  # dumb hourly heartbeat and whyNotNow() says no most of the time.
   unit mwk-queue \
     'Post the next queued MWK item, if it is a good moment' \
     "$repo/scripts/run-queue.js --scheduled" \
@@ -111,7 +98,7 @@ if [[ "$want" == all || "$want" == yt-notes ]]; then
 fi
 
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-mirror mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes; do
+for name in mwk-first-comment mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done

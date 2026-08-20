@@ -1,10 +1,10 @@
 /*
  * What each platform will and won't allow. One table, so a rule is stated once.
  *
- * `verifiable` is the load-bearing field: it says whether we can ask a platform
- * "does a copy of this clip already exist here?" and believe the answer. Threads
- * cannot be enumerated at all, so it can prove presence but never absence — and
- * the mirror must never treat "I found nothing" there as "there is nothing".
+ * Everything publishes through this pipeline now, so the fields that existed to
+ * work out whether a copy of a clip was ALREADY somewhere are gone with the
+ * mirror that needed them. What is left describes what a platform will accept
+ * and what it reports back.
  */
 'use strict';
 
@@ -22,8 +22,6 @@ const PLATFORMS = {
     markerInCaption: false,
     supportsFirstComment: true,    // native platformSpecificData.firstComment
     deletable: false,              // nothing can be removed via the API — ever
-    verifiable: 'strong',          // the only platform reporting videoDurationSeconds
-    mediaUrlAvailable: true,
     videoMinSec: 3,
     videoMaxSec: 900,
     aspectRange: [0.5, 1.0],
@@ -40,8 +38,6 @@ const PLATFORMS = {
     markerInCaption: false,
     supportsFirstComment: false,   // no native field; the watcher does it
     deletable: true,
-    verifiable: 'none',            // invisible to analytics:posts
-    mediaUrlAvailable: false,
     videoMaxSec: 300,
   },
   tiktok: {
@@ -56,8 +52,6 @@ const PLATFORMS = {
     markerInCaption: true,
     supportsFirstComment: false,
     deletable: true,
-    verifiable: 'medium',
-    mediaUrlAvailable: false,      // platform_withheld
     consent: true,                 // six required flags, read from creator-info
     videoMinSec: 3,
     videoMaxSec: 3600,        // creator-info's live value; read it per account rather than trusting this
@@ -75,8 +69,6 @@ const PLATFORMS = {
     markerInCaption: true,
     supportsFirstComment: false,
     deletable: true,
-    verifiable: 'medium',
-    mediaUrlAvailable: false,
     estCostCents: 20,              // content_create_with_url, measured
   },
   facebook: {
@@ -91,8 +83,6 @@ const PLATFORMS = {
     markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
-    verifiable: 'strong',
-    mediaUrlAvailable: true,
   },
   youtube: {
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
@@ -106,8 +96,6 @@ const PLATFORMS = {
     markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
-    verifiable: 'strong',
-    mediaUrlAvailable: false,      // empty url; use yt-dlp
   },
   linkedin: {
     commentsApi: true,
@@ -121,18 +109,9 @@ const PLATFORMS = {
     markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
-    verifiable: 'strong',
-    mediaUrlAvailable: false,
   },
 };
 
-// Where new reels are mirrored to. Facebook is the source, and LinkedIn,
-// YouTube and Twitch are already covered by Restream.
-const MIRROR_TARGETS = ['threads', 'twitter', 'tiktok', 'instagram'];
-// Deliberately in that order: reversibility first. Instagram is last on every
-// clip because it is the only one we cannot undo.
-
-const SOURCE_PLATFORM = 'facebook';
 
 const get = (name) => {
   const p = PLATFORMS[name];
@@ -173,4 +152,4 @@ function flowFor(name) {
 
 const flows = () => Object.keys(PLATFORMS).map(flowFor);
 
-module.exports = { PLATFORMS, MIRROR_TARGETS, SOURCE_PLATFORM, get, flowFor, flows };
+module.exports = { PLATFORMS, get, flowFor, flows };

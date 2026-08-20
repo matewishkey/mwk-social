@@ -107,16 +107,19 @@ async function loadSnapshots(env) {
 async function overview(request, env, tz, snapshots, email, url) {
   const kind = url.searchParams.get('kind') || '';
   const level = url.searchParams.get('level') || '';
-  const [beat, events, counts, actions] = await Promise.all([
+  const [beat, events, counts, actions, queue] = await Promise.all([
     env.DB.prepare('SELECT at, count FROM ingest_batch ORDER BY at DESC LIMIT 1').first(),
     env.DB.prepare(
       `SELECT * FROM event WHERE (?1 = '' OR kind = ?1) AND (?2 = '' OR level = ?2)
         ORDER BY ts DESC LIMIT ${EVENT_PAGE}`).bind(kind, level).all(),
     env.DB.prepare('SELECT kind, COUNT(*) n FROM event GROUP BY kind ORDER BY n DESC').all(),
     env.DB.prepare('SELECT * FROM manual_action WHERE done_at IS NULL ORDER BY created_at DESC LIMIT 50').all(),
+    env.DB.prepare(
+      `SELECT SUM(status IN ('queued','claimed')) waiting, SUM(status = 'failed') failed FROM queue_item`).first(),
   ]);
   return overviewPage({ email, tz, beat, snapshots, events: events.results || [],
-    counts: counts.results || [], kind, level, actions: actions.results || [] });
+    counts: counts.results || [], kind, level, actions: actions.results || [],
+    queue: { waiting: (queue && queue.waiting) || 0, failed: (queue && queue.failed) || 0 } });
 }
 
 async function stats(env, tz, snapshots, email) {

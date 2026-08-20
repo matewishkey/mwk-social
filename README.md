@@ -32,23 +32,16 @@ at once, straight from a shell — these are the actual live posts:
 - `config/voice.json` — everything the pipeline says out loud: the rotating first-comment
   variants, the identity and brand tags, per-platform hashtag caps, the tag blocklist and the
   YouTube show blurb. One file to change what gets posted.
-- `scripts/first-comment.js` — the catch-all: finds posts that went out without
-  the comment (phone-app posts, live-event videos, anything created straight on
-  the platform) and adds it. Skips anything that already has it. The wording
-  rotates, and some comments quote a real guest wish from the show's feed.
+- `scripts/first-comment.js` — makes sure everything published has its comment.
+  Facebook, Instagram, LinkedIn and YouTube get it natively at publish time;
+  Threads has no such field, so this picks it up. TikTok and X have no usable
+  comments API at all. The wording rotates, and some comments quote a real guest
+  wish from the show's feed.
 - `docs/playbook.md` — the rules this pipeline runs on, and what each platform
   will and won't allow.
-- `scripts/mirror.js` — reposts new reels from Facebook to the platforms that
-  don't get them automatically (Instagram, TikTok, Threads, X). `--plan` shows
-  what's missing, `--media` fetches and probes each clip, `--apply` publishes.
-  It re-checks every clip against the live platform immediately before posting
-  and fails closed: anything it can't see clearly, it doesn't post.
-- `scripts/lib/matcher.js` — "is this clip already over there?". The caption is
-  the only signal that survives copying between platforms, so it decides, and
-  `test/fixtures/corpus.json` pins the answer against real history.
-- `scripts/lib/media.js` — gets the actual video. Facebook's signed URLs expire,
-  so `yt-dlp` pulls the YouTube copy instead — which turns out to be the better
-  one. Probes duration, resolution and codec before anything is uploaded.
+- `scripts/lib/media.js` — probes a clip's duration, aspect, codec and audio,
+  and says which platforms will take it. The queue checks this before publishing:
+  a video Instagram or TikTok would reject costs the post otherwise.
 - `scripts/lib/topic-tags.js` — works out what a video was about so the comment
   can say so. Downloads the clip, strips the audio with ffmpeg, transcribes it,
   and names the subjects it covers — `#Debugging`, `#Trading`, whatever the clip
@@ -61,9 +54,15 @@ at once, straight from a shell — these are the actual live posts:
   approval, and a workflow map of what happens on each platform. Fed by
   `scripts/ship-events.js` (every two minutes) and `scripts/ship-stats.js`
   (hourly).
+- **Everything publishes from here.** The pipeline used to also mirror reels
+  that Restream had put on Facebook, and carried a whole matcher to work out
+  whether a copy was already on a platform before posting another. That is gone:
+  the queue is the only way content goes out, so there is nothing to reconcile
+  against and nothing to guess about. Anything posted outside it is a one-off,
+  handled by hand.
 - `scripts/lib/pace.js` — the one thing that decides *when* anything goes out:
   the posting window in the audience's timezone, the daily cap, the minimum gap.
-  The mirror and the queue both ask it, so queueing five things at once produces
+  Everything that publishes asks it, so queueing five things at once produces
   five posts spread over hours rather than five posts in a minute.
 - `scripts/run-queue.js` — takes one item off the dashboard queue and posts it,
   if now is a good moment. Claims before publishing, and puts an item back
@@ -79,10 +78,10 @@ at once, straight from a shell — these are the actual live posts:
   transcript. `--sync` fills in videos that have none and files a *proposal* for
   anything that already has a description, which does nothing until it is
   approved on the dashboard.
-- `scripts/install-timers.sh` — installs the six systemd `--user` timers: the
-  catch-all comment hourly, the mirror hourly, the queue hourly, the event
-  uploader every two minutes, analytics hourly, and the show-notes draft daily.
-  The posting *pace* lives in `lib/pace.js`, not the timers.
+- `scripts/install-timers.sh` — installs the five systemd `--user` timers: the
+  comment check hourly, the queue hourly, the event uploader every two minutes,
+  analytics hourly, and the show-notes draft daily. The posting *pace* lives in
+  `lib/pace.js`, not the timers.
 
 ## Reproduce it
 
@@ -135,10 +134,10 @@ which is exactly why the CTA has its own short domain.
 - **YouTube won't take comments on a private video** — the API 403s and a
   `firstComment` never appears. Unlisted works fine.
 - **Instagram can't be deleted or edited through any API.** Every mistake there
-  is permanent, which is why the mirror posts to it last on every clip, only
-  after the deletable platforms have proved the media and the caption.
-- **Instagram's 5-hashtag cap counts the caption and the comments together.** A
-  mirrored caption therefore carries none, and the first comment spends all five.
+  is permanent, so a clip is checked against its limits before anything is sent.
+- **Instagram's 5-hashtag cap counts the caption and the comments together.** So
+  the caption carries none and the first comment spends all five — two always-on
+  tags and three describing the clip.
 - **TikTok's settings go in `tiktokSettings` at the top level** of the request,
   not in `platformSpecificData` — which would look accepted and silently apply
   none of them, because that field stores and echoes any key you send it.

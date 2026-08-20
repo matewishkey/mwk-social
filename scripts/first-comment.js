@@ -107,15 +107,18 @@ const isStory = (post, pf) =>
   /\/stories\//.test(pf.platformPostUrl || post.platformPostUrl || '') ||
   (post.platformSpecificData && post.platformSpecificData.contentType === 'story');
 
-// posts:list carries a pipeline post the moment it publishes; analytics:posts
-// lags behind it but is the only place native (app / live-event) posts appear.
-// Reading both is what makes this a complete net.
+/*
+ * Only what we published. Everything goes out through this pipeline now, so
+ * posts:list is the whole universe — and it carries a post the moment it
+ * publishes, where analytics:posts lags minutes behind.
+ *
+ * This used to also sweep analytics:posts per platform, which was the only
+ * place posts written in the apps ever showed up. That net is gone with the
+ * thing it was catching: a post made outside this pipeline is now a one-off,
+ * handled by hand rather than by an hourly scan of every platform.
+ */
 function sources(opts) {
-  const out = [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
-  for (const platform of opts.platforms) {
-    out.push(zernio(['analytics:posts', '--platform', platform, '--limit', String(opts.limit)]));
-  }
-  return out;
+  return [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
 }
 
 function collectPosts(opts) {
@@ -131,10 +134,9 @@ function collectPosts(opts) {
         if (isStory(post, pf)) continue;
         const publishedAt = Date.parse(pf.publishedAt || post.publishedAt || post.scheduledFor || '');
         if (!Number.isFinite(publishedAt) || publishedAt < cutoff) continue;
-        // posts:list populates accountId into an object; analytics:posts leaves it a string.
         const accountId = typeof pf.accountId === 'object' && pf.accountId ? pf.accountId._id : pf.accountId;
-        // External posts are only addressable by their native platform ID —
-        // the Zernio _id 404s on every inbox: command.
+        // Addressable only by the native platform ID — the Zernio _id 404s on
+        // every inbox: command.
         if (!pf.platformPostId || !accountId) continue;
         const key = `${pf.platform}:${pf.platformPostId}`;
         if (seen.has(key)) continue;

@@ -29,12 +29,9 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 const pace = require('./lib/pace');
 const events = require('./lib/events');
 const platforms = require('./lib/platforms');
+const mediaLib = require('./lib/media');
 const { publish } = require('./post');
 const reshare = require('./lib/reshare');
-
-const ledgerPath = () => process.env.MWK_MIRROR_LEDGER ||
-  path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
-    'mwk-social', 'mirror-ledger.json');
 
 const cacheDir = () => process.env.MWK_MEDIA_CACHE ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
@@ -110,7 +107,7 @@ async function main() {
   const api = endpoint();
 
   if (!ignoreWindow) {
-    const why = pace.whyNotNow(load(ledgerPath(), {}), {}, new Date(), events.read());
+    const why = pace.whyNotNow(events.read());
     if (why) { console.log(`not this run — ${why}`); return; }
   }
 
@@ -123,13 +120,31 @@ async function main() {
   // back or mark it failed, or it sits 'claimed' forever with nobody looking.
   try {
     let media = [];
-    if (item.mediaUrl) media = [fetchMedia(item.mediaUrl, api.token)];
+    let clip = null;
+    if (item.mediaUrl) {
+      const file = fetchMedia(item.mediaUrl, api.token);
+      media = [file];
+      // ffprobe it once. Only videos have an aspect or a duration to check, so
+      // an image simply skips this rather than failing on a missing stream.
+      try { clip = mediaLib.probe(file); } catch { clip = null; }
+    }
 
     const want = item.platforms || [];
     // Instagram will not take a post without media, and a text-only item aimed
     // at "wherever it fits" should quietly skip it rather than fail the lot.
     const usable = accountsFor(want).filter((a) => {
       if (a.platform === 'instagram' && !media.length) return false;
+      if (clip) {
+        // Check the clip against each platform before Zernio does: a duration
+        // or aspect a platform will not take costs the post otherwise, and the
+        // item is already claimed by then. check() returns the reasons, empty
+        // when it is fine.
+        const problems = mediaLib.check(a.platform, clip);
+        if (problems.length) {
+          console.log(`skip  ${a.platform} — ${problems.join('; ')}`);
+          return false;
+        }
+      }
       return true;
     });
     if (!usable.length) throw new Error('no account can take this post');

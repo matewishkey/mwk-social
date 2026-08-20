@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Ship the local event log, and the mirror ledger, to the Cloudflare dashboard.
+ * Ship the local event log to the Cloudflare dashboard.
  *
  * Runs every two minutes. Two rules make it safe to leave unattended:
  *
@@ -13,9 +13,6 @@
  *      are the same picture on the dashboard, which is the one thing a status
  *      page must never do.
  *
- * The ledger goes with every batch as a snapshot rather than being rebuilt from
- * the log at the far end: it is already the authoritative projection, computed
- * here by the thing that knows the truth.
  *
  * Usage:
  *   scripts/ship-events.js
@@ -47,10 +44,6 @@ const BATCH = 500;
 const statePath = () => process.env.MWK_SHIP_CURSOR ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
     'mwk-social', 'ship-cursor.json');
-
-const ledgerPath = () => process.env.MWK_MIRROR_LEDGER ||
-  path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
-    'mwk-social', 'mirror-ledger.json');
 
 const load = (file, fallback) => {
   try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
@@ -87,15 +80,10 @@ async function main() {
     return;
   }
 
-  const ledger = load(ledgerPath(), null);
-  const body = {
-    source: os.hostname(),
-    events: pending,
-    snapshots: ledger ? { 'mirror-ledger': ledger } : {},
-  };
+  const body = { source: os.hostname(), events: pending, snapshots: {} };
 
   if (dryRun) {
-    console.log(`would ship ${pending.length} event(s)${ledger ? ' + the ledger' : ''} to ${url}`);
+    console.log(`would ship ${pending.length} event(s) to ${url}`);
     if (pending.length) console.log(`  ${pending[0].id} … ${pending[pending.length - 1].id}`);
     return;
   }
@@ -118,7 +106,7 @@ async function main() {
     lastId: pending.length ? pending[pending.length - 1].id : cursor.lastId,
     lastSentAt: new Date().toISOString(),
   });
-  console.log(`shipped ${pending.length} event(s)${ledger ? ' + the ledger' : ''} — ${text.slice(0, 120)}`);
+  console.log(`shipped ${pending.length} event(s) — ${text.slice(0, 120)}`);
 }
 
 main().catch((err) => { console.error(err.message); process.exit(1); });

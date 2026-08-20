@@ -12,37 +12,22 @@ const path = require('node:path');
 const src = (f) => import(path.join(__dirname, '..', 'web', 'src', f));
 
 const TZ = 'Australia/Brisbane';
-const LEDGER = {
-  updatedAt: new Date().toISOString(),
-  body: { clips: { 'facebook:123': {
-    publishedAt: '2026-08-18T21:33:00.000Z',
-    caption: 'Ever wondered why prompts beat websites?',
-    targets: {
-      threads: { status: 'posted', url: 'https://www.threads.com/x', note: 'mirrored' },
-      twitter: { status: 'posted', url: 'https://twitter.com/x' },
-      tiktok: { status: 'pending' },
-      instagram: { status: 'blocked', note: 'held' },
-    },
-  } } },
-};
+const PACE = { body: { today: 2, perDay: 6, nextAt: 'Fri 09:00' } };
 
 const base = (over = {}) => ({
   tz: TZ, email: 'mate@matewishkey.com', beat: { at: new Date().toISOString(), count: 3 },
-  snapshots: { 'mirror-ledger': LEDGER }, events: [], counts: [], kind: '', level: '',
-  actions: [], ...over,
+  snapshots: { pace: PACE }, events: [], counts: [], kind: '', level: '',
+  actions: [], queue: { waiting: 3, failed: 0 }, ...over,
 });
 
 /* ------------------------------------------------------------- overview -- */
 
-test('the page renders the ledger as a matrix', async () => {
+test('the page leads with what is waiting and what has gone out today', async () => {
   const { overviewPage } = await src('pages/overview.js');
   const html = overviewPage(base());
-  assert.match(html, /Ever wondered why prompts beat websites\?/);
-  assert.match(html, /s-posted/);
-  assert.match(html, /s-pending/);
-  assert.match(html, /s-blocked/);
-  assert.match(html, /https:\/\/www\.threads\.com\/x/);
-  assert.match(html, /<b>2<\/b>/, 'two posted');
+  assert.match(html, /<b>3<\/b>\s*<span>waiting to go out<\/span>/);
+  assert.match(html, /<b>2\/6<\/b>\s*<span>sent today<\/span>/);
+  assert.match(html, /next Fri 09:00/);
 });
 
 // "Nothing happened" and "the box is off" must never look the same. The
@@ -57,9 +42,10 @@ test('a stale heartbeat is called out, a fresh one is not', async () => {
 
 test('an empty database renders rather than throwing', async () => {
   const { overviewPage } = await src('pages/overview.js');
-  const html = overviewPage(base({ snapshots: {}, beat: null }));
-  assert.match(html, /No mirror ledger has been shipped yet/);
+  const html = overviewPage(base({ snapshots: {}, beat: null, queue: null, actions: [] }));
+  assert.match(html, /never checked in/);
   assert.match(html, /Nothing yet/);
+  assert.match(html, /Nothing waiting on you/);
 });
 
 // Captions and messages come from the platforms, not from us.

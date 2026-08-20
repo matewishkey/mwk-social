@@ -1,9 +1,9 @@
 /*
  * When may something go out?
  *
- * One answer, shared by the mirror and the queue, because two schedulers would
- * eventually disagree about what today already holds — and the audience sees
- * one feed, not two pipelines.
+ * One answer, for the one thing that publishes. Everything now goes out through
+ * the queue, so the event log is the complete record of what we have sent — no
+ * second source to reconcile against.
  *
  * Everything here is in the AUDIENCE's timezone, never the box's. This machine
  * runs Etc/UTC; unqualified, a 09:00-21:00 window would put every post out
@@ -36,34 +36,24 @@ function zoned(date, tz = TZ) {
   };
 }
 
-/**
- * Every publish we have made, newest last. Two sources, each authoritative for
- * its own half: the ledger records what the mirror sent, the event log records
- * what the queue sent. Neither can see the other's work, so both are read.
- */
-function sentTimes(ledger, events) {
-  const out = [];
-  for (const clip of Object.values((ledger && ledger.clips) || {})) {
-    for (const t of Object.values(clip.targets || {})) {
-      if (t.note === 'mirrored' && t.at) out.push(t.at);
-    }
-  }
-  for (const e of events || []) {
-    if (e.kind === 'queue.posted' && e.ts) out.push(e.ts);
-  }
-  return out.sort();
+/** Every publish we have made, newest last, straight off the event log. */
+function sentTimes(events) {
+  return (events || [])
+    .filter((e) => e.kind === 'queue.posted' && e.ts)
+    .map((e) => e.ts)
+    .sort();
 }
 
 /**
  * @returns {string|null} why not now, or null if now is fine.
  */
-function whyNotNow(ledger, opts = {}, now = new Date(), events = []) {
+function whyNotNow(events = [], opts = {}, now = new Date()) {
   const cfg = { ...DEFAULTS, ...opts };
   const here = zoned(now, cfg.tz);
   if (here.hour < cfg.startHour || here.hour > cfg.endHour) {
     return `${here.hour}:00 ${cfg.tz} is outside the ${cfg.startHour}:00-${cfg.endHour}:00 window`;
   }
-  const sent = sentTimes(ledger, events);
+  const sent = sentTimes(events);
   const todays = sent.filter((at) => zoned(new Date(at), cfg.tz).day === here.day);
   if (todays.length >= cfg.perDay) return `${todays.length} already went out today`;
 
@@ -78,9 +68,9 @@ function whyNotNow(ledger, opts = {}, now = new Date(), events = []) {
 }
 
 /** The next instant a post could go out, as an ISO string. */
-function nextSlot(ledger, opts = {}, now = new Date(), events = []) {
+function nextSlot(events = [], opts = {}, now = new Date()) {
   const cfg = { ...DEFAULTS, ...opts };
-  const sent = sentTimes(ledger, events);
+  const sent = sentTimes(events);
   const last = sent[sent.length - 1];
 
   // Earliest candidate: the minimum gap after the last post, or now.
@@ -106,13 +96,13 @@ function nextSlot(ledger, opts = {}, now = new Date(), events = []) {
 }
 
 /** What the dashboard shows about the pace. Computed here so the page cannot disagree. */
-function status(ledger, opts = {}, now = new Date(), events = []) {
+function status(events = [], opts = {}, now = new Date()) {
   const cfg = { ...DEFAULTS, ...opts };
   const here = zoned(now, cfg.tz);
-  const sent = sentTimes(ledger, events);
+  const sent = sentTimes(events);
   const today = sent.filter((at) => zoned(new Date(at), cfg.tz).day === here.day).length;
-  const why = whyNotNow(ledger, cfg, now, events);
-  const next = nextSlot(ledger, cfg, now, events);
+  const why = whyNotNow(events, cfg, now);
+  const next = nextSlot(events, cfg, now);
   return {
     perDay: cfg.perDay,
     today,

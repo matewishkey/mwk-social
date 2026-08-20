@@ -49,24 +49,20 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `episodeMixRatio` of comments quote a real guest wish pulled from the show's RSS feed and link
   that episode. If the feed is unreachable every comment falls back to a plain variant —
   freshness must never block a comment.
-- **Hashtag caps are enforced per platform in `voice.tagLine()`** — the always-on trio is
-  `#PIY #MWKShow #MWK`, so Instagram's 5 leaves room for exactly two topic tags, and a cap tighter
-  than the trio (X's 1) truncates it rather than blowing the budget.
+- **Hashtag caps are enforced per platform in `voice.tagLine()`** — the always-on pair is
+  `#MWKShow #PIY` (mate's call, 2026-08-20; `#MWK` dropped), so Instagram's 5 leaves room for three
+  topic tags, and a cap tighter than the pair (X's 1) truncates it rather than blowing the budget.
 - **`matewishkey.com/show` is the guest SIGN-UP page, not the stream** — the show goes out live on
   youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
-- **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
-  `mwk-first-comment.timer` systemd --user unit (install/refresh:
-  `scripts/install-timers.sh`, logs: `journalctl --user -u mwk-first-comment`).
-  Covers what the publish-time field cannot: posts made in the apps, live-event videos, anything
-  created straight on the platform. IG/FB/LI/YT, any post type; **TikTok is impossible** (no
-  comments API at all). Skips a post that already carries the CTA link, whoever put it there, so
-  it composes with the native field instead of double-posting. State lives outside the repo at
-  `~/.local/state/mwk-social/first-comments.json`. `--dry-run`, `--seed` (mark in-window posts
-  done without commenting — used when widening scope, to avoid a burst of backfill), `--hours N`,
-  `--all`, `--platforms`, `--limit N`, `--no-topics` (skip transcription, plain CTA), `--message`.
-  Pings `$MWK_COMMENT_HC_URL` (and `/fail`) when that env var is set — the hook exists, no check
-  is provisioned yet. To backfill later, drop the `"note": "seeded…"` entries
-  from the state file and re-run.
+- **First-comment watcher**: `scripts/first-comment.js`, hourly via `mwk-first-comment.timer`
+  (install/refresh: `scripts/install-timers.sh`, logs: `journalctl --user -u mwk-first-comment`).
+  FB/IG/LI/YT get the comment natively at publish time; **Threads has no such field, so this is what
+  covers it**, along with any post whose native comment silently failed. **It reads `posts:list`
+  only** — the per-platform `analytics:posts` sweep was the net for app-authored posts and went with
+  the mirror. TikTok and X are impossible (no usable comments API). State lives outside the repo at
+  `~/.local/state/mwk-social/first-comments.json`. `--dry-run`, `--seed`, `--hours N`, `--all`,
+  `--platforms`, `--limit N`, `--no-topics`, `--message`. Pings `$MWK_COMMENT_HC_URL` (and `/fail`)
+  when set — the hook exists, no check is provisioned yet.
 - **The comment's hashtags describe the video**: `scripts/lib/topic-tags.js` downloads the clip,
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
   (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that
@@ -153,101 +149,53 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
   (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
-- **The mirror** (`scripts/mirror.js`, read-only so far: `--plan`, `--seed`) reposts Facebook
-  reels to what Restream misses. **Its universe is Facebook posts with `mediaType: 'video'`** —
-  7 of the 18 Facebook posts; the rest are image/text and are not reels. Ledger lives outside the
-  repo at `~/.local/state/mwk-social/mirror-ledger.json`; seeded 2026-08-20 as 9 already-live and
-  19 queued. `test/fixtures/corpus.json` is the live corpus at that date and the regression gate.
-- **Dedupe is caption-only, because nothing else exists across platforms.** `videoDurationSeconds`
-  sits at `analytics.videoDurationSeconds` (on the post *and* on `platforms[]`) and **only
-  Instagram populates it**, on some posts; TikTok and X return `url:null`/`platform_withheld`.
-  Two rules the 2026-08-19 TikTok duplicate taught: compare captions on the **shorter** one's
-  length (the manual post's caption normalises to 45 chars against our 64 — a fixed 64-char key
-  never matches it), and any "published before the source" penalty needs a **tolerance window**,
-  because that manual TikTok predates its own Facebook source by a minute.
-- **The matcher fails closed**: `duplicate`, `review` and `unknown` all mean *do not publish*; only
-  `none` publishes. Threads is `verifiable: 'none'` — invisible to `analytics:posts` — so absence
-  there proves only that *we* have not mirrored it; it publishes flagged `weak`, backed by the
-  ledger, because Threads posts can be deleted.
-
-- **Media: `scripts/lib/media.js`, `mirror.js --media`.** Resolves a clip once and caches it in
-  `~/.local/state/mwk-social/media/`. Facebook URL first, **YouTube via `yt-dlp` when it 403s** —
-  which is also the better copy (1080x1920 against Facebook's 720x1280). All 7 reels resolve;
-  2 of them only through YouTube. `ffprobe` is required and now installed in `~/.local/bin`
-  (dotfiles-cz#36 asks for it, and yt-dlp, in the baseline). Two yt-dlp traps: it **appends its own extension
-  to `-o`** (ask for `x`, get `x.mp4`, read it as "downloaded nothing"), and it **serves AV1 by
-  default** — force `[vcodec^=avc1]` because IG and TikTok want H.264.
+- **Everything publishes through the queue now (mate's call, 2026-08-20). The mirror is gone.**
+  Restream clips are no longer used; content goes out from this pipeline only, so there is no
+  second origin to reconcile against. Deleted with it: `scripts/mirror.js`, `scripts/lib/matcher.js`
+  (caption dedupe), `scripts/lib/captions.js`, their tests and `test/fixtures/corpus.json`, plus
+  `verifiable`/`mediaUrlAvailable`/`MIRROR_TARGETS` from the platform table. **Do not reintroduce a
+  "is a copy already over there?" check** — it existed only because Restream put copies somewhere we
+  could not see. A post made outside the pipeline is now a one-off, handled by hand.
+- **`~/.local/state/mwk-social/mirror-ledger.json` still exists but has no writer.** Kept as history;
+  nothing reads it. The `mirror-ledger` D1 snapshot was deleted so the dashboard cannot render a
+  frozen table. **15 target-slots across 7 Facebook reels were left `pending`** when the mirror was
+  retired — abandoned by the decision, not by a failure.
+- **Media: `scripts/lib/media.js`.** `probe(file)` → duration/aspect/codec/audio; `check(platform,
+  probe)` → an ARRAY of problem strings, empty when fine. Note the argument order and the return
+  shape; I got both wrong first time. `run-queue.js` probes an uploaded clip once and drops any
+  platform that would reject it, rather than letting the platform fail an already-claimed item.
+  **The Instagram 1.91:1 rejection is an IMAGE rule, not a video one** — the video aspect range is
+  inclusive at both ends, and applying the image edge there rejects a legitimate square reel.
+- **Two yt-dlp traps, still true wherever it is used:** it **appends its own extension to `-o`**
+  (ask for `x`, get `x.mp4`, read it as "downloaded nothing"), and it **serves AV1 by default** —
+  force `[vcodec^=avc1]` because IG and TikTok want H.264.
 - **Node's `fetch` cannot reach a Meta CDN from this box — and it looks exactly like an expired
-  URL.** `ETIMEDOUT` at ~253 ms every time: no IPv6 route here, the AAAA record wins the lookup,
-  and undici's Happy Eyeballs window is 250 ms so it never tries IPv4. curl falls back and gets a
-  206. Media downloads shell out to curl for this reason; if you must use fetch,
-  `net.setDefaultAutoSelectFamilyAttemptTimeout(500)` fixes it (measured 4/4).
-- **The Instagram 1.91:1 rejection is an IMAGE rule, not a video one.** `media.check()` treats the
-  video aspect range as inclusive at both ends — applying the image edge there rejects a
-  legitimate square reel.
-
-- **`mirror.js --apply` publishes; all four targets verified live 2026-08-20.** Threads
-  `DcP1ZQWD_Ly`, X `2090285587903160541`, TikTok `v_pub_url~v2-1.7675951303247562753`, Instagram
-  `DcP2BWJFR7y` (native first comment confirmed on it: CTA + exactly 5 tags, caption carries none).
-  Default is one post per run. **Instagram refuses to run on a clip until the other three targets
-  are done** — the schedule already orders it last, but `--platforms instagram` skips that, so the
-  rule lives in the publish path.
+  URL.** `ETIMEDOUT` at ~253 ms every time: no IPv6 route here, the AAAA record wins the lookup, and
+  undici's Happy Eyeballs window is 250 ms so it never tries IPv4. Media downloads shell out to curl
+  for this reason; if you must use fetch, `net.setDefaultAutoSelectFamilyAttemptTimeout(500)` fixes
+  it (measured 4/4).
+- **A publish call that times out has NOT necessarily failed.** The request aborts at the client and
+  Zernio keeps processing, so a timeout is *unknown* — reconcile by searching `posts:list` for the
+  caption just composed. The publish timeout is 240s and the queue claims an item **before** the
+  request for this reason.
 - **TikTok settings go in `tiktokSettings` at the TOP LEVEL of the request body, not
-  `platformSpecificData`** (docs.zernio.com/platforms/tiktok). This is the one real special case,
-  and getting it wrong is silent — `platformSpecificData` stores and echoes any key, so it would
-  look accepted while the post went out with no consent flags. Six flags, all `required` with
-  `default: false`: `allow_comment`, `allow_duet`, `allow_stitch`, `content_preview_confirmed`,
-  `express_consent_given`, plus `privacy_level`. TikTok's live `maxVideoDurationSec` is **3600**,
-  not the 600 the static table assumed — read `accounts:tiktok-creator-info`.
-- **A publish call that times out has NOT necessarily failed.** Bitten on the first live mirror:
-  the request aborted at 60s and the post was live on Threads anyway. Zernio keeps processing after
-  the caller gives up, so a timeout is *unknown* — reconcile by searching `posts:list` for the
-  caption you just composed. The publish timeout is now 240s and the ledger is written **before**
-  the request.
+  `platformSpecificData`** (docs.zernio.com/platforms/tiktok). Getting it wrong is silent —
+  `platformSpecificData` stores and echoes any key, so it would look accepted while the post went
+  out with no consent flags. Six flags, all `required` with `default: false`: `allow_comment`,
+  `allow_duet`, `allow_stitch`, `content_preview_confirmed`, `express_consent_given`, plus
+  `privacy_level`. TikTok's live `maxVideoDurationSec` is **3600**, not the 600 the static table
+  assumed — read `accounts:tiktok-creator-info`.
 - **TikTok returns a publish token, not a video ID** (`v_pub_url~v2-1.…`); the real numeric ID
   arrives later with the analytics sync. It also returns **no post URL at all**.
-- **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one mirrored
-  post carrying a link.
+- **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one post
+  carrying a link.
 
-- **Six systemd --user timers, installed by `scripts/install-timers.sh`**: `mwk-first-comment`
-  at `*:00`, `mwk-mirror` at `*:10`, `mwk-queue` at `*:20`, `mwk-ship-stats` at `*:35`,
-  `mwk-ship-events` every 2 min, `mwk-yt-notes` daily at 05:40. The mirror runs
-  `--apply --scheduled`, so **the pace lives in the script, not the cron cadence** — the timer is
-  a dumb heartbeat and `whyNotNow()` says no most of the time. A hand run obeys the same rules.
-  `:10` keeps the mirror behind the comment run so a freshly mirrored clip has settled before the
-  watcher looks for it. Units are `Type=oneshot`, so `TimeoutStartUSec=infinity` — the show-notes
-  run takes ~13 min on a cold topics cache and will not be killed.
-- **The pace lives in `scripts/lib/pace.js`, and BOTH the mirror and the queue ask it.** 6/day,
-  09:00–21:00 Brisbane, 90 min minimum gap. It reads the ledger (what the mirror sent) *and* the
-  event log (`queue.posted`), because neither source can see the other's work — a shared budget
-  that read only one would not be shared. `nextSlot()` is bounded, not `while(true)`.
-- **The queue is a to-do list in D1, not a scheduler.** The dashboard form writes a row; the box
-  claims one at a time with a conditional UPDATE (so overlapping runs cannot both take it), and
-  the claim happens **before** the publish for the same reason the mirror writes its ledger
-  first. A failure puts the item back rather than burning it. Media uploads go to R2 and the box
-  pulls them back through `/media/<key>` on the ingest host with the same bearer token.
-- **LinkedIn: `accountsFor()` keeps native posts to the COMPANY page.** "linkedin" resolves to two
-  accounts and posting to both would native-post to the personal profile — the one thing the
-  playbook rules out, since the point is moving engagement onto the page. The personal account
-  only ever quote-reshares, and **the thought on top is his sentence or there is no reshare**.
-- **`/v1/analytics/posts` and `/v1/analytics/daily` are NOT REST routes** — Zernio answers an
-  unknown path with its marketing SPA, so a wrong path fails as "not JSON" rather than as a 404.
-  That is how a broken call in `yt-description.js` went unseen. `/v1/posts`, `/v1/accounts` and
-  `/v1/inbox/comments` are real; for analytics use `cli(['analytics:posts'…])`. **Positive-control
-  any new path against `/inbox/comments` before believing a failure.**
-- **YouTube show notes: `yt-description.js --sync`.** Empty description → written outright
-  (nothing to overwrite, original backed up anyway). Already has one → a **proposal** in D1 that
-  does nothing until approved on the dashboard. Both refuse to write while `voice.json` marks the
-  show blurb `PENDING` — it goes at the bottom of every description and it is still my paraphrase.
-  Re-drafting never un-approves: the upsert has `WHERE state = 'proposed'`.
-- **The posting window is the AUDIENCE's timezone, not the box's.** This machine is `Etc/UTC`; the
-  window is `Australia/Brisbane` (`MWK_TZ` overrides). Unqualified, "09:00–21:00" would have put
-  every post out between 19:00 and 07:00 Brisbane — the entire window overnight. Day boundaries for
-  the daily cap are zoned too, or the cap resets twelve hours early.
-- **Seeding must preserve provenance.** `--seed` repairs an unsettled ledger entry from the live
-  platform, and if that entry has an `at` then **we** posted it — relabelling it "already live
-  before the mirror ran" drops it from the day's pace count and the drip overshoots.
-
+- **The YouTube description tail is written from `matewishkey.com/brand`**, which is the authority
+  on how the show describes itself — not a paraphrase of it. Its rules are load-bearing and are
+  recorded beside the text in `config/voice.json`: first person, the viewer as the subject, plain
+  language, the host never an expert or teacher, never the words "free"/"guaranteed"/"safe", and
+  never a claim that anyone became a developer. The `PENDING` gate that paused auto-fill is
+  satisfied, so empty descriptions now get filled.
 - **The dashboard is `web/`, deployed with `web/deploy.sh` (locally, never on push).** One Worker
   `mwk-social-log`, **three** custom domains — `social.matewishkey.com` (Cloudflare Access, email
   OTP, allowing mate@ and suzy@matewishkey.com), `ingest.matewishkey.com` (bearer token) and
@@ -277,9 +225,11 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `markers[]` lists every substring that counts and `voice.carriesCta()` matches any; tests pin
   both the old and the new. Minting is **idempotent** (a re-run must render the identical comment)
   and **never fatal** (no dashboard → plain URL → the comment still goes out).
-- **No SQL projections.** The dashboard renders `mirror-ledger.json` shipped whole as a snapshot.
-  The ledger is already the authoritative projection, computed by the thing that knows the truth,
-  so rebuilding it in D1 would only add a way for the two to disagree.
+- **Snapshots over SQL projections, where the box already knows the answer.** `platforms`, `voice`
+  and `pace` are computed on the box and shipped whole — the platform table and the pace are
+  computed by the code that uses them, so rebuilding either in D1 would only add a way for the two
+  to disagree. What IS a table: the queue, links, clicks, daily metrics and follower points, because
+  those are written at the far end or must outlive Zernio's ~12-month window.
 - **`scripts/ship-events.js` every 2 min; the cursor advances only on a 2xx**, and replays are free
   (`INSERT OR IGNORE` on a stable ULID). It sends an **empty batch when idle** — without that
   heartbeat "nothing happened" and "the box is off" are the same picture.
