@@ -47,7 +47,9 @@ test('instagram never exceeds five hashtags', () => {
 });
 
 test('a cap tighter than the always-on pair truncates the pair', () => {
-  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#PIY');
+  // X allows one tag. Truncating beats blowing the budget, and the brand tag
+  // is the one worth keeping when only one survives.
+  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#MWKShow');
 });
 
 test('the brand tag is on every post that has room for it', () => {
@@ -92,12 +94,14 @@ test('pinning a variant that does not exist is refused', () => {
   assert.throws(() => voice.firstComment('k', { platform: 'facebook', variantIndex: -1 }));
 });
 
-test('the short brand tag rides along wherever there is room', () => {
+test('the motto tag rides along wherever there is room', () => {
   for (const p of ['instagram', 'threads', 'tiktok', 'facebook', 'youtube', 'linkedin']) {
-    assert.ok(voice.tagLine(p, ['VPN']).includes('#MWK '), `${p} lost the short brand tag`);
+    assert.ok(voice.tagLine(p, ['VPN']).includes('#PIY'), `${p} lost the motto tag`);
   }
-  // Instagram's budget is the binding one: three always-on leaves exactly two.
+  // Instagram's budget is the binding one: two always-on now leaves three topic
+  // slots, where the old trio left two.
   assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']).split(' ').length, 5);
+  assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']), '#MWKShow #PIY #A #B #C');
 });
 
 /* ------------------------------------------------------- the short link -- */

@@ -20,8 +20,8 @@
   "feed": "https://matewishkey.com/rss.xml",
 
   "tags": {
-    "always": ["#PIY", "#MWKShow", "#MWK"],
-    "_always": "Every post, in this order. #PIY is the motto short form, #MWKShow is the brand and #MWK is the short brand tag. Three always-on tags leave Instagram only two topic slots — that is the price of the third one. \"Prompt it Yourself\" stays in the comment TEXT where it reads as a sentence — it is not a tag.",
+    "always": ["#MWKShow", "#PIY"],
+    "_always": "Every post, in this order. #MWKShow is the brand and #PIY is the motto short form. Two always-on tags rather than three leaves Instagram three topic slots instead of two — #MWK was dropped because it earned nothing the other two did not. \"Prompt it Yourself\" stays in the comment TEXT where it reads as a sentence — it is not a tag.",
     "maxTopic": 4,
     "caps": { "instagram": 5, "twitter": 1, "tiktok": null, "threads": null, "facebook": null, "youtube": null },
     "_caps": "null = no meaningful cap. Instagram's 5 counts the caption AND the comments together.",
@@ -58,7 +58,7 @@
   },
 
   "youtubeDescription": {
-    "showBlurb": "Mate Wish Key is a live show where someone who has never written code builds the thing they actually need. I hand over the keys instead of doing it for them.\n\nWant to build yours on the show? Sign up at https://matewishkey.com/show\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey",
-    "_showBlurb": "PENDING: mate has five candidate rewrites of this on work.l (2026-08-19_shownotes-and-thumbnails) and has not picked one. The current text is my paraphrase, not his voice — replace it once he chooses."
+    "showBlurb": "Why let others solve your problems with AI? Prompt it yourself.\n\nMate Wish Key is a live show. Someone turns up with a real problem out of their own work, or an idea they have never tested, and we build it on their own computer while we talk. Three to four hours, up to three wishes, and the mistakes and wrong turns stay in.\n\nNo terminal and no experience needed. A problem you actually have and your own computer is the whole list. You keep what we build, and you can change it afterwards without me.\n\nBring me something you wish your computer did: https://matewishkey.com/show\n\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey\n\n#MWKShow #PIY",
+    "_showBlurb": "Written from matewishkey.com/brand, which is the authority on how the show describes itself — not a paraphrase of it. The brand page's rules are load-bearing here: first person, the viewer as the subject, plain language, no smugness, and the host is never positioned as expert or teacher. Never the words \"free\", \"guaranteed\" or \"safe\", and never a claim that anyone became a developer. Change this and every YouTube description changes with it."
   }
 }
