@@ -57,7 +57,7 @@ const READ = [SOURCE, ...TARGETS, FALLBACK];
  * a posting window is for. Override with MWK_TZ if the audience moves.
  */
 const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
-const DEFAULTS = { perDay: 3, startHour: 9, endHour: 21, minGapMinutes: 90, tz: TZ };
+const DEFAULTS = { perDay: 6, startHour: 9, endHour: 21, minGapMinutes: 90, tz: TZ };
 
 /** The calendar day and hour at an instant, as the audience sees them. */
 function zoned(date) {
