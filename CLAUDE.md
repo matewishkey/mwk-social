@@ -209,8 +209,9 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one mirrored
   post carrying a link.
 
-- **Two systemd --user timers, installed by `scripts/install-timers.sh`** (which replaced the
-  first-comment-only installer): `mwk-first-comment` at `*:00` and `mwk-mirror` at `*:10`. The
+- **Three systemd --user timers, installed by `scripts/install-timers.sh`** (which replaced the
+  first-comment-only installer): `mwk-first-comment` at `*:00`, `mwk-mirror` at `*:10`, and
+  `mwk-ship-events` every 2 min. The
   mirror runs `--apply --scheduled`, so **the pace lives in the script, not the cron cadence** —
   the timer is a dumb hourly heartbeat and `whyNotNow()` says no most of the time. A hand run
   obeys the same rules. `:10` keeps the mirror ten minutes behind the comment run so a freshly
