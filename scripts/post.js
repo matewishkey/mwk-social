@@ -13,6 +13,8 @@
  *   scripts/post.js --text "..." --all --media clip.mp4 --title "Episode 3"
  *   scripts/post.js --text "..." --all --dry-run       # print the request body
  *
+ *   --topics a,b,c       hashtags describing the clip, for the first comment
+ *   --comment-variant N  pin one plain variant instead of letting it rotate
  *   --no-first-comment   publish without the CTA comment
  *   --draft              save as a draft (Zernio skips firstComment on drafts)
  *   --schedule <ISO>     schedule instead of publishing now
@@ -37,7 +39,8 @@ const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
-    firstComment: true, draft: false, schedule: null, wait: true, dryRun: false };
+    firstComment: true, draft: false, schedule: null, wait: true, dryRun: false,
+    topics: [], commentVariant: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--text') opts.text = argv[++i];
@@ -45,6 +48,8 @@ function parseArgs(argv) {
     else if (a === '--all') opts.all = true;
     else if (a === '--media') opts.media = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '--title') opts.title = argv[++i];
+    else if (a === '--topics') opts.topics = argv[++i].split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
+    else if (a === '--comment-variant') opts.commentVariant = Number(argv[++i]);
     else if (a === '--no-first-comment') opts.firstComment = false;
     else if (a === '--draft') opts.draft = true;
     else if (a === '--schedule') opts.schedule = argv[++i];
@@ -60,7 +65,8 @@ function parseArgs(argv) {
 
 function usage() {
   console.log('usage: post.js --text TEXT (--accounts id1,id2 | --all) [--media file|url,...]');
-  console.log('               [--title TEXT] [--no-first-comment] [--draft] [--schedule ISO]');
+  console.log('               [--title TEXT] [--topics a,b,c] [--comment-variant N]');
+  console.log('               [--no-first-comment] [--draft] [--schedule ISO]');
   console.log('               [--no-wait] [--dry-run]');
 }
 
@@ -102,10 +108,15 @@ function resolveMedia(items) {
 }
 
 // No post ID exists yet, so the rotation is keyed off the content itself:
-// stable for a given post, different between posts. Topic tags are not derived
-// here — the clip would have to be transcribed before publishing (repo issue #10).
-function commentFor(platform, text) {
-  return voice.firstComment(`new:${voice.hash(text)}`, { platform }).text;
+// stable for a given post, different between posts. Topic tags cannot be derived
+// here — the clip is a local file, not a published post with a media URL — so
+// they come in on --topics, named by whoever watched the video.
+function commentFor(platform, text, opts) {
+  return voice.firstComment(`new:${voice.hash(text)}`, {
+    platform,
+    topicTags: opts.topics,
+    variantIndex: opts.commentVariant,
+  }).text;
 }
 
 async function waitForResults(postId) {
@@ -131,7 +142,7 @@ async function main() {
   body.platforms = accounts.map((a) => {
     const entry = { platform: a.platform, accountId: a.id };
     if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
-      entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text) };
+      entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text, opts) };
     }
     return entry;
   });

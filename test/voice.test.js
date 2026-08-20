@@ -79,3 +79,23 @@ test('a config without the marker is refused', () => {
     ['-e', 'require(process.env.V).config()'],
     { env: { ...process.env, MWK_VOICE_CONFIG: bad, V: require.resolve('../scripts/lib/voice') }, stdio: 'pipe' }));
 });
+
+test('a pinned variant beats the rotation, on every platform and every key', () => {
+  const pinned = new Set(['a', 'b', 'c'].flatMap((k) => ['instagram', 'facebook', 'youtube']
+    .map((p) => voice.firstComment(k, { platform: p, variantIndex: 0 }).text)));
+  assert.strictEqual(pinned.size, 1, 'pinning still varied the comment');
+  assert.ok([...pinned][0].startsWith('Do not let others solve your problem'));
+});
+
+test('pinning a variant that does not exist is refused', () => {
+  assert.throws(() => voice.firstComment('k', { platform: 'facebook', variantIndex: 99 }));
+  assert.throws(() => voice.firstComment('k', { platform: 'facebook', variantIndex: -1 }));
+});
+
+test('the short brand tag rides along wherever there is room', () => {
+  for (const p of ['instagram', 'threads', 'tiktok', 'facebook', 'youtube', 'linkedin']) {
+    assert.ok(voice.tagLine(p, ['VPN']).includes('#MWK '), `${p} lost the short brand tag`);
+  }
+  // Instagram's budget is the binding one: three always-on leaves exactly two.
+  assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']).split(' ').length, 5);
+});

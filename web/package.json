@@ -1,0 +1,6 @@
+{
+  "name": "mwk-social-log",
+  "private": true,
+  "type": "module",
+  "description": "Worker source is ESM; the repo root is CommonJS. This file is what tells node which is which, and it is also what lets the test suite import the renderer."
+}

@@ -213,6 +213,27 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   platform, and if that entry has an `at` then **we** posted it — relabelling it "already live
   before the mirror ran" drops it from the day's pace count and the drip overshoots.
 
+- **The dashboard is `web/`, deployed with `web/deploy.sh` (locally, never on push).** One Worker
+  `mwk-social-log`, two custom domains — `internal.matewishkey.com` (Cloudflare Access, email OTP,
+  allowing mate@ and suzy@matewishkey.com) and `ingest.matewishkey.com` (bearer token). D1 database
+  `mwk-social`. **`workers_dev = false` is the load-bearing line**: Access binds to a *hostname*,
+  not to a script, so leaving it on would serve the whole dashboard ungated on
+  `*.workers.dev` beside the gated one. The Worker verifies the `Cf-Access-Jwt-Assertion` itself —
+  signature, `aud` **and** expiry; a signature alone would accept a token minted for a different
+  app in the same Access org.
+- **No SQL projections.** The dashboard renders `mirror-ledger.json` shipped whole as a snapshot.
+  The ledger is already the authoritative projection, computed by the thing that knows the truth,
+  so rebuilding it in D1 would only add a way for the two to disagree.
+- **`scripts/ship-events.js` every 2 min; the cursor advances only on a 2xx**, and replays are free
+  (`INSERT OR IGNORE` on a stable ULID). It sends an **empty batch when idle** — without that
+  heartbeat "nothing happened" and "the box is off" are the same picture.
+- **`MWK_LOG_TOKEN` / `MWK_LOG_URL` live in `td-sops/apps/mwk-social.enc.env`**, and
+  `scripts/with-secrets.sh` is what puts both those and `~/.secrets` into a unit's environment —
+  systemd's `EnvironmentFile` can read neither.
+- **The IPv6 trap bites the dashboard hostnames too**: they resolve AAAA-first and this box has no
+  IPv6 route, so plain `curl` fails to connect in ~14 ms and `fetch` times out. Use `curl -4` when
+  testing by hand; `ship-events.js` sets `net.setDefaultAutoSelectFamilyAttemptTimeout(1000)`.
+
 ## Platform gotchas (verified against docs.zernio.com)
 
 - **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).

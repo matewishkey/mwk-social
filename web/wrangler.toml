@@ -1,0 +1,35 @@
+name = "mwk-social-log"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# THE MOST IMPORTANT LINE IN THIS FILE. Cloudflare Access binds to a HOSTNAME,
+# not to a Worker script — so leaving workers.dev enabled would publish the whole
+# dashboard at mwk-social-log.<subdomain>.workers.dev with no gate at all, beside
+# the gated hostname and completely invisible from it.
+workers_dev = false
+
+[observability]
+enabled = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mwk-social"
+database_id = "423c5334-3057-4752-95dc-3583f1eb2684"
+
+# Two hostnames, one Worker. An Access application covers a hostname, so putting
+# ingest behind the same one would 302 the uploader into a login page; and path
+# rules would mean depending on Access path-ordering forever.
+[[routes]]
+pattern = "internal.matewishkey.com"
+custom_domain = true
+
+[[routes]]
+pattern = "ingest.matewishkey.com"
+custom_domain = true
+
+[vars]
+INGEST_HOST = "ingest.matewishkey.com"
+DASHBOARD_HOST = "internal.matewishkey.com"
+TZ_DISPLAY = "Australia/Brisbane"
+ACCESS_TEAM = "mergodon.cloudflareaccess.com"
+ACCESS_AUD = "2fd35333ed0426dba26231df5f21de72e3d6432f96cab62d4357dad65d9eb2ca"

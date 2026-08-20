@@ -96,19 +96,32 @@ const unescapeXml = (s) => s
  * @param {string[]} opts.topicTags  bare names, no leading '#'
  * @param {number} opts.avoidIndex   variant index used last on this platform
  * @param {boolean} opts.noEpisode   force a plain variant
+ * @param {number} opts.variantIndex pin one plain variant instead of rotating
  * @returns {{text: string, variant: string, index: number}}
  */
-function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false } = {}) {
+function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
+  variantIndex = null } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
 
-  const episodes = noEpisode ? [] : latestEpisodes();
+  // Pinning names a line out of the plain list, so it also rules out an episode
+  // variant: a human picked that exact wording and must get it, not a quote.
+  const pinned = Number.isInteger(variantIndex);
+  const episodes = (noEpisode || pinned) ? [] : latestEpisodes();
   const wantEpisode = episodes.length > 0 &&
     (hash(key, 'mix') % 1000) / 1000 < (fc.episodeMixRatio ?? 0);
 
   const pool = wantEpisode ? fc.episode : fc.plain;
-  let index = hash(key, platform || '') % pool.length;
-  if (pool.length > 1 && index === avoidIndex) index = (index + 1) % pool.length;
+  let index;
+  if (pinned) {
+    if (variantIndex < 0 || variantIndex >= pool.length) {
+      throw new Error(`no such comment variant: ${variantIndex} (0-${pool.length - 1})`);
+    }
+    index = variantIndex;
+  } else {
+    index = hash(key, platform || '') % pool.length;
+    if (pool.length > 1 && index === avoidIndex) index = (index + 1) % pool.length;
+  }
 
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
   let text = pool[index]

@@ -205,6 +205,39 @@ so an unqualified "09:00 to 21:00" would put every post out between 19:00 and 07
 window overnight. `MWK_TZ` moves it. Day boundaries for the daily cap are zoned as well, or the
 cap resets twelve hours early.
 
+## The dashboard
+
+`internal.matewishkey.com` — one page, behind Cloudflare Access with an email one-time PIN, showing
+what the pipeline is doing. `web/` holds it; `web/deploy.sh` ships it from this box, never on push.
+
+| | |
+|---|---|
+| Worker | `mwk-social-log`, one script |
+| Dashboard | `internal.matewishkey.com`, Access (OTP), 720h session |
+| Ingest | `ingest.matewishkey.com`, bearer token |
+| Storage | D1 `mwk-social` — `event`, `snapshot`, `ingest_batch` |
+| Uploader | `scripts/ship-events.js`, every two minutes |
+
+**`workers_dev = false` is the line that keeps it closed.** Access binds to a hostname, not to a
+Worker script, so leaving workers.dev on would publish the entire dashboard at
+`mwk-social-log.<subdomain>.workers.dev` with no gate — beside the gated hostname, and invisible
+from it. The Worker also verifies the `Cf-Access-Jwt-Assertion` itself, checking the signature, the
+audience *and* the expiry: a signature alone would accept a perfectly valid token minted for a
+different application in the same Access org.
+
+**Two hostnames, not one with path rules.** An Access application covers a hostname, so putting
+ingest behind the same one would 302 the uploader into a login page.
+
+**No SQL projections.** The dashboard renders `mirror-ledger.json`, shipped whole as a snapshot.
+That ledger is already the authoritative projection, computed on the box by the thing that knows
+the truth — rebuilding it in D1 would add nothing except a way for the two to disagree.
+
+**The cursor advances only on a 2xx.** Anything else leaves it where it was and the same events go
+again next run; replays are free because the sink is `INSERT OR IGNORE` on a stable ULID. And the
+uploader sends an **empty batch when idle**, at least every fifteen minutes — without that
+heartbeat, "nothing happened" and "the box is off" are the same picture, which is the one thing a
+status page must never do.
+
 ## Reading the API
 
 `posts:list` has a pipeline post the instant it publishes. `analytics:posts` lags minutes behind

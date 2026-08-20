@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
 # Install (or refresh) the systemd --user timers this pipeline runs on.
 #
-#   scripts/install-timers.sh                 # both
+#   scripts/install-timers.sh                 # all of them
 #   scripts/install-timers.sh first-comment   # just one
 #
 # Logs:  journalctl --user -u mwk-first-comment -f
 #        journalctl --user -u mwk-mirror -f
+#        journalctl --user -u mwk-ship-events -f
 set -euo pipefail
 
 repo="$(cd "$(dirname "$0")/.." && pwd)"
 unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 mkdir -p "$unit_dir"
 
-# Both units run through zsh so ~/.secrets is sourced: the transcription keys
-# live there and it is shell syntax, which systemd's EnvironmentFile cannot
-# parse. mise owns node and systemd gets no login shell, so PATH is spelled out.
+# Every unit runs through scripts/with-secrets.sh: the transcription keys live in
+# ~/.secrets and the dashboard's ingest token in td-sops, and neither is
+# something systemd's EnvironmentFile can read. mise owns node and systemd gets
+# no login shell, so PATH is spelled out.
 unit() {
   local name="$1" description="$2" command="$3" schedule="$4" timer_description="$5"
   cat > "$unit_dir/$name.service" <<UNIT
@@ -26,7 +28,7 @@ After=network-online.target
 Type=oneshot
 Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=$repo
-ExecStart=/usr/bin/zsh -c 'source ~/.secrets && exec $command'
+ExecStart=$repo/scripts/with-secrets.sh $command
 UNIT
 
   cat > "$unit_dir/$name.timer" <<UNIT
@@ -65,8 +67,19 @@ if [[ "$want" == all || "$want" == mirror ]]; then
     'Check whether a reel is due to be mirrored'
 fi
 
+if [[ "$want" == all || "$want" == ship-events ]]; then
+  # Every two minutes. It is cheap, it sends an empty batch when idle, and that
+  # heartbeat is the only thing that stops "nothing happened" and "the box is
+  # off" looking identical on the dashboard.
+  unit mwk-ship-events \
+    'Ship the MWK event log to the dashboard' \
+    "$repo/scripts/ship-events.js" \
+    '*:0/2' \
+    'Ship new MWK events to Cloudflare'
+fi
+
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-mirror; do
+for name in mwk-first-comment mwk-mirror mwk-ship-events; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done
