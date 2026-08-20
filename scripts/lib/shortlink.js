@@ -1,0 +1,54 @@
+/*
+ * Minting the CTA link for one post.
+ *
+ * The whole point is measurement: `clicks` is populated by Facebook and, once,
+ * by LinkedIn — Instagram, YouTube, TikTok, Threads and X report zero on every
+ * post, structurally. So without this the first-comment mechanic, which is the
+ * entire links-out-of-body strategy, has no scoreboard at all.
+ *
+ * Two rules, both load-bearing:
+ *
+ *   1. IDEMPOTENT. A re-run must render the identical comment, because the
+ *      duplicate guard works by looking for the CTA in the text. The far end
+ *      keys on (target, platform, clip), so asking twice returns one code.
+ *   2. NEVER FATAL. If the dashboard is unreachable the plain URL is used and
+ *      the comment still goes out. A link we cannot measure beats a comment
+ *      that never happened — the same rule the RSS feed already follows.
+ */
+'use strict';
+
+const net = require('net');
+
+// No IPv6 route here and the ingest hostname resolves AAAA-first.
+net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
+
+const voice = require('./voice');
+
+/**
+ * @returns {Promise<string|null>} the short URL, or null to use the plain one.
+ */
+async function mint({ platform = null, clipId = null, postKey = null, label = null } = {}) {
+  const cfg = voice.shortLink();
+  if (!cfg.enabled) return null;
+
+  const base = process.env.MWK_LOG_URL;
+  const token = process.env.MWK_LOG_TOKEN;
+  if (!base || !token) return null;
+
+  const target = voice.config().links.show;
+  try {
+    const res = await fetch(`${new URL(base).origin}/links`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target, platform, clipId, postKey, label }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    return json.ok ? json.url : null;
+  } catch {
+    return null;                 // deliberately silent — see rule 2 above
+  }
+}
+
+module.exports = { mint };

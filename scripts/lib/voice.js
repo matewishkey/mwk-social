@@ -30,6 +30,19 @@ function config() {
     if (!cached.links.show.includes(cached.marker)) {
       throw new Error(`${CONFIG_PATH}: links.show must contain the marker "${cached.marker}"`);
     }
+    // The guard matches ANY of these. The primary must be among them, or a
+    // plain comment would compose fine and then not be recognised as ours.
+    cached.markers = cached.markers && cached.markers.length ? cached.markers : [cached.marker];
+    if (!cached.markers.includes(cached.marker)) {
+      throw new Error(`${CONFIG_PATH}: markers must include the primary marker "${cached.marker}"`);
+    }
+    const short = cached.shortLink;
+    if (short && short.enabled) {
+      if (!short.host) throw new Error(`${CONFIG_PATH}: shortLink.enabled needs shortLink.host`);
+      if (!cached.markers.some((m) => short.host.includes(m.split('/')[0]))) {
+        throw new Error(`${CONFIG_PATH}: no marker would match a ${short.host} link — the guard would re-comment on every post`);
+      }
+    }
     for (const v of [...cached.firstComment.plain, ...cached.firstComment.episode]) {
       if (!v.includes('{show}')) throw new Error(`${CONFIG_PATH}: every variant must contain {show} — offender: ${v.slice(0, 40)}`);
     }
@@ -38,6 +51,20 @@ function config() {
 }
 
 const marker = () => config().marker;
+const markers = () => config().markers.slice();
+
+/**
+ * Does this text already carry our call to action, whoever put it there?
+ *
+ * Matches any known marker, which is what lets the CTA change host without the
+ * watcher re-commenting on every post it wrote before the change.
+ */
+const carriesCta = (text) => {
+  const t = String(text || '');
+  return config().markers.some((m) => t.includes(m));
+};
+
+const shortLink = () => config().shortLink || { enabled: false };
 const alwaysTags = () => config().tags.always.slice();
 const blockedTags = () => new Set(config().tags.blocked);
 const maxTopicTags = () => config().tags.maxTopic;
@@ -100,7 +127,7 @@ const unescapeXml = (s) => s
  * @returns {{text: string, variant: string, index: number}}
  */
 function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
-  variantIndex = null } = {}) {
+  variantIndex = null, showUrl = null } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
 
@@ -125,7 +152,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
 
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
   let text = pool[index]
-    .replace(/\{show\}/g, cfg.links.show)
+    .replace(/\{show\}/g, showUrl || cfg.links.show)
     .replace(/\{wish\}/g, episode ? episode.wish : '')
     .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
     .replace(/\{episodeUrl\}/g, episode ? episode.url : '');
@@ -133,8 +160,10 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   const tags = tagLine(platform, topicTags);
   if (tags) text += `\n\n${tags}`;
 
-  if (!text.includes(cfg.marker)) {
-    throw new Error(`composed comment lost the marker "${cfg.marker}" — refusing to post`);
+  // Any known marker will do: with a short link the text carries mwkshow.com/…
+  // rather than the long URL, and both must count as "this is ours".
+  if (!carriesCta(text)) {
+    throw new Error(`composed comment carries none of the markers ${cfg.markers.join(', ')} — refusing to post`);
   }
   return { text, variant: wantEpisode ? 'episode' : 'plain', index };
 }
@@ -164,6 +193,6 @@ function tagLine(platform, topicTags = []) {
 const showBlurb = () => config().youtubeDescription.showBlurb;
 
 module.exports = {
-  config, marker, alwaysTags, blockedTags, maxTopicTags, capFor,
+  config, marker, markers, carriesCta, shortLink, alwaysTags, blockedTags, maxTopicTags, capFor,
   firstComment, tagLine, latestEpisodes, showBlurb, hash, CONFIG_PATH,
 };

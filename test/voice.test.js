@@ -99,3 +99,56 @@ test('the short brand tag rides along wherever there is room', () => {
   // Instagram's budget is the binding one: three always-on leaves exactly two.
   assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']).split(' ').length, 5);
 });
+
+/* ------------------------------------------------------- the short link -- */
+
+/*
+ * Introducing the short link changed the CTA's host. config/voice.json warns in
+ * its own notes that this is a breaking change: the duplicate guard works by
+ * finding the CTA in a comment's text, so a guard taught only the NEW host
+ * would fail to recognise every comment written before the change and would
+ * comment again on all of them. These are the cases that catch that.
+ */
+test('the guard recognises a comment written before the short link existed', () => {
+  assert.ok(voice.carriesCta('come and build yours\n\nhttps://matewishkey.com/show'));
+});
+
+test('the guard recognises a comment carrying a short link', () => {
+  assert.ok(voice.carriesCta('come and build yours\n\nhttps://mwkshow.com/ab12x'));
+});
+
+test('the guard does not fire on an unrelated comment', () => {
+  assert.ok(!voice.carriesCta('great video mate'));
+  assert.ok(!voice.carriesCta('see matewishkey.com/episodes'));
+});
+
+test('every marker is a real substring of something we would post', () => {
+  const cfg = voice.config();
+  assert.ok(cfg.markers.includes(cfg.marker), 'the primary marker must be in the list');
+  assert.ok(cfg.links.show.includes(cfg.marker));
+  if (cfg.shortLink && cfg.shortLink.enabled) {
+    const sample = `https://${cfg.shortLink.host}/abcde`;
+    assert.ok(voice.carriesCta(sample), `no marker matches ${sample} — the guard would re-comment on every post`);
+  }
+});
+
+test('a composed comment renders the short link when it is given one', () => {
+  const short = voice.firstComment('k1', { platform: 'threads', noEpisode: true,
+    showUrl: 'https://mwkshow.com/ab12x' });
+  assert.match(short.text, /mwkshow\.com\/ab12x/);
+  assert.ok(!short.text.includes('matewishkey.com/show'));
+  assert.ok(voice.carriesCta(short.text), 'and it still reads as ours');
+});
+
+test('without a short link it falls back to the plain URL rather than failing', () => {
+  const plain = voice.firstComment('k1', { platform: 'threads', noEpisode: true, showUrl: null });
+  assert.match(plain.text, /matewishkey\.com\/show/);
+  assert.ok(voice.carriesCta(plain.text));
+});
+
+// Same post, same rendering — or the guard sees a different comment each run.
+test('the same post renders the identical comment twice running', () => {
+  const a = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, showUrl: 'https://mwkshow.com/zz' });
+  const b = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, showUrl: 'https://mwkshow.com/zz' });
+  assert.equal(a.text, b.text);
+});

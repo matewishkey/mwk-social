@@ -2,11 +2,20 @@
   "_": "Everything this pipeline says out loud. Public-safe by design: account IDs, budgets and keys live in ~/.config/mwk-social/ and ~/.secrets, never here.",
 
   "marker": "matewishkey.com/show",
-  "_marker": "The duplicate guard keys off this exact substring. Every composed comment must contain it. Changing it is a breaking change: the watcher would stop recognising its own past comments and would comment again on every post.",
+  "_marker": "The PRIMARY duplicate-guard substring, and the one every plain composed comment contains. Changing it is a breaking change: the watcher would stop recognising its own past comments and would comment again on every post.",
+
+  "markers": ["matewishkey.com/show", "mwkshow.com/"],
+  "_markers": "EVERY substring that means 'this post already carries our CTA'. The guard matches any of them, which is the only reason the short link could be introduced at all: comments posted before it exists carry the long URL forever, and a guard that knew only the new one would re-comment on every past post.",
 
   "links": {
     "show": "https://matewishkey.com/show",
     "live": ["https://youtube.com/@matewishkey", "https://twitch.tv/matewishkey"]
+  },
+
+  "shortLink": {
+    "enabled": true,
+    "host": "mwkshow.com",
+    "_": "One code per (platform, clip), minted through the dashboard's ingest API and idempotent — a re-run must render the identical comment or the guard above breaks. If minting fails the plain links.show is used instead: a link we cannot measure is far better than a comment that never goes out."
   },
   "feed": "https://matewishkey.com/rss.xml",
 

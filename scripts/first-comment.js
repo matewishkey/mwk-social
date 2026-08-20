@@ -40,7 +40,10 @@ const events = require('./lib/events');
 // Anything already carrying this string counts as "first comment done" —
 // including the one Zernio itself posted at publish time. It and the wording,
 // tags and caps all come from config/voice.json.
-const MARKER = voice.marker();
+// Any known marker counts as "already ours" — see config/voice.json markers[].
+// Matching only the newest one would re-comment on every post written before it.
+const carriesCta = voice.carriesCta;
+const shortlink = require('./lib/shortlink');
 
 // YouTube takes a while to auto-caption a fresh upload — hours for a long live
 // stream — and a comment cannot be edited once posted. So a recent video with no
@@ -158,7 +161,7 @@ function collectPosts(opts) {
 // already got the comment natively at publish time is left alone.
 async function alreadyCommented(target) {
   const res = await getComments(target.postId, target.accountId);
-  return (res.comments || []).some((c) => String(c.text || c.message || c.content || '').includes(MARKER));
+  return (res.comments || []).some((c) => carriesCta(c.text || c.message || c.content));
 }
 
 async function main() {
@@ -184,7 +187,7 @@ async function main() {
   for (const target of pending) {
     try {
       // The link is already in the caption — a comment repeating it is noise.
-      if (target.content.includes(MARKER)) {
+      if (carriesCta(target.content)) {
         state[target.key] = { commentedAt: null, note: 'link already in the caption', url: target.url };
         saveState(state);
         events.emit('comment.skipped', { message: 'link already in the caption', platform: target.platform,
@@ -255,11 +258,18 @@ async function main() {
       // Rotated per post so no two consecutive comments read the same, and
       // sometimes quoting a real guest wish from the show's feed.
       const override = opts.message || process.env.MWK_FIRST_COMMENT;
+      // One code per (platform, post), so a click says which channel and which
+      // clip earned it. Idempotent, and null if the dashboard is unreachable —
+      // in which case the plain URL goes out and the comment still happens.
+      const showUrl = override ? null : await shortlink.mint({
+        platform: target.platform, postKey: target.key, label: target.url || null,
+      });
       const composed = override
         ? { text: override, variant: 'override', index: -1 }
         : voice.firstComment(target.key, {
             platform: target.platform,
             topicTags,
+            showUrl,
             avoidIndex: state.__lastVariant?.[target.platform] ?? -1,
           });
       const body = composed.text;
