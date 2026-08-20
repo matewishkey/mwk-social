@@ -151,6 +151,41 @@ test('channels with almost no followers are left off the trend on purpose', asyn
   assert.match(html, /threads/);
 });
 
+/*
+ * daily_metric is one row per PLATFORM, so summing post_count counts a single
+ * clip once per platform it went to. Off two weeks of real data that read as
+ * "30.6 posts a week", which is nonsense. Cadence is days-we-posted instead.
+ */
+test('cadence counts days we posted, not platform-posts', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  // One clip a day for 7 days, each going to four platforms: 28 rows, 7 days.
+  const rows = [];
+  for (let d = 1; d <= 7; d++) {
+    for (const platform of ['facebook', 'instagram', 'tiktok', 'threads']) {
+      rows.push({ date: `2026-08-0${d}`, platform, post_count: 1, impressions: 10,
+        reach: 10, views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 });
+    }
+  }
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [], snapshots: {} });
+  const cadence = html.match(/<b>([\d.]+)<\/b>\s*<span>days a week we post<\/span>/);
+  assert.ok(cadence, 'the cadence tile should render');
+  assert.equal(cadence[1], '7.0', `posted every day for a week, got ${cadence[1]}`);
+});
+
+// A gap day is still a day that went by; the divisor is the span, not the
+// number of dates carrying data.
+test('the window is the real span, gaps included', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const rows = [
+    { date: '2026-08-01', platform: 'facebook', post_count: 1, impressions: 5, reach: 5,
+      views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 },
+    { date: '2026-08-15', platform: 'facebook', post_count: 1, impressions: 5, reach: 5,
+      views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 },
+  ];
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [], snapshots: {} });
+  assert.match(html, /Last 15 days/, 'two dates a fortnight apart is 15 days, not 2');
+});
+
 test('with no clicks the page says why there is nothing to show', async () => {
   const { statsPage } = await src('pages/stats.js');
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [], snapshots: {} });

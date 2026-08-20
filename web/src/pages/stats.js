@@ -63,8 +63,21 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
     return a;
   }, {});
   const rate = RATE(totals);
-  const weeks = Math.max(dates.length / 7, 1);
-  const cadence = totals.posts ? totals.posts / weeks : 0;
+
+  /*
+   * Cadence is DAYS WE POSTED, not posts. daily_metric is one row per platform,
+   * so summing post_count counts a single clip four times over if it went to
+   * four platforms — which read as "30 posts a week" off two weeks of data.
+   * Days-we-posted is unambiguous, and it is the lever that is actually ours.
+   *
+   * The divisor is the real span, first date to last, not the number of dates
+   * carrying data: a day with no post is still a day that went by.
+   */
+  const spanDays = dates.length
+    ? Math.max(Math.round((Date.parse(dates[dates.length - 1]) - Date.parse(dates[0])) / 86400_000) + 1, 1)
+    : 0;
+  const postedOn = dates.filter((d) => byDate[d].posts > 0).length;
+  const cadence = spanDays ? postedOn / (spanDays / 7) : 0;
   const totalClicks = clicks.reduce((a, c) => a + c.n, 0);
 
   // ---- per-channel cards -------------------------------------------------
@@ -109,7 +122,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
 
   const body = `
 <h1>Stats</h1>
-<p class="lede">Last ${dates.length || days} days${dates.length ? `, ${esc(dates[0])} to ${esc(dates[dates.length - 1])}` : ''}.</p>
+<p class="lede">Last ${spanDays || days} days${dates.length ? `, ${esc(dates[0])} to ${esc(dates[dates.length - 1])}` : ''}.</p>
 
 <div class="tiles">
   ${tile(num(totals.reach || totals.impressions || 0), 'people reached', 'plain', 'did anyone see it')}
@@ -117,7 +130,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
   ${tile(rate == null ? '—' : `${rate.toFixed(1)}%`, 'engagement rate',
     rate == null ? 'plain' : rate >= 5 ? 'ok' : rate >= 2 ? 'warn' : 'bad', 'did anyone care')}
   ${tile(totalClicks, 'link clicks', totalClicks ? 'ok' : 'plain', 'sign-up CTA')}
-  ${tile(cadence.toFixed(1), 'posts a week', cadence >= 5 ? 'ok' : cadence >= 2 ? 'warn' : 'bad', 'the lever we control')}
+  ${tile(cadence.toFixed(1), 'days a week we post', cadence >= 5 ? 'ok' : cadence >= 3 ? 'warn' : 'bad', 'the lever we control')}
 </div>
 
 ${card('Reach by day', bars(dates.map((d) => ({ label: d, value: byDate[d].reach })), { label: 'reach by day' })
