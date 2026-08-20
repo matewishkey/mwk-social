@@ -1,0 +1,94 @@
+# Playbook
+
+What this pipeline does, the rules it runs on, and what each platform will and won't allow.
+Everything here was learned by doing it live — where a rule exists, something broke to earn it.
+
+## The shape of it
+
+```
+Restream ──> Facebook · LinkedIn · YouTube · Twitch      (automatic, not ours)
+                │
+                └── the mirror ──> Instagram · TikTok · Threads · X
+                                          │
+first-comment.js (hourly) ────────────────┴──> the CTA comment, everywhere it can reach
+```
+
+Two ways the call-to-action gets under a post:
+
+| | How | Where |
+|---|---|---|
+| **At publish time** | `platformSpecificData.firstComment`, posted by Zernio seconds after the post | Facebook, Instagram, LinkedIn, YouTube |
+| **Afterwards** | `scripts/first-comment.js`, hourly, for anything we didn't publish | + Threads |
+| **In the caption** | no comment API exists | TikTok, X |
+
+They compose safely because both read `config/voice.json` and both skip a post that already
+carries the marker — whoever put it there.
+
+## What gets said
+
+`config/voice.json` is the only place. The CTA variants, the identity tags, the per-platform
+hashtag caps, the blocklist, the YouTube blurb, the feed URL. Change it there or you'll change it
+in the wrong place.
+
+- **`#PromptItYourself` and `#PIY` always travel together, in that order.** `#MWKShow` is for show
+  and episode content, not every clip.
+- **Topic tags describe the video**, derived from its own transcript. If it's about trading it
+  says `#Trading`. Never audience tags, never marketing, never `#AI` — there's a blocklist that
+  enforces it whatever the model suggests.
+- **The comment rotates** so it isn't the same three lines forever, and roughly two in five quote
+  a real guest wish from `matewishkey.com/rss.xml` and link that episode.
+- **`matewishkey.com/show` is load-bearing.** It's how we recognise our own comments. Any composed
+  comment that loses it is refused rather than posted.
+
+## Rules that exist because something broke
+
+| Rule | What happened |
+|---|---|
+| Comment calls take the **platform-native** post ID, never Zernio's `_id` | The Zernio id 404s on every `inbox:` call |
+| Never pass a post ID as a CLI positional | A YouTube ID starting with `-` is read as a flag; the CLI printed its help and the script logged a failure. Hence `scripts/lib/api.js` |
+| Check the target before posting | We put a clip on TikTok that was already there. An assumed list of "what Restream covers" will always drift |
+| Secrets never in `argv` | `ps` is world-readable |
+| Alert on `needsReconnect` or `error`, never on `warning` | Tokens refresh lazily; `warning` is a normal state to pass through |
+| Write state after **every** decision | A backfill killed at two minutes had posted 13 comments and recorded none |
+| A caption that already has the link gets no comment | Otherwise the same URL appears twice under one post |
+| Wait for the transcript rather than posting untagged | The comment is one-shot; it can't be edited later |
+| No `--flag` on `post-everywhere.sh` | A stray `--dry-run` was read as the video argument and published for real |
+
+## What each platform allows
+
+| | Comment API | Delete via API | Notes |
+|---|---|---|---|
+| **Facebook** | yes | yes | Pages only, never personal timelines. ~60-day tokens |
+| **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
+| **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, quote-reshare from personal |
+| **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
+| **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
+| **TikTok** | **none at all** | yes | Link goes in the caption. Consent flags required per post. Its own daily cap |
+| **X** | 403 on this plan | yes | Link goes in the post. Premium required or link posts get zero engagement |
+
+### The two that cost money or reach if you get them wrong
+
+**Instagram caps hashtags at 5, counting the caption and the comments together.** Enforced since
+18 Dec 2025; over the cap and the post loses Explore, hashtag pages and Reels recommendations.
+So a mirrored Instagram caption carries *zero* hashtags and the comment spends the budget.
+
+**X bills $0.20 for a post containing a URL, against $0.015 without.** The fee follows whichever
+post holds the link, so a thread pays the $0.20 *plus* $0.015 for the second post — the link goes
+in the post itself, never in a reply. Measured against real billing, not the price list.
+
+## Media
+
+- Facebook's media URLs are **signed and expire** — two of seven were already dead within a
+  fortnight. Download at detection, not at publish.
+- YouTube returns an **empty** media URL, so transcripts there come from `yt-dlp --write-auto-subs`
+  instead. Free, and it covers a four-hour stream in full rather than the first fifteen minutes.
+- TikTok and X withhold media entirely (`platform_withheld`).
+- `--download-sections` segfaults this box's ffmpeg build. Don't reach for it.
+
+## Reading the API
+
+`posts:list` has a pipeline post the instant it publishes. `analytics:posts` lags minutes behind
+but is the only place natively-authored posts ever appear. **Read both.**
+
+A comment read on a post the account doesn't own returns success with an empty list — "no
+comments" never proves "not commented".

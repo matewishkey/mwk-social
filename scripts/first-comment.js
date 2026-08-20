@@ -2,7 +2,7 @@
 /*
  * Post the standard first comment on anything published that hasn't got one yet.
  *
- * Two paths put the same comment out, both reading first-comment.txt:
+ * Two paths put the comment out, both composing it from config/voice.json:
  *   - posts published through the pipeline carry it natively (scripts/post.js
  *     sends platformSpecificData.firstComment, Zernio posts it within seconds);
  *   - everything else — phone-app posts, live-event videos, anything created
@@ -34,17 +34,15 @@ const path = require('path');
 
 const { topicsFor } = require('./lib/topic-tags');
 const { getComments, replyToPost } = require('./lib/api');
+const voice = require('./lib/voice');
 
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
-const TEMPLATE = path.join(REPO, 'first-comment.txt');
 
 // Anything already carrying this string counts as "first comment done" —
-// including the one Zernio itself posted at publish time.
-const MARKER = 'matewishkey.com/show';
-
-// Goes on every post, always. The topic tags derived from the video follow it.
-const IDENTITY_TAG = '#PromptItYourself';
+// including the one Zernio itself posted at publish time. It and the wording,
+// tags and caps all come from config/voice.json.
+const MARKER = voice.marker();
 
 // YouTube takes a while to auto-caption a fresh upload — hours for a long live
 // stream — and a comment cannot be edited once posted. So a recent video with no
@@ -68,7 +66,7 @@ function parseArgs(argv) {
     else if (a === '--all') opts.all = true;
     else if (a === '--hours') opts.hours = Number(argv[++i]);
     else if (a === '--limit') opts.limit = Number(argv[++i]);
-    else if (a === '--message') opts.message = argv[++i];
+    else if (a === '--message') opts.message = argv[++i];   // bypasses rotation entirely
     else if (a === '--platforms') opts.platforms = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
     else if (a === '-h' || a === '--help') { usage(); process.exit(0); }
     else { console.error(`unknown option: ${a}`); usage(); process.exit(2); }
@@ -122,13 +120,6 @@ function saveState(state) {
   const p = statePath();
   fs.mkdirSync(path.dirname(p), { recursive: true });
   fs.writeFileSync(p, JSON.stringify(state, null, 2) + '\n');
-}
-
-function template() {
-  const text = fs.readFileSync(TEMPLATE, 'utf8').trim();
-  if (!text) throw new Error(`${TEMPLATE} is empty`);
-  if (!text.includes(MARKER)) throw new Error(`${TEMPLATE} must contain ${MARKER} — the duplicate guard keys off it`);
-  return text;
 }
 
 // Stories can't be commented on and expire anyway.
@@ -195,7 +186,6 @@ async function alreadyCommented(target) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const message = opts.message || process.env.MWK_FIRST_COMMENT || template();
   const state = loadState();
   const stamp = new Date().toISOString();
 
@@ -247,7 +237,7 @@ async function main() {
       }
       // Work out what the video was about, and tag it with that. A failure here
       // must never cost the post its comment — fall back to the plain CTA.
-      let tags = [IDENTITY_TAG];
+      let topicTags = [];
       let summary = '';
       let gotTopics = false;
       if (!opts.noTopics) {
@@ -257,7 +247,7 @@ async function main() {
             youtubeId: target.platform === 'youtube' ? target.postId : null,
           });
           if (topics) {
-            tags = tags.concat(topics.tags.map((t) => `#${t}`));
+            topicTags = topics.tags;
             summary = topics.summary;
             gotTopics = true;
           }
@@ -273,10 +263,21 @@ async function main() {
         console.log(`wait  ${target.key} — no transcript yet, ${ageHours.toFixed(1)}h old, retrying next run (${target.url})`);
         continue;
       }
-      const body = `${message}\n\n${tags.join(' ')}`;
+      // Rotated per post so no two consecutive comments read the same, and
+      // sometimes quoting a real guest wish from the show's feed.
+      const override = opts.message || process.env.MWK_FIRST_COMMENT;
+      const composed = override
+        ? { text: override, variant: 'override', index: -1 }
+        : voice.firstComment(target.key, {
+            platform: target.platform,
+            topicTags,
+            avoidIndex: state.__lastVariant?.[target.platform] ?? -1,
+          });
+      const body = composed.text;
 
       if (opts.dryRun) {
-        console.log(`DRY   ${target.key} — would comment ${tags.join(' ')} (${target.url})`);
+        console.log(`DRY   ${target.key} — would comment [${composed.variant}/${composed.index}] (${target.url})`);
+        console.log(`      ${body.replace(/\n+/g, ' | ').slice(0, 150)}`);
         if (summary) console.log(`      about: ${summary}`);
         continue;
       }
@@ -284,11 +285,13 @@ async function main() {
       state[target.key] = {
         commentedAt: new Date().toISOString(),
         commentId: (res.comment && res.comment.id) || res.commentId || null,
-        tags,
+        variant: `${composed.variant}/${composed.index}`,
+        tags: topicTags,
         url: target.url,
       };
+      state.__lastVariant = { ...(state.__lastVariant || {}), [target.platform]: composed.index };
       saveState(state);
-      console.log(`post  ${target.key} — commented ${tags.join(' ')} (${target.url})`);
+      console.log(`post  ${target.key} — commented [${composed.variant}/${composed.index}] (${target.url})`);
     } catch (err) {
       failures++;
       console.error(`FAIL  ${target.key} — ${err.message}`);

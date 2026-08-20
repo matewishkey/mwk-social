@@ -1,0 +1,57 @@
+{
+  "_": "Everything this pipeline says out loud. Public-safe by design: account IDs, budgets and keys live in ~/.config/mwk-social/ and ~/.secrets, never here.",
+
+  "marker": "matewishkey.com/show",
+  "_marker": "The duplicate guard keys off this exact substring. Every composed comment must contain it. Changing it is a breaking change: the watcher would stop recognising its own past comments and would comment again on every post.",
+
+  "links": {
+    "show": "https://matewishkey.com/show",
+    "live": ["https://youtube.com/@matewishkey", "https://twitch.tv/matewishkey"]
+  },
+  "feed": "https://matewishkey.com/rss.xml",
+
+  "tags": {
+    "identity": ["#PromptItYourself", "#PIY"],
+    "_identity": "Always emitted together and adjacent, in this order.",
+    "brand": "#MWKShow",
+    "_brand": "Show and episode content only, not every clip.",
+    "maxTopic": 4,
+    "caps": { "instagram": 5, "twitter": 1, "tiktok": null, "threads": null, "facebook": null, "youtube": null },
+    "_caps": "null = no meaningful cap. Instagram's 5 counts the caption AND the comments together.",
+    "blocked": [
+      "ai", "artificialintelligence", "chatgpt", "openai", "genai", "aitools", "machinelearning",
+      "tech", "technology", "coding", "programming",
+      "fyp", "foryou", "foryoupage", "viral", "trending", "explore", "explorepage",
+      "instagood", "reels", "reel", "reelsinstagram", "shorts", "tiktok", "instagram",
+      "motivation", "inspiration", "success", "mindset", "hustle", "grind", "entrepreneur",
+      "contentcreator", "creator", "follow", "like", "share", "subscribe"
+    ]
+  },
+
+  "firstComment": {
+    "episodeMixRatio": 0.4,
+    "_episodeMixRatio": "Roughly this share of comments quote a real guest wish from the feed. The rest are the plain invitation. If the feed is unreachable, every comment falls back to a plain variant.",
+    "_register": "Written informally on purpose — lowercase openings, dropped commas, 'dont'. Hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker.",
+
+    "plain": [
+      "Do not let others solve your problem with AI. Prompt it Yourself!\nCome to the show and let's build what You wish for!\n\n{show}",
+      "one wish is one show. bring me something you wish your computer did, and we build it on your own machine while we talk.\n\n{show}",
+      "if theres something you wish your computer did, thats the whole show. three to four hours, unedited.\n\n{show}",
+      "dont let someone else prompt it for you. come and build the thing yourself.\n\n{show}",
+      "no experience needed and no camera skills either. a real problem and your own computer is the whole list.\n\n{show}",
+      "you keep what we build, and you can change it afterwards without me. thats the point of it.\n\n{show}",
+      "somebodys problem, out of their own work, built on their own computer. thats one show.\n\n{show}"
+    ],
+
+    "episode": [
+      "\"{wish}\"\n\nthats what someone brought to the show — {episodeTitle}. yours could be next.\n\n{show}",
+      "someone turned up and said: \"{wish}\"\n\nwe built it, unedited: {episodeUrl}\n\nwhats yours? {show}",
+      "last one on the show wished for this: \"{wish}\"\n\n{episodeTitle} — {episodeUrl}\n\nbring me yours: {show}"
+    ]
+  },
+
+  "youtubeDescription": {
+    "showBlurb": "Mate Wish Key is a live show where someone who has never written code builds the thing they actually need. I hand over the keys instead of doing it for them.\n\nWant to build yours on the show? Sign up at https://matewishkey.com/show\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey",
+    "_showBlurb": "PENDING: mate has five candidate rewrites of this on work.l (2026-08-19_shownotes-and-thumbnails) and has not picked one. The current text is my paraphrase, not his voice — replace it once he chooses."
+  }
+}

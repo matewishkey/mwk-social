@@ -36,10 +36,22 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   **No TikTok.** Skipped on drafts. **The CLI has no flag for it**, same as `reshareUrl` — so
   `scripts/post.js` talks to `POST /v1/posts` directly; `posts:create` cannot do this.
   Verified live 2026-08-19 on YouTube.
-- **The standard first comment lives in `first-comment.txt`** — one file, read by both paths.
-  It must contain `matewishkey.com/show`: the dedupe guard keys off that string, so a template
-  edited to drop the URL would have the watcher duplicate every natively-posted comment. Both
-  `first-comment.js` and `post.js` refuse to run without it.
+- **Everything we say out loud lives in `config/voice.json`** — the CTA variants, identity and
+  brand tags, per-platform hashtag caps, the blocklist, the YouTube show blurb, the feed URL.
+  `scripts/lib/voice.js` is the only reader; no script carries its own copy any more.
+  It must contain `marker` (`matewishkey.com/show`) and every variant must contain `{show}`:
+  the dedupe guard keys off that string, so a variant that dropped the URL would have the watcher
+  duplicate every natively-posted comment. `voice.js` refuses to load a config that breaks either
+  rule, and refuses to return a composed comment that has lost the marker.
+- **The first comment rotates.** A variant is picked deterministically from the post's key, so a
+  re-run renders the identical comment while consecutive posts differ; the last index used per
+  platform is kept in the state file so the same one never lands twice running. Roughly
+  `episodeMixRatio` of comments quote a real guest wish pulled from the show's RSS feed and link
+  that episode. If the feed is unreachable every comment falls back to a plain variant —
+  freshness must never block a comment.
+- **Hashtag caps are enforced per platform in `voice.tagLine()`** — Instagram's 5 leaves room for
+  the two identity tags plus three topic tags, and a cap tighter than the identity pair (X's 1)
+  truncates the pair rather than blowing the budget.
 - **`matewishkey.com/show` is the guest SIGN-UP page, not the stream** — the show goes out live on
   youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
 - **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the

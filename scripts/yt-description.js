@@ -20,19 +20,14 @@ const os = require('os');
 const path = require('path');
 const { api } = require('./lib/api');
 const { topicsFor } = require('./lib/topic-tags');
+const voice = require('./lib/voice');
 
 const ACCOUNT = process.env.MWK_YT_ACCOUNT || '6a7f2a4677555aae01be88d4';
 const BACKUP = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
   'mwk-social', 'yt-descriptions');
 
-// The constant half of every description. Kept here rather than in a template
-// file because it is show copy, not the CTA the comment machinery keys off.
-const SHOW_BLURB = `Mate Wish Key is a live show where someone who has never written code builds the thing they actually need. I hand over the keys instead of doing it for them.
-
-Want to build yours on the show? Sign up at https://matewishkey.com/show
-Live on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey`;
-
-const IDENTITY_TAG = '#PromptItYourself';
+// The constant half of every description, and the identity tags, both from
+// config/voice.json so there is one place to change what we say.
 
 const yt = (args) => execFileSync('yt-dlp', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const currentDescription = (id) => yt(['-q', '--no-warnings', '--print', '%(description)s', '--', `https://www.youtube.com/watch?v=${id}`]);
@@ -79,8 +74,8 @@ async function build(id) {
   const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
   if (!topics) throw new Error('no transcript available (YouTube has not captioned it yet)');
   const opening = await summarise(topics.transcript, title);
-  const tags = [IDENTITY_TAG, ...topics.tags.map((t) => `#${t}`)].join(' ');
-  return { title, description: `${opening}\n\n${SHOW_BLURB}\n\n${tags}` };
+  const tags = voice.tagLine('youtube', topics.tags);
+  return { title, description: `${opening}\n\n${voice.showBlurb()}\n\n${tags}` };
 }
 
 async function main() {

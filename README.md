@@ -29,10 +29,15 @@ at once, straight from a shell — these are the actual live posts:
   standard first comment natively, so it lands seconds after the post does.
 - `scripts/post-everywhere.sh` — the original one-liner entry point, now a thin
   wrapper over `post.js`.
-- `first-comment.txt` — the first comment itself. One file, used by both paths.
+- `config/voice.json` — everything the pipeline says out loud: the rotating first-comment
+  variants, the identity and brand tags, per-platform hashtag caps, the tag blocklist and the
+  YouTube show blurb. One file to change what gets posted.
 - `scripts/first-comment.js` — the catch-all: finds posts that went out without
   the comment (phone-app posts, live-event videos, anything created straight on
-  the platform) and adds it. Skips anything that already has it.
+  the platform) and adds it. Skips anything that already has it. The wording
+  rotates, and some comments quote a real guest wish from the show's feed.
+- `docs/playbook.md` — the rules this pipeline runs on, and what each platform
+  will and won't allow.
 - `scripts/install-first-comment-timer.sh` — installs the systemd `--user` timer
   that runs the catch-all hourly.
 - `scripts/lib/topic-tags.js` — works out what a video was about so the comment

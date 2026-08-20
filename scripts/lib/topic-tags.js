@@ -16,25 +16,19 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const voice = require('./voice');
 
 const CACHE = process.env.MWK_TOPIC_CACHE ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
     'mwk-social', 'topics');
 
-const MAX_TAGS = 4;          // + the identity tag = Instagram's cap of 5
 const MAX_AUDIO_SECONDS = 900;
 
-// Never let these through, whatever the model says: the mainstream AI/creator
-// tags are the exact crowd we're trying to step around, and the hype tags say
-// nothing about the content.
-const BLOCKED = new Set([
-  'ai', 'artificialintelligence', 'chatgpt', 'openai', 'genai', 'aitools', 'machinelearning',
-  'tech', 'technology', 'coding', 'programming',
-  'fyp', 'foryou', 'foryoupage', 'viral', 'trending', 'explore', 'explorepage',
-  'instagood', 'reels', 'reel', 'reelsinstagram', 'shorts', 'tiktok', 'instagram',
-  'motivation', 'inspiration', 'success', 'mindset', 'hustle', 'grind', 'entrepreneur',
-  'contentcreator', 'creator', 'follow', 'like', 'share', 'subscribe',
-]);
+// Tag rules live in config/voice.json — one file for everything we say out loud.
+// The blocklist is the backstop that stops the mainstream AI/creator/hype tags
+// getting through whatever the model suggests.
+const MAX_TAGS = voice.maxTopicTags();
+const BLOCKED = voice.blockedTags();
 
 const sh = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
 

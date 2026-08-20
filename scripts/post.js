@@ -22,26 +22,18 @@
 
 const { execFileSync } = require('child_process');
 const { api } = require('./lib/api');
+const voice = require('./lib/voice');
 const fs = require('fs');
 const path = require('path');
 
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
-const TEMPLATE = path.join(REPO, 'first-comment.txt');
 
 // Platforms whose platformSpecificData accepts firstComment (docs.zernio.com
 // platform guides). TikTok has no such field.
 const FIRST_COMMENT_PLATFORMS = new Set(['facebook', 'instagram', 'linkedin', 'youtube']);
 
 const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
-
-// On every post, same as the watcher's comments. Topic tags are not derived here
-// yet — the clip would have to be transcribed before publishing (see repo issues).
-const IDENTITY_TAG = '#PromptItYourself';
-
-// first-comment.js keys its duplicate guard off this string. A template that
-// lost it would have the watcher comment again on top of the native one.
-const MARKER = 'matewishkey.com/show';
 
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
@@ -109,11 +101,11 @@ function resolveMedia(items) {
   });
 }
 
-function template() {
-  const text = fs.readFileSync(TEMPLATE, 'utf8').trim();
-  if (!text) throw new Error(`${TEMPLATE} is empty`);
-  if (!text.includes(MARKER)) throw new Error(`${TEMPLATE} must contain ${MARKER} — the dedupe guard keys off it`);
-  return `${text}\n\n${IDENTITY_TAG}`;
+// No post ID exists yet, so the rotation is keyed off the content itself:
+// stable for a given post, different between posts. Topic tags are not derived
+// here — the clip would have to be transcribed before publishing (repo issue #10).
+function commentFor(platform, text) {
+  return voice.firstComment(`new:${voice.hash(text)}`, { platform }).text;
 }
 
 async function waitForResults(postId) {
@@ -130,7 +122,7 @@ async function waitForResults(postId) {
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
   const accounts = resolveAccounts(opts);
-  const message = opts.firstComment ? template() : null;
+  const wantComment = opts.firstComment;
 
   const body = { content: opts.text };
   const media = resolveMedia(opts.media);
@@ -138,8 +130,8 @@ async function main() {
   if (opts.title) body.title = opts.title;
   body.platforms = accounts.map((a) => {
     const entry = { platform: a.platform, accountId: a.id };
-    if (message && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
-      entry.platformSpecificData = { firstComment: message };
+    if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
+      entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text) };
     }
     return entry;
   });
@@ -147,7 +139,7 @@ async function main() {
   else if (opts.schedule) body.scheduledFor = opts.schedule;
   else body.publishNow = true;
 
-  const noComment = accounts.filter((a) => message && !FIRST_COMMENT_PLATFORMS.has(a.platform));
+  const noComment = accounts.filter((a) => wantComment && !FIRST_COMMENT_PLATFORMS.has(a.platform));
   if (noComment.length) {
     console.log(`note: ${noComment.map((a) => a.platform).join(', ')} take no firstComment — first-comment.js picks those up later`);
   }
