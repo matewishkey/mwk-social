@@ -183,6 +183,28 @@ misdiagnose: it makes seven live clips look dead. If you ever do need `fetch` ag
 `net.setDefaultAutoSelectFamilyAttemptTimeout(500)` fixes it — measured, four out of four, not
 guessed.
 
+## The pace, and what runs it
+
+Two systemd `--user` timers, both from `scripts/install-timers.sh`:
+
+| Unit | When | What |
+|---|---|---|
+| `mwk-first-comment` | `*:00` | the CTA comment on anything that hasn't got one |
+| `mwk-mirror` | `*:10` | `--apply --scheduled` — publishes if this is a turn |
+
+Ten minutes apart on purpose: a clip the mirror publishes has settled before the watcher goes
+looking for it.
+
+**The pace is in the script, not the cadence.** The timer is a dumb hourly heartbeat and
+`whyNotNow()` says no most of the time — three a day, ninety minutes apart, inside a
+09:00–21:00 window. Keeping it there means the rules are readable in one place and a run by hand
+obeys them too.
+
+**That window is the audience's timezone.** The box is `Etc/UTC` and the audience is in Brisbane,
+so an unqualified "09:00 to 21:00" would put every post out between 19:00 and 07:00 — the whole
+window overnight. `MWK_TZ` moves it. Day boundaries for the daily cap are zoned as well, or the
+cap resets twelve hours early.
+
 ## Reading the API
 
 `posts:list` has a pipeline post the instant it publishes. `analytics:posts` lags minutes behind

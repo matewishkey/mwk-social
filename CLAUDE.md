@@ -56,7 +56,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
 - **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
   `mwk-first-comment.timer` systemd --user unit (install/refresh:
-  `scripts/install-first-comment-timer.sh`, logs: `journalctl --user -u mwk-first-comment`).
+  `scripts/install-timers.sh`, logs: `journalctl --user -u mwk-first-comment`).
   Covers what the publish-time field cannot: posts made in the apps, live-event videos, anything
   created straight on the platform. IG/FB/LI/YT, any post type; **TikTok is impossible** (no
   comments API at all). Skips a post that already carries the CTA link, whoever put it there, so
@@ -198,6 +198,20 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   arrives later with the analytics sync. It also returns **no post URL at all**.
 - **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one mirrored
   post carrying a link.
+
+- **Two systemd --user timers, installed by `scripts/install-timers.sh`** (which replaced the
+  first-comment-only installer): `mwk-first-comment` at `*:00` and `mwk-mirror` at `*:10`. The
+  mirror runs `--apply --scheduled`, so **the pace lives in the script, not the cron cadence** —
+  the timer is a dumb hourly heartbeat and `whyNotNow()` says no most of the time. A hand run
+  obeys the same rules. `:10` keeps the mirror ten minutes behind the comment run so a freshly
+  mirrored clip has settled before the watcher looks for it.
+- **The posting window is the AUDIENCE's timezone, not the box's.** This machine is `Etc/UTC`; the
+  window is `Australia/Brisbane` (`MWK_TZ` overrides). Unqualified, "09:00–21:00" would have put
+  every post out between 19:00 and 07:00 Brisbane — the entire window overnight. Day boundaries for
+  the daily cap are zoned too, or the cap resets twelve hours early.
+- **Seeding must preserve provenance.** `--seed` repairs an unsettled ledger entry from the live
+  platform, and if that entry has an `at` then **we** posted it — relabelling it "already live
+  before the mirror ran" drops it from the day's pace count and the drip overshoots.
 
 ## Platform gotchas (verified against docs.zernio.com)
 

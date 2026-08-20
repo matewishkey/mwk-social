@@ -6,7 +6,7 @@
  * Instagram, TikTok, Threads and X get nothing unless someone does it by hand —
  * which is what this closes.
  *
- * Read-only until --apply exists. Two modes today:
+ * Four modes; only the last one publishes:
  *
  *   --plan   what is missing, and when each one would go out. Touches nothing.
  *   --media  fetch and probe every reel's video, and say whether each target
@@ -47,9 +47,49 @@ const SOURCE = platforms.SOURCE_PLATFORM;
 const FALLBACK = 'youtube';
 const READ = [SOURCE, ...TARGETS, FALLBACK];
 
-// Posting window and pace. The owner asked for "a few a day, spread over days";
-// these are the knobs that means.
-const DEFAULTS = { perDay: 3, startHour: 9, endHour: 21, minGapMinutes: 90 };
+/*
+ * Posting window and pace. The owner asked for "a few a day, spread over days";
+ * these are the knobs that means.
+ *
+ * THE TIMEZONE IS THE AUDIENCE'S, NOT THE BOX'S. This machine runs on UTC, so
+ * an unqualified "09:00 to 21:00" would put every post out between 19:00 and
+ * 07:00 in Brisbane — the whole window overnight, which is the opposite of what
+ * a posting window is for. Override with MWK_TZ if the audience moves.
+ */
+const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
+const DEFAULTS = { perDay: 3, startHour: 9, endHour: 21, minGapMinutes: 90, tz: TZ };
+
+/** The calendar day and hour at an instant, as the audience sees them. */
+function zoned(date) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', {
+    timeZone: TZ, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
+  }).formatToParts(date).map((p) => [p.type, p.value]));
+  return { day: `${parts.year}-${parts.month}-${parts.day}`, hour: Number(parts.hour) };
+}
+
+const offsetMinutes = (date) => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', {
+    timeZone: TZ, hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(date).map((x) => [x.type, x.value]));
+  return (Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - date.getTime()) / 60000;
+};
+
+/**
+ * The instant at which it is `hour` o'clock, on the audience's calendar day
+ * `dayOffset` days after `from`. Two passes because the offset itself depends on
+ * the answer — which is what makes this correct across a DST boundary rather
+ * than only in a zone that happens not to have one.
+ */
+function zonedInstant(from, dayOffset, hour) {
+  const [y, m, d] = zoned(from).day.split('-').map(Number);
+  const wall = Date.UTC(y, m - 1, d + dayOffset, hour);
+  let guess = wall;
+  for (let i = 0; i < 2; i++) guess = wall - offsetMinutes(new Date(guess)) * 60000;
+  return new Date(guess);
+}
 
 function ledgerPath() {
   return process.env.MWK_MIRROR_LEDGER ||
@@ -71,7 +111,7 @@ function parseArgs(argv) {
   // --apply defaults to a single post. Publishing is the one thing here that
   // cannot be undone on every platform, so more than one has to be asked for.
   const opts = { mode: null, days: 7, perDay: DEFAULTS.perDay, json: false, dryRun: false,
-    limit: 100, apply: 1, platforms: TARGETS };
+    limit: 100, apply: 1, platforms: TARGETS, scheduled: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--plan') opts.mode = 'plan';
@@ -85,6 +125,7 @@ function parseArgs(argv) {
     else if (a === '--per-day') opts.perDay = Number(argv[++i]);
     else if (a === '--limit') opts.limit = Number(argv[++i]);
     else if (a === '--count') opts.apply = Number(argv[++i]);
+    else if (a === '--scheduled') opts.scheduled = true;
     else if (a === '-h' || a === '--help') { usage(); process.exit(0); }
     else { console.error(`unknown option: ${a}`); usage(); process.exit(2); }
   }
@@ -105,6 +146,8 @@ function usage() {
   console.log('  --media  fetch and probe each reel, and check it against every target');
   console.log('  --seed   record what is already live, so nothing already posted is posted again');
   console.log('  --apply  publish the next N missing posts (default 1)');
+  console.log('           --scheduled  obey the drip: 3/day, 90 min apart, 09:00-21:00.');
+  console.log('                        Safe to run every hour; it decides whether this is a turn.');
 }
 
 // posts:list carries a pipeline post the instant it publishes; analytics:posts
@@ -227,10 +270,8 @@ function schedule(assessment, opts, from = new Date()) {
   const step = opts.perDay > 1 ? span / (opts.perDay - 1) : 0;
   for (let day = 0; slots.length < queue.length && day < opts.days; day++) {
     for (let i = 0; i < opts.perDay && slots.length < queue.length; i++) {
-      const at = new Date(from);
-      at.setDate(at.getDate() + day + 1);           // start tomorrow, never mid-run
-      at.setHours(DEFAULTS.startHour + Math.round(step * i), 0, 0, 0);
-      slots.push(at);
+      // day + 1: start tomorrow, never mid-run.
+      slots.push(zonedInstant(from, day + 1, DEFAULTS.startHour + Math.round(step * i)));
     }
   }
 
@@ -289,10 +330,10 @@ function printPlan(assessment, plan, universe, opts) {
   let lastDay = '';
   for (const item of plan) {
     if (!item.at) { console.log(`  (past --days ${opts.days})  ${item.platform.padEnd(10)} ${label(item.source)}`); continue; }
-    const day = item.at.slice(0, 10);
-    if (day !== lastDay) { console.log(`  ${day}`); lastDay = day; }
+    const { day, hour } = zoned(new Date(item.at));
+    if (day !== lastDay) { console.log(`  ${day}  (${TZ})`); lastDay = day; }
     const weak = assessment.find((c) => c.clipId === item.clipId).targets[item.platform].confidence === 'weak';
-    console.log(`    ${item.at.slice(11, 16)}  ${item.platform.padEnd(10)} ${label(item.source)}${weak ? '   (unverifiable — ledger only)' : ''}`);
+    console.log(`    ${String(hour).padStart(2, '0')}:00  ${item.platform.padEnd(10)} ${label(item.source)}${weak ? '   (unverifiable — ledger only)' : ''}`);
   }
 }
 
@@ -325,8 +366,14 @@ function seed(assessment, ledger, opts) {
       if (already && already.status !== 'pending' && v.verdict !== 'duplicate') continue;
 
       if (v.verdict === 'duplicate') {
-        entry.targets[platform] = { status: 'posted', at: null, seededAt: stamp,
-          note: 'already live before the mirror ran', evidence: v.evidence, url: v.url };
+        // Keep provenance. If this entry was mid-flight or recorded as failed,
+        // WE posted it — repairing it must not relabel our own post as
+        // pre-existing, or the day's pace count loses it and the drip overshoots.
+        const ours = already && already.at;
+        entry.targets[platform] = { status: 'posted', seededAt: stamp,
+          at: ours ? already.at : null,
+          note: ours ? 'mirrored' : 'already live before the mirror ran',
+          evidence: v.evidence, url: v.url };
         posted++;
       } else if (v.verdict === 'none') {
         entry.targets[platform] = { status: 'pending', seededAt: stamp, confidence: v.confidence };
@@ -586,7 +633,45 @@ async function waitFor(postId) {
   return [];
 }
 
+/*
+ * Is now a turn?
+ *
+ * The owner asked for "a few a day, spread over days", so the pace is enforced
+ * here rather than by the timer's cadence: the unit fires hourly and this says
+ * no most of the time. Keeping the decision in the script means the rules are
+ * readable in one place and a manual run obeys them too.
+ *
+ * @returns {string|null} why not, or null if it is
+ */
+function whyNotNow(ledger, opts, now = new Date()) {
+  const here = zoned(now);
+  if (here.hour < DEFAULTS.startHour || here.hour > DEFAULTS.endHour) {
+    return `${here.hour}:00 ${TZ} is outside the ${DEFAULTS.startHour}:00-${DEFAULTS.endHour}:00 window`;
+  }
+  const mirrored = [];
+  for (const clip of Object.values(ledger.clips || {})) {
+    for (const t of Object.values(clip.targets || {})) {
+      if (t.note === 'mirrored' && t.at) mirrored.push(t.at);
+    }
+  }
+  const todays = mirrored.filter((at) => zoned(new Date(at)).day === here.day);
+  if (todays.length >= opts.perDay) return `${todays.length} already went out today`;
+
+  const last = mirrored.sort().pop();
+  if (last) {
+    const gap = (now - new Date(last)) / 60000;
+    if (gap < DEFAULTS.minGapMinutes) {
+      return `only ${Math.round(gap)} min since the last one (${DEFAULTS.minGapMinutes} min minimum)`;
+    }
+  }
+  return null;
+}
+
 async function applyAll(assessment, plan, universe, ledger, opts) {
+  if (opts.scheduled) {
+    const why = whyNotNow(ledger, opts);
+    if (why) { console.log(`not this run — ${why}`); return; }
+  }
   const byPlatform = accountsByPlatform();
   const queue = plan.filter((p) => opts.platforms.includes(p.platform)).slice(0, opts.apply);
 
@@ -657,4 +742,5 @@ async function main() {
 
 if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });
 
-module.exports = { assess, schedule, fetchUniverse, youtubeIdFor, loadLedger, ledgerPath, DEFAULTS };
+module.exports = { assess, schedule, fetchUniverse, youtubeIdFor, whyNotNow, zoned, zonedInstant,
+  loadLedger, ledgerPath, DEFAULTS, TZ };

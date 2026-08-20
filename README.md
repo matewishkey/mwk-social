@@ -38,7 +38,7 @@ at once, straight from a shell — these are the actual live posts:
   rotates, and some comments quote a real guest wish from the show's feed.
 - `docs/playbook.md` — the rules this pipeline runs on, and what each platform
   will and won't allow.
-- `scripts/install-first-comment-timer.sh` — installs the systemd `--user` timer
+- `scripts/install-timers.sh` — installs the systemd `--user` timer
   that runs the catch-all hourly.
 - `scripts/lib/topic-tags.js` — works out what a video was about so the comment
   can say so. Downloads the clip, strips the audio with ffmpeg, transcribes it,
