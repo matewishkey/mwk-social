@@ -118,12 +118,37 @@ records it, and Threads posts can be deleted — so it publishes, flagged `weak`
 
 ## Media
 
-- Facebook's media URLs are **signed and expire** — two of seven were already dead within a
-  fortnight. Download at detection, not at publish.
+`scripts/lib/media.js` fetches a clip once, caches it under
+`~/.local/state/mwk-social/media/`, and probes it with `ffprobe`. `mirror.js --media` runs the
+whole thing over every reel and reports what each target would make of it.
+
+- Facebook's media URLs are **signed and expire** — two of seven were dead within a fortnight.
+  Download at detection, not at publish.
+- **YouTube is the fallback, and it is the better copy.** Both dead clips came back through
+  `yt-dlp` at 1080x1920, against Facebook's 720x1280. Same matcher as the dedupe finds the video,
+  so "this is the same clip" means one thing everywhere.
+- **YouTube serves AV1 by default.** Instagram and TikTok want H.264 for a reel, so the format
+  selector asks for `avc1` first and only falls through if there is none.
+- **yt-dlp appends its own extension to `-o`.** Asking for `x` and getting `x.mp4` reads as "the
+  download produced nothing". It downloads into a scratch directory and takes whatever lands.
 - YouTube returns an **empty** media URL, so transcripts there come from `yt-dlp --write-auto-subs`
   instead. Free, and it covers a four-hour stream in full rather than the first fifteen minutes.
 - TikTok and X withhold media entirely (`platform_withheld`).
 - `--download-sections` segfaults this box's ffmpeg build. Don't reach for it.
+- The aspect check is the **video** range, inclusive at both ends. Instagram's "exactly 1.91:1 is
+  rejected" edge is an *image* rule; applying it to video throws away a legitimate square reel.
+
+### Downloads use curl, not fetch, and that is not an accident
+
+Node's `fetch` fails on every Meta CDN host from this box — `ETIMEDOUT` at almost exactly 253 ms,
+every time. The box has no IPv6 route, the CDN's AAAA record wins the lookup, and undici's
+Happy Eyeballs window is 250 ms by default, so it gives up before trying IPv4. curl falls back
+correctly and gets a 206.
+
+**That failure is indistinguishable from an expired signed URL**, which is an expensive thing to
+misdiagnose: it makes seven live clips look dead. If you ever do need `fetch` against a Meta host,
+`net.setDefaultAutoSelectFamilyAttemptTimeout(500)` fixes it — measured, four out of four, not
+guessed.
 
 ## Reading the API
 

@@ -9,6 +9,8 @@
  * Read-only until --apply exists. Two modes today:
  *
  *   --plan   what is missing, and when each one would go out. Touches nothing.
+ *   --media  fetch and probe every reel's video, and say whether each target
+ *            platform would accept it. Downloads, publishes nothing.
  *   --seed   write the ledger from what is already live, so the first real run
  *            starts from today's truth instead of reposting seven weeks of it.
  *
@@ -28,10 +30,17 @@ const path = require('path');
 const { cli } = require('./lib/api');
 const platforms = require('./lib/platforms');
 const matcher = require('./lib/matcher');
+const media = require('./lib/media');
 const events = require('./lib/events');
 
 const TARGETS = platforms.MIRROR_TARGETS;
 const SOURCE = platforms.SOURCE_PLATFORM;
+
+// YouTube is neither source nor target — Restream already posts there — but it
+// is read anyway, because it is the standing copy of every clip and therefore
+// the fallback when Facebook's signed URL has expired.
+const FALLBACK = 'youtube';
+const READ = [SOURCE, ...TARGETS, FALLBACK];
 
 // Posting window and pace. The owner asked for "a few a day, spread over days";
 // these are the knobs that means.
@@ -59,6 +68,7 @@ function parseArgs(argv) {
     const a = argv[i];
     if (a === '--plan') opts.mode = 'plan';
     else if (a === '--seed') opts.mode = 'seed';
+    else if (a === '--media') opts.mode = 'media';
     else if (a === '--json') opts.json = true;
     else if (a === '--dry-run') opts.dryRun = true;
     else if (a === '--days') opts.days = Number(argv[++i]);
@@ -74,9 +84,11 @@ function parseArgs(argv) {
 
 function usage() {
   console.log('usage: mirror.js --plan [--days N] [--per-day N] [--json]');
+  console.log('       mirror.js --media');
   console.log('       mirror.js --seed [--dry-run]');
   console.log('');
   console.log('  --plan   show what is missing on each platform and when it would go out');
+  console.log('  --media  fetch and probe each reel, and check it against every target');
   console.log('  --seed   record what is already live, so nothing already posted is posted again');
 }
 
@@ -116,9 +128,9 @@ function fetchUniverse(limit) {
   };
 
   try { take(cli(['posts:list', '--status', 'published', '--limit', String(limit)])); }
-  catch (err) { for (const p of [SOURCE, ...TARGETS]) errors[p] = err.message; }
+  catch (err) { for (const p of READ) errors[p] = err.message; }
 
-  for (const platform of [SOURCE, ...TARGETS]) {
+  for (const platform of READ) {
     try { take(cli(['analytics:posts', '--platform', platform, '--limit', String(limit)])); }
     catch (err) { errors[platform] = err.message; }
   }
@@ -130,9 +142,21 @@ function fetchUniverse(limit) {
     .sort((a, b) => String(b.publishedAt).localeCompare(String(a.publishedAt)));
 
   const index = {};
-  for (const platform of TARGETS) index[platform] = rows.filter((r) => r.platform === platform);
+  for (const platform of [...TARGETS, FALLBACK]) index[platform] = rows.filter((r) => r.platform === platform);
 
   return { rows, sources, index, errors };
+}
+
+/**
+ * The YouTube copy of a reel, for when Facebook's signed URL has expired.
+ * Same matcher as the dedupe, so "this is the same clip" means one thing here.
+ */
+function youtubeIdFor(source, universe) {
+  const v = matcher.classify(source, universe.index[FALLBACK] || [], {
+    platform: FALLBACK,
+    indexError: universe.errors[FALLBACK],
+  });
+  return v.verdict === 'duplicate' ? v.match.platformPostId : null;
 }
 
 /** Classify every clip against every target. Pure once the universe is fetched. */
@@ -305,6 +329,45 @@ function seed(assessment, ledger, opts) {
     data: { posted, pending, blocked } });
 }
 
+/*
+ * Fetch every reel and say whether each target would take it. Read-only in the
+ * sense that matters — it publishes nothing — but it does download, which is
+ * the point: the media has to be in hand before a publish, not at the moment of
+ * one, because by then the signed URL may already be dead.
+ */
+function reportMedia(assessment, universe) {
+  let ok = 0; let failed = 0;
+  for (const clip of assessment) {
+    const label = clip.source.content.replace(/[^\p{L}\p{N}\p{P}\p{Zs}]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 42);
+    const youtubeId = youtubeIdFor(clip.source, universe);
+    let got;
+    try {
+      got = media.resolve(clip.clipId, { url: clip.source.mediaUrl, youtubeId });
+    } catch (err) {
+      failed++;
+      events.emit('media.failed', { message: err.message, level: 'error', clipId: clip.clipId });
+      console.log(`  FAIL  ${label}`);
+      console.log(`        ${err.message}${youtubeId ? '' : ' (no YouTube copy found either)'}`);
+      continue;
+    }
+    ok++;
+    const p = got.probe;
+    const mb = (p.bytes / 1048576).toFixed(1);
+    console.log(`  ok    ${label}`);
+    console.log(`        via ${got.via.padEnd(8)} ${p.width}x${p.height} (${p.aspect})  ${p.durationSec}s  ${mb} MB  ${p.codec}${p.hasAudio ? '' : '  NO AUDIO'}`);
+    for (const platform of TARGETS) {
+      const problems = media.check(platform, p);
+      if (problems.length) console.log(`        ${platform}: ${problems.join('; ')}`);
+    }
+    events.emit('media.resolved', { message: `${got.via}: ${p.width}x${p.height} ${p.durationSec}s`,
+      clipId: clip.clipId, dedupeKey: `media.resolved|${clip.clipId}`,
+      data: { via: got.via, ...p, youtubeId } });
+  }
+  console.log('');
+  console.log(`${ok} resolved, ${failed} could not be`);
+  console.log(`cached in ${media.CACHE}`);
+}
+
 function main() {
   const opts = parseArgs(process.argv.slice(2));
   events.initRun({ source: 'mirror' });
@@ -320,10 +383,11 @@ function main() {
     printPlan(assessment, plan, universe, opts);
   }
   if (opts.mode === 'seed') seed(assessment, ledger, opts);
+  if (opts.mode === 'media') reportMedia(assessment, universe);
 
   events.finishRun({ reels: universe.sources.length, queued: plan.length });
 }
 
 if (require.main === module) main();
 
-module.exports = { assess, schedule, fetchUniverse, loadLedger, ledgerPath, DEFAULTS };
+module.exports = { assess, schedule, fetchUniverse, youtubeIdFor, loadLedger, ledgerPath, DEFAULTS };

@@ -160,6 +160,22 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   there proves only that *we* have not mirrored it; it publishes flagged `weak`, backed by the
   ledger, because Threads posts can be deleted.
 
+- **Media: `scripts/lib/media.js`, `mirror.js --media`.** Resolves a clip once and caches it in
+  `~/.local/state/mwk-social/media/`. Facebook URL first, **YouTube via `yt-dlp` when it 403s** —
+  which is also the better copy (1080x1920 against Facebook's 720x1280). All 7 reels resolve;
+  2 of them only through YouTube. `ffprobe` is required and now installed in `~/.local/bin`
+  (dotfiles-cz#13 asks for it in the baseline). Two yt-dlp traps: it **appends its own extension
+  to `-o`** (ask for `x`, get `x.mp4`, read it as "downloaded nothing"), and it **serves AV1 by
+  default** — force `[vcodec^=avc1]` because IG and TikTok want H.264.
+- **Node's `fetch` cannot reach a Meta CDN from this box — and it looks exactly like an expired
+  URL.** `ETIMEDOUT` at ~253 ms every time: no IPv6 route here, the AAAA record wins the lookup,
+  and undici's Happy Eyeballs window is 250 ms so it never tries IPv4. curl falls back and gets a
+  206. Media downloads shell out to curl for this reason; if you must use fetch,
+  `net.setDefaultAutoSelectFamilyAttemptTimeout(500)` fixes it (measured 4/4).
+- **The Instagram 1.91:1 rejection is an IMAGE rule, not a video one.** `media.check()` treats the
+  video aspect range as inclusive at both ends — applying the image edge there rejects a
+  legitimate square reel.
+
 ## Platform gotchas (verified against docs.zernio.com)
 
 - **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).
