@@ -16,11 +16,21 @@ binding = "DB"
 database_name = "mwk-social"
 database_id = "423c5334-3057-4752-95dc-3583f1eb2684"
 
+# Media queued from the browser. The box pulls it back through /media/<key> on
+# the ingest hostname when it claims the item.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "mwk-social-media"
+
 # Two hostnames, one Worker. An Access application covers a hostname, so putting
-# ingest behind the same one would 302 the uploader into a login page; and path
-# rules would mean depending on Access path-ordering forever.
+# ingest behind the same one would 302 the uploader into a login page.
+#
+# The short-link domain is a THIRD route, added once it is registered. It must be
+# its own hostname with NO Access application on it: Access gates a whole
+# hostname and runs ahead of the Worker, so a public path alongside the gated
+# dashboard is not possible. Until the domain exists, no short link resolves.
 [[routes]]
-pattern = "internal.matewishkey.com"
+pattern = "social.matewishkey.com"
 custom_domain = true
 
 [[routes]]
@@ -29,7 +39,10 @@ custom_domain = true
 
 [vars]
 INGEST_HOST = "ingest.matewishkey.com"
-DASHBOARD_HOST = "internal.matewishkey.com"
+DASHBOARD_HOST = "social.matewishkey.com"
+# Set to the short domain once it is registered, and add a matching route above.
+LINK_HOST = ""
+LINK_FALLBACK = "https://matewishkey.com/show"
 TZ_DISPLAY = "Australia/Brisbane"
 ACCESS_TEAM = "mergodon.cloudflareaccess.com"
-ACCESS_AUD = "2fd35333ed0426dba26231df5f21de72e3d6432f96cab62d4357dad65d9eb2ca"
+ACCESS_AUD = "e0c111b1e728e26782234a2d627208f95473247eae963d17ed63875359cca56c"

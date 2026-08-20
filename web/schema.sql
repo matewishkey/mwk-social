@@ -45,3 +45,100 @@ CREATE TABLE IF NOT EXISTS ingest_batch (
   source  TEXT
 );
 CREATE INDEX IF NOT EXISTS ingest_at ON ingest_batch (at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Added with the app-shell dashboard: the queue, short links and the metrics
+-- we bank ourselves.
+
+-- Posts waiting for a slot. The Worker writes rows here from the queue form;
+-- the box claims them one at a time when its own pace rules say it may post.
+-- The pace lives on the box, not here — this table is a to-do list, not a
+-- scheduler, so there is exactly one thing deciding when a post goes out.
+CREATE TABLE IF NOT EXISTS queue_item (
+  id            TEXT PRIMARY KEY,     -- ULID minted by the Worker
+  created_at    TEXT NOT NULL,
+  created_by    TEXT,                 -- the Access identity that queued it
+  status        TEXT NOT NULL DEFAULT 'queued',  -- queued|claimed|posted|failed|cancelled
+  body          TEXT NOT NULL,        -- the post text
+  platforms     TEXT NOT NULL,        -- JSON array; [] means "wherever it fits"
+  media_key     TEXT,                 -- R2 object key, when a file was uploaded
+  media_url     TEXT,                 -- or a URL, when one was pasted
+  media_type    TEXT,
+  first_comment INTEGER NOT NULL DEFAULT 1,
+  priority      INTEGER NOT NULL DEFAULT 0,      -- higher jumps the line
+  claimed_at    TEXT,
+  posted_at     TEXT,
+  result        TEXT,                 -- JSON, per-platform outcome
+  note          TEXT
+);
+CREATE INDEX IF NOT EXISTS queue_ready ON queue_item (status, priority DESC, created_at);
+
+-- One short code per (destination, platform, clip), so a click tells us which
+-- channel and which video earned it. Codes are never reused.
+CREATE TABLE IF NOT EXISTS link (
+  code       TEXT PRIMARY KEY,
+  target     TEXT NOT NULL,
+  platform   TEXT,
+  clip_id    TEXT,
+  post_key   TEXT,
+  label      TEXT,
+  created_at TEXT NOT NULL
+);
+
+-- One row per click. Deliberately no IP, no user agent, no cookie: the channel
+-- and the time answer the only question we have, and storing nothing personal
+-- keeps this out of consent territory entirely.
+CREATE TABLE IF NOT EXISTS click (
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  code         TEXT NOT NULL,
+  at           TEXT NOT NULL,
+  referer_host TEXT
+);
+CREATE INDEX IF NOT EXISTS click_code ON click (code, at DESC);
+CREATE INDEX IF NOT EXISTS click_at   ON click (at DESC);
+
+-- Daily per-platform metrics, banked as they arrive. Zernio keeps roughly
+-- twelve months per account; this is the part that cannot be backfilled once
+-- that window rolls, which is the whole reason it is a table and not a snapshot.
+CREATE TABLE IF NOT EXISTS daily_metric (
+  date        TEXT NOT NULL,
+  platform    TEXT NOT NULL,
+  post_count  INTEGER, impressions INTEGER, reach INTEGER, views INTEGER,
+  likes       INTEGER, comments INTEGER, shares INTEGER, saves INTEGER, clicks INTEGER,
+  updated_at  TEXT NOT NULL,
+  PRIMARY KEY (date, platform)
+);
+
+-- Follower counts over time, same reasoning.
+CREATE TABLE IF NOT EXISTS follower_point (
+  day        TEXT NOT NULL,
+  account_id TEXT NOT NULL,
+  platform   TEXT, username TEXT, followers INTEGER,
+  PRIMARY KEY (day, account_id)
+);
+
+-- The "your turn" list: things no API can do for us, chiefly sharing a Facebook
+-- post to a personal timeline. A row is a link to click, not a task to type.
+CREATE TABLE IF NOT EXISTS manual_action (
+  id         TEXT PRIMARY KEY,
+  created_at TEXT NOT NULL,
+  kind       TEXT NOT NULL,
+  platform   TEXT, clip_id TEXT, url TEXT, label TEXT,
+  done_at    TEXT, done_by TEXT
+);
+CREATE INDEX IF NOT EXISTS manual_open ON manual_action (done_at, created_at DESC);
+
+-- YouTube descriptions the box has drafted. A video with no description is
+-- filled in automatically — there is nothing to overwrite and the original is
+-- backed up on the box either way. A video that already has one only ever gets
+-- a PROPOSAL, which sits here until someone says yes.
+CREATE TABLE IF NOT EXISTS yt_proposal (
+  video_id     TEXT PRIMARY KEY,
+  title        TEXT,
+  current_text TEXT,
+  proposed     TEXT,
+  state        TEXT NOT NULL DEFAULT 'proposed',  -- proposed|approved|applied|rejected
+  proposed_at  TEXT NOT NULL,
+  decided_at   TEXT, decided_by TEXT, applied_at TEXT
+);
+CREATE INDEX IF NOT EXISTS yt_state ON yt_proposal (state, proposed_at DESC);
