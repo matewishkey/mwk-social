@@ -14,6 +14,7 @@
  *   scripts/post.js --text "..." --all --dry-run       # print the request body
  *
  *   --topics a,b,c       hashtags describing the clip, for the first comment
+ *   --tiktok-privacy L   TikTok privacy level (default: PUBLIC_TO_EVERYONE)
  *   --comment-variant N  pin one plain variant instead of letting it rotate
  *   --no-first-comment   publish without the CTA comment
  *   --draft              save as a draft (Zernio skips firstComment on drafts)
@@ -40,7 +41,7 @@ const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
     firstComment: true, draft: false, schedule: null, wait: true, dryRun: false,
-    topics: [], commentVariant: null };
+    topics: [], commentVariant: null, tiktokPrivacy: 'PUBLIC_TO_EVERYONE' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--text') opts.text = argv[++i];
@@ -50,6 +51,7 @@ function parseArgs(argv) {
     else if (a === '--title') opts.title = argv[++i];
     else if (a === '--topics') opts.topics = argv[++i].split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
     else if (a === '--comment-variant') opts.commentVariant = Number(argv[++i]);
+    else if (a === '--tiktok-privacy') opts.tiktokPrivacy = argv[++i];
     else if (a === '--no-first-comment') opts.firstComment = false;
     else if (a === '--draft') opts.draft = true;
     else if (a === '--schedule') opts.schedule = argv[++i];
@@ -99,6 +101,35 @@ function resolveAccounts(opts) {
   });
 }
 
+/*
+ * TikTok refuses a post that arrives without its six consent flags, and they do
+ * NOT live in platformSpecificData — `tiktokSettings` sits at the top level of
+ * the body, the one platform that works that way. The allowed privacy levels and
+ * which interactions the creator permits are per-account and change, so they get
+ * read from creator-info rather than assumed: an unsupported level fails the post.
+ */
+function tiktokSettings(accountId, privacy, hasVideo) {
+  const info = zernio(['accounts:tiktok-creator-info', accountId, '--mediaType', hasVideo ? 'video' : 'photo']);
+  if (info.creator && info.creator.canPostMore === false) {
+    throw new Error('tiktok: the account has hit its posting limit — try again later');
+  }
+  const levels = (info.privacyLevels || []).map((l) => l.value);
+  if (levels.length && !levels.includes(privacy)) {
+    throw new Error(`tiktok: privacy ${privacy} not offered for this account (${levels.join(', ')})`);
+  }
+  // An interaction the creator has switched off cannot be turned back on here.
+  const allowed = (info.postingLimits || {}).interactionSettings || {};
+  const can = (name) => (allowed[name] ? allowed[name].enabled !== false : true);
+  return {
+    privacy_level: privacy,
+    allow_comment: can('allow_comment'),
+    allow_duet: hasVideo && can('allow_duet'),
+    allow_stitch: hasVideo && can('allow_stitch'),
+    content_preview_confirmed: true,
+    express_consent_given: true,
+  };
+}
+
 function resolveMedia(items) {
   return items.map((item) => {
     const url = /^https?:\/\//.test(item) ? item : zernio(['media:upload', item]).url;
@@ -146,6 +177,10 @@ async function main() {
     }
     return entry;
   });
+  if (accounts.some((a) => a.platform === 'tiktok')) {
+    const tt = accounts.find((a) => a.platform === 'tiktok');
+    body.tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
+  }
   if (opts.draft) body.isDraft = true;
   else if (opts.schedule) body.scheduledFor = opts.schedule;
   else body.publishNow = true;

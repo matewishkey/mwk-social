@@ -49,9 +49,9 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `episodeMixRatio` of comments quote a real guest wish pulled from the show's RSS feed and link
   that episode. If the feed is unreachable every comment falls back to a plain variant —
   freshness must never block a comment.
-- **Hashtag caps are enforced per platform in `voice.tagLine()`** — Instagram's 5 leaves room for
-  `#PIY #MWKShow` plus three topic tags, and a cap tighter than that pair (X's 1) truncates it
-  rather than blowing the budget.
+- **Hashtag caps are enforced per platform in `voice.tagLine()`** — the always-on trio is
+  `#PIY #MWKShow #MWK`, so Instagram's 5 leaves room for exactly two topic tags, and a cap tighter
+  than the trio (X's 1) truncates it rather than blowing the budget.
 - **`matewishkey.com/show` is the guest SIGN-UP page, not the stream** — the show goes out live on
   youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
 - **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
@@ -71,10 +71,20 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
   (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that
   file hard-stops the mainstream AI/creator/hype tags whatever the model returns.
-  `#PIY` and `#MWKShow` lead every comment, then ≤4 topic tags. "Prompt it Yourself" stays in
+  `#PIY`, `#MWKShow` and `#MWK` lead every comment, then ≤4 topic tags. "Prompt it Yourself" stays in
   the comment TEXT where it reads as a sentence — it is not a tag. **Keys come from `~/.secrets`,
   which is why the systemd unit runs through `zsh -c 'source ~/.secrets && …'`** — systemd's
   `EnvironmentFile` cannot parse shell syntax. No keys → plain CTA, never a failed comment.
+- **Tags chosen for WHO they reach are allowed on a manual post** (mate's call, 2026-08-20),
+  reversing the earlier subject-matter-only rule. The target is people currently paying providers
+  who could build it themselves. Evidence gathered that day, worth not re-deriving: `#NoCode`
+  co-occurs with `#webdesign`/`#webflow`/`#uiux` — it reaches the people who build FOR others, the
+  supply side, not the buyer. `#LearnAI` co-occurs with `#chatgpt`/`#machinelearning`, the
+  already-using-AI crowd. `#SmallBusiness` runs ~1,800 posts/hour against `#SmallBusinessOwner`'s
+  ~362 for the same audience. And Instagram's own head says hashtags do not drive reach at all —
+  they feed SEARCH — so the words in the caption matter more than the tag list.
+  `topic-tags.js` still derives subject-matter tags for the automated watcher; this applies to
+  what a human picks for a hand-published post.
 - **YouTube needs a different transcript source**: `analytics:posts` returns a video mediaItem
   with an **empty url** for YouTube, so there is nothing to download. `yt-dlp --write-auto-subs`
   fetches the auto-captions instead — free, seconds, and it covers the whole video rather than
