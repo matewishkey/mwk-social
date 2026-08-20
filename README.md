@@ -38,14 +38,29 @@ at once, straight from a shell — these are the actual live posts:
   rotates, and some comments quote a real guest wish from the show's feed.
 - `docs/playbook.md` — the rules this pipeline runs on, and what each platform
   will and won't allow.
-- `scripts/install-timers.sh` — installs the systemd `--user` timer
-  that runs the catch-all hourly.
+- `scripts/mirror.js` — reposts new reels from Facebook to the platforms that
+  don't get them automatically (Instagram, TikTok, Threads, X). `--plan` shows
+  what's missing, `--media` fetches and probes each clip, `--apply` publishes.
+  It re-checks every clip against the live platform immediately before posting
+  and fails closed: anything it can't see clearly, it doesn't post.
+- `scripts/lib/matcher.js` — "is this clip already over there?". The caption is
+  the only signal that survives copying between platforms, so it decides, and
+  `test/fixtures/corpus.json` pins the answer against real history.
+- `scripts/lib/media.js` — gets the actual video. Facebook's signed URLs expire,
+  so `yt-dlp` pulls the YouTube copy instead — which turns out to be the better
+  one. Probes duration, resolution and codec before anything is uploaded.
 - `scripts/lib/topic-tags.js` — works out what a video was about so the comment
   can say so. Downloads the clip, strips the audio with ffmpeg, transcribes it,
   and names the subjects it covers — `#Debugging`, `#Trading`, whatever the clip
   is actually about, never audience or marketing tags. Needs `OPENAI_API_KEY`
   and `GEMINI_API_KEY`; without them the comment still goes out, just untagged.
   Results are cached per post under `~/.local/state/mwk-social/topics/`.
+- `web/` — a small private dashboard on Cloudflare Workers + D1, behind an email
+  one-time PIN, showing which clip is on which platform and what the pipeline
+  has been doing. `scripts/ship-events.js` feeds it.
+- `scripts/install-timers.sh` — installs the three systemd `--user` timers: the
+  catch-all comment hourly, the mirror hourly, and the event uploader every two
+  minutes. The posting *pace* lives in the scripts, not the timers.
 
 ## Reproduce it
 
@@ -80,3 +95,13 @@ scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
   roughly every 90 minutes, so the catch-all comment lands within about that.
 - **YouTube won't take comments on a private video** — the API 403s and a
   `firstComment` never appears. Unlisted works fine.
+- **Instagram can't be deleted or edited through any API.** Every mistake there
+  is permanent, which is why the mirror posts to it last on every clip, only
+  after the deletable platforms have proved the media and the caption.
+- **Instagram's 5-hashtag cap counts the caption and the comments together.** A
+  mirrored caption therefore carries none, and the first comment spends all five.
+- **TikTok's settings go in `tiktokSettings` at the top level** of the request,
+  not in `platformSpecificData` — which would look accepted and silently apply
+  none of them, because that field stores and echoes any key you send it.
+
+The full set, with the story behind each, is in [docs/playbook.md](docs/playbook.md).
