@@ -30,6 +30,7 @@ const pace = require('./lib/pace');
 const events = require('./lib/events');
 const platforms = require('./lib/platforms');
 const { publish } = require('./post');
+const reshare = require('./lib/reshare');
 
 const ledgerPath = () => process.env.MWK_MIRROR_LEDGER ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
@@ -80,12 +81,24 @@ function fetchMedia(url, token) {
   return out;
 }
 
-/** Which accounts an item should go to. */
+/**
+ * Which accounts an item should go to.
+ *
+ * LinkedIn is the exception: there are two accounts and only ONE of them may be
+ * posted to natively. The playbook is company page first, then a quote-reshare
+ * from the personal account — never a native post to personal — because the
+ * point is to move engagement onto the page, and a native personal post moves
+ * none. Without this filter "linkedin" would resolve to both and do the wrong
+ * thing silently.
+ */
 function accountsFor(want) {
   const { cli } = require('./lib/api');
   const all = (cli(['accounts:list']).accounts || []).filter((a) => a.isActive !== false);
   const chosen = want.length ? all.filter((a) => want.includes(a.platform)) : all;
-  return chosen.map((a) => ({ id: a._id || a.id, platform: a.platform }));
+  const { company } = reshare.linkedinAccounts();
+  return chosen
+    .filter((a) => a.platform !== 'linkedin' || !company || (a._id || a.id) === (company._id || company.id))
+    .map((a) => ({ id: a._id || a.id, platform: a.platform }));
 }
 
 async function main() {
@@ -159,6 +172,23 @@ async function main() {
       dedupeKey: `queue.posted|${item.id}`,
       data: { queueId: item.id, platforms: outcome },
     });
+
+    // LinkedIn: the company page has it, now share it as him — but only if he
+    // wrote the words. A reshare that fails must not fail the post, which is
+    // already live and correct.
+    const li = outcome.find((o) => o.platform === 'linkedin' && o.url);
+    if (li && item.reshareText) {
+      try {
+        const shared = await reshare.quoteReshare(li.url, item.reshareText);
+        console.log(`reshared from the personal account — ${shared ? shared._id : 'skipped'}`);
+        events.emit('linkedin.reshared', { message: 'quote-reshared from the personal account',
+          platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}` });
+      } catch (err) {
+        console.error(`reshare failed (the post itself is fine): ${err.message}`);
+        events.emit('linkedin.reshare-failed', { message: err.message, level: 'warn',
+          platform: 'linkedin', dedupeKey: `linkedin.reshare-failed|${item.id}` });
+      }
+    }
 
     // Facebook cannot post to a personal timeline through any API, so a live FB
     // post becomes a link to click rather than a thing we pretend we did.

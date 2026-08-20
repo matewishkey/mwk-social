@@ -11,6 +11,20 @@
  *   scripts/yt-description.js --apply <videoId>...
  *   scripts/yt-description.js --empty-only --apply    # only videos with no description
  *   scripts/yt-description.js --restore <videoId>     # put the backed-up one back
+ *   scripts/yt-description.js --sync                  # the dashboard loop, below
+ *
+ * --sync is what the timer runs. Two paths, deliberately different:
+ *
+ *   a video with NO description gets one written straight away — there is
+ *   nothing to overwrite, and the original is backed up either way;
+ *
+ *   a video that ALREADY has one only gets a PROPOSAL, filed to the dashboard,
+ *   which does nothing until it is approved there. Overwriting words someone
+ *   chose is not a thing to do quietly, however reversible it is.
+ *
+ * Both paths refuse to write while config/voice.json still marks the show blurb
+ * PENDING: it goes at the bottom of every description, and shipping a paraphrase
+ * of the show to the channel is exactly the mistake this is here to avoid.
  */
 'use strict';
 
@@ -18,7 +32,10 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const { api } = require('./lib/api');
+const net = require('net');
+net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
+
+const { api, cli } = require('./lib/api');
 const { topicsFor } = require('./lib/topic-tags');
 const voice = require('./lib/voice');
 
@@ -78,11 +95,92 @@ async function build(id) {
   return { title, description: `${opening}\n\n${voice.showBlurb()}\n\n${tags}` };
 }
 
+/** Has the show blurb been chosen, or is it still my paraphrase? */
+const blurbChosen = () => !/PENDING/.test((voice.config().youtubeDescription || {})._showBlurb || '');
+
+function dashboard() {
+  const base = process.env.MWK_LOG_URL;
+  const token = process.env.MWK_LOG_TOKEN;
+  if (!base || !token) throw new Error('MWK_LOG_URL and MWK_LOG_TOKEN must be set (td-sops apps/mwk-social.enc.env)');
+  const origin = new URL(base).origin;
+  return async (path_, body) => {
+    const res = await fetch(`${origin}${path_}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {}),
+      signal: AbortSignal.timeout(30000),
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${path_} → ${res.status}: ${text.slice(0, 200)}`);
+    return JSON.parse(text);
+  };
+}
+
+const setDescription = (id, description) =>
+  api('POST', '/posts/_/update-metadata',
+    { body: { platform: 'youtube', videoId: id, accountId: ACCOUNT, description } });
+
+async function sync({ dryRun = false, limit = 50 } = {}) {
+  const call = dashboard();
+
+  // Anything approved since last time goes out first — he has already decided,
+  // and making him wait a cycle for a decision he made is just rude.
+  const { items: approved } = await call('/youtube/pending', {});
+  const written = [];
+  for (const item of approved) {
+    if (!blurbChosen()) { console.log(`hold  ${item.video_id} — approved, but the show blurb is still PENDING`); continue; }
+    if (dryRun) { console.log(`DRY   ${item.video_id} — would write the approved description`); continue; }
+    try {
+      backup(item.video_id, currentDescription(item.video_id), item.title || '');
+      await setDescription(item.video_id, item.proposed);
+      written.push(item.video_id);
+      console.log(`wrote ${item.video_id} — approved (previous backed up)`);
+    } catch (err) {
+      console.error(`FAIL  ${item.video_id} — ${err.message}`);
+    }
+  }
+  if (written.length) await call('/youtube/applied', { videoIds: written });
+
+  // Through the CLI, not lib/api: that path is not a REST route at all, and
+  // Zernio answers an unknown path with its marketing SPA — so a wrong one
+  // fails as "not JSON" rather than as a 404, which is how this went unseen.
+  const res = cli(['analytics:posts', '--platform', 'youtube', '--limit', String(limit)]);
+  const ids = (res.posts || []).flatMap((p) => (p.platforms || []).map((pf) => pf.platformPostId)).filter(Boolean);
+
+  const proposals = [];
+  let filled = 0;
+  for (const id of ids) {
+    try {
+      const existing = currentDescription(id);
+      if (existing.trim()) {
+        // Already has words someone chose. Draft, file, and touch nothing.
+        const { title, description } = await build(id);
+        if (description.trim() === existing.trim()) continue;
+        proposals.push({ videoId: id, title, currentText: existing, proposed: description });
+        continue;
+      }
+      if (!blurbChosen()) { console.log(`hold  ${id} — empty, but the show blurb is still PENDING`); continue; }
+      const { title, description } = await build(id);
+      if (dryRun) { console.log(`DRY   ${id} — empty, would fill it in`); continue; }
+      backup(id, existing, title);
+      await setDescription(id, description);
+      filled++;
+      console.log(`wrote ${id} — was empty`);
+    } catch (err) {
+      console.error(`FAIL  ${id} — ${err.message}`);
+    }
+  }
+
+  if (proposals.length && !dryRun) await call('/youtube/propose', { items: proposals });
+  console.log(`${filled} filled, ${proposals.length} proposed, ${written.length} approved and written`);
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const apply = argv.includes('--apply');
   const emptyOnly = argv.includes('--empty-only');
   const restore = argv.includes('--restore');
+  if (argv.includes('--sync')) return sync({ dryRun: argv.includes('--dry-run') });
   let ids = argv.filter((a) => !a.startsWith('--'));
 
   if (restore) {
@@ -96,7 +194,7 @@ async function main() {
   }
 
   if (!ids.length) {
-    const res = await api('GET', '/analytics/posts', { query: { platform: 'youtube', limit: 50 } });
+    const res = cli(['analytics:posts', '--platform', 'youtube', '--limit', '50']);
     ids = (res.posts || []).flatMap((p) => (p.platforms || []).map((pf) => pf.platformPostId)).filter(Boolean);
   }
 

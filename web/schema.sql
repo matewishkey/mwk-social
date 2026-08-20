@@ -142,3 +142,8 @@ CREATE TABLE IF NOT EXISTS yt_proposal (
   decided_at   TEXT, decided_by TEXT, applied_at TEXT
 );
 CREATE INDEX IF NOT EXISTS yt_state ON yt_proposal (state, proposed_at DESC);
+
+-- The personal-account commentary for a LinkedIn quote-reshare. Empty means no
+-- reshare: the thought on top is his to write, never one to generate, so the
+-- absence of words is a decision rather than a gap to fill.
+ALTER TABLE queue_item ADD COLUMN reshare_text TEXT;

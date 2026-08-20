@@ -66,7 +66,8 @@ export async function queueAction(request, env, email) {
        media_key, media_url, media_type, first_comment, priority)
      VALUES (?,?,?,'queued',?,?,?,?,?,?,0)`,
   ).bind(ulid(), new Date().toISOString(), email, text, JSON.stringify(platforms),
-    mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0).run();
+    mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0,
+    String(form.get('reshareText') || '').trim() || null).run();
   return back;
 }
 
@@ -83,6 +84,7 @@ export function queuePage({ email, tz, items, pace }) {
         <div class="faint meta">${platforms.length ? esc(platforms.join(' · ')) : 'wherever it fits'}
           ${i.media_key || i.media_url ? ' · has media' : ''}
           ${i.first_comment ? ' · first comment' : ' · no first comment'}
+          ${i.reshare_text ? ' · reshared from your personal account' : ''}
           ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}</div>
         ${i.note ? `<div class="faint meta">${esc(i.note)}</div>` : ''}</td>
       <td class="nowrap faint">${esc(when(i.created_at, tz))}<br><span style="font-size:.72rem">${esc(ago(i.created_at))}</span></td>
@@ -132,6 +134,13 @@ ${card('Queue something', `
   </div>
   <div class="field">
     <div class="checks"><label><input type="checkbox" name="firstComment" checked> Add the standard first comment</label></div>
+  </div>
+  <div class="field">
+    <label for="qreshare">LinkedIn — your thought, resharing it from your personal account (optional)</label>
+    <textarea id="qreshare" name="reshareText" style="min-height:5rem"
+      placeholder="Left empty, nothing is reshared. These words go out as you, quoting the company page."></textarea>
+    <p class="note">The company post goes out first, then your personal account quote-reshares it
+      with this on top. LinkedIn is the only platform where resharing works through the API.</p>
   </div>
   <button class="primary" type="submit">Queue it</button>
 </form>`)}

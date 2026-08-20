@@ -6,6 +6,9 @@
  *   POST /queue/claim   "give me one thing to post, if there is one"
  *   POST /queue/result  what happened to it
  *   POST /links         mint (or re-use) a short code for a CTA
+ *   POST /youtube/propose   file drafted descriptions for approval
+ *   POST /youtube/pending   "which ones did he say yes to?"
+ *   POST /youtube/applied   mark them written
  *   POST /actions       file a your-turn item
  *
  * The queue is a to-do list, not a scheduler. The box decides WHEN — it already
@@ -29,6 +32,9 @@ export async function api(request, env, url) {
     case '/queue/claim':  return claim(body, env);
     case '/queue/result': return result(body, env);
     case '/links':        return mintLink(body, env);
+    case '/youtube/propose': return propose(body, env);
+    case '/youtube/pending': return pending(body, env);
+    case '/youtube/applied': return applied(body, env);
     case '/actions':      return fileAction(body, env);
     default:              return new Response('not found', { status: 404 });
   }
@@ -148,6 +154,7 @@ async function claim(body, env) {
       item: {
         id: row.id, body: row.body, platforms: want, mediaUrl,
         mediaType: row.media_type, firstComment: !!row.first_comment,
+        reshareText: row.reshare_text || null,
         createdAt: row.created_at, createdBy: row.created_by,
       },
     });
@@ -215,4 +222,43 @@ async function fileAction(body, env) {
      VALUES (?,?,?,?,?,?,?)`,
   ).bind(id, new Date().toISOString(), kind, platform, clipId, url, label).run();
   return json({ ok: true, id });
+}
+
+/* ---------------------------------------------------------------- youtube -- */
+
+/*
+ * File drafted descriptions. A proposal that has already been decided is left
+ * exactly as it is: re-drafting must never quietly un-approve something, or
+ * reset a "keep what's there" back into the queue on the next run.
+ */
+async function propose(body, env) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return json({ ok: true, filed: 0 });
+  const now = new Date().toISOString();
+  await env.DB.batch(items.map((i) => env.DB.prepare(
+    `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at)
+     VALUES (?,?,?,?,'proposed',?)
+     ON CONFLICT(video_id) DO UPDATE SET
+       title = excluded.title, current_text = excluded.current_text,
+       proposed = excluded.proposed, proposed_at = excluded.proposed_at
+     WHERE yt_proposal.state = 'proposed'`,
+  ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now)));
+  return json({ ok: true, filed: items.length });
+}
+
+const pending = async (_body, env) => json({
+  ok: true,
+  items: (await env.DB.prepare(
+    `SELECT video_id, title, proposed FROM yt_proposal WHERE state = 'approved' ORDER BY decided_at`,
+  ).all()).results || [],
+});
+
+async function applied(body, env) {
+  const ids = Array.isArray(body.videoIds) ? body.videoIds : [];
+  if (!ids.length) return json({ ok: true, applied: 0 });
+  const now = new Date().toISOString();
+  await env.DB.batch(ids.map((id) => env.DB.prepare(
+    `UPDATE yt_proposal SET state = 'applied', applied_at = ? WHERE video_id = ?`,
+  ).bind(now, id)));
+  return json({ ok: true, applied: ids.length });
 }
