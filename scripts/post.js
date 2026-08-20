@@ -26,6 +26,8 @@
 const { execFileSync } = require('child_process');
 const { api } = require('./lib/api');
 const voice = require('./lib/voice');
+const platformTable = require('./lib/platforms');
+const shortlink = require('./lib/shortlink');
 const fs = require('fs');
 const path = require('path');
 
@@ -167,52 +169,110 @@ async function waitForResults(postId) {
  * TikTok consent flags and the platform routing are all decided here, and a
  * copy of that logic would drift the first time one of them changed.
  */
+/** Does this platform take the link in its caption, because it has nowhere else? */
+const linkInCaption = (platform) => {
+  try { return platformTable.get(platform).linkPlacement === 'caption'; } catch { return false; }
+};
+
+/*
+ * The caption for a platform that cannot carry a comment.
+ *
+ * TikTok and X have no comments API we can use, so a post there with a clean
+ * caption is a dead end — nothing links back to the sign-up page and nothing
+ * is measurable. His words stay first and untouched; the call to action and
+ * the tags are appended, under that platform's own tag cap.
+ */
+async function captionFor(platform, opts) {
+  const url = await shortlink.mint({ platform, postKey: opts.postKey || null,
+    label: opts.title || null }) || voice.config().links.show;
+  const tags = voice.tagLine(platform, opts.topics || []);
+  return [opts.text, url, tags].filter(Boolean).join('\n\n');
+}
+
 async function publish(opts) {
   const accounts = resolveAccounts(opts);
   const wantComment = opts.firstComment;
-
-  const body = { content: opts.text };
   const media = resolveMedia(opts.media);
-  if (media.length) body.mediaItems = media;
-  if (opts.title) body.title = opts.title;
-  body.platforms = accounts.map((a) => {
-    const entry = { platform: a.platform, accountId: a.id };
-    if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
-      entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text, opts) };
-    }
-    return entry;
-  });
-  if (accounts.some((a) => a.platform === 'tiktok')) {
-    const tt = accounts.find((a) => a.platform === 'tiktok');
-    body.tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
-  }
-  if (opts.draft) body.isDraft = true;
-  else if (opts.schedule) body.scheduledFor = opts.schedule;
-  else body.publishNow = true;
 
-  const noComment = accounts.filter((a) => wantComment && !FIRST_COMMENT_PLATFORMS.has(a.platform));
-  if (noComment.length) {
-    console.log(`note: ${noComment.map((a) => a.platform).join(', ')} take no firstComment — first-comment.js picks those up later`);
+  // Two shapes of post, and they cannot share a request: one caption is his
+  // words alone with the link in a comment, the other has the link appended.
+  // Sending one body would force the same caption on both.
+  const commentGroup = accounts.filter((a) => !linkInCaption(a.platform));
+  const captionGroup = accounts.filter((a) => linkInCaption(a.platform));
+
+  const base = () => {
+    const b = {};
+    if (media.length) b.mediaItems = media;
+    if (opts.title) b.title = opts.title;
+    if (opts.draft) b.isDraft = true;
+    else if (opts.schedule) b.scheduledFor = opts.schedule;
+    else b.publishNow = true;
+    return b;
+  };
+
+  const bodies = [];
+
+  if (commentGroup.length) {
+    const b = { ...base(), content: opts.text };
+    b.platforms = commentGroup.map((a) => {
+      const entry = { platform: a.platform, accountId: a.id };
+      if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
+        entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text, opts) };
+      }
+      return entry;
+    });
+    bodies.push(b);
+  }
+
+  // One request per caption-link platform: they need different captions anyway,
+  // since each gets its own tracked code and X's tag cap is 1 against TikTok's none.
+  for (const a of captionGroup) {
+    const b = { ...base(), content: await captionFor(a.platform, opts) };
+    b.platforms = [{ platform: a.platform, accountId: a.id }];
+    if (a.platform === 'tiktok') {
+      b.tiktokSettings = tiktokSettings(a.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
+    }
+    bodies.push(b);
+  }
+
+  if (commentGroup.some((a) => a.platform === 'tiktok')) {
+    const tt = commentGroup.find((a) => a.platform === 'tiktok');
+    bodies[0].tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
+  }
+
+  // Only platforms that HAVE a comments API get picked up by the watcher. Saying
+  // so for TikTok and X was wrong: nothing ever reaches them, which is exactly
+  // why the link is in their caption instead.
+  const later = commentGroup.filter((a) => wantComment && !FIRST_COMMENT_PLATFORMS.has(a.platform));
+  if (later.length) {
+    console.log(`note: ${later.map((a) => a.platform).join(', ')} take no native firstComment — the watcher adds it`);
+  }
+  if (captionGroup.length) {
+    console.log(`note: ${captionGroup.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
   }
 
   if (opts.dryRun) {
-    console.log(JSON.stringify(body, null, 2));
-    return { body, dryRun: true };
+    for (const b of bodies) console.log(JSON.stringify(b, null, 2));
+    return { bodies, dryRun: true };
   }
 
   // A publish carrying video regularly outlives the request. Zernio keeps
   // going after the caller gives up, so a timeout here is *unknown*, never
   // failure — the caller reconciles by searching for the caption it composed.
-  const { post } = await api('POST', '/posts', { body, timeout: 240000 });
-  console.log(`post ${post._id} — ${post.status}`);
-  if (!opts.wait || opts.draft || opts.schedule) return { post, platforms: [] };
-
-  const results = await waitForResults(post._id);
-  for (const p of results) {
-    const where = p.platformPostUrl || p.errorMessage || '';
-    console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${where}`);
+  const posts = [];
+  const platforms = [];
+  for (const body of bodies) {
+    const { post } = await api('POST', '/posts', { body, timeout: 240000 });
+    posts.push(post);
+    console.log(`post ${post._id} — ${post.status}`);
+    if (!opts.wait || opts.draft || opts.schedule) continue;
+    for (const p of await waitForResults(post._id)) {
+      const where = p.platformPostUrl || p.errorMessage || '';
+      console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${where}`);
+      platforms.push(p);
+    }
   }
-  return { post, platforms: results };
+  return { post: posts[0], posts, platforms };
 }
 
 async function main() {

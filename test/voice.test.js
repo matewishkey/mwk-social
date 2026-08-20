@@ -156,3 +156,38 @@ test('the same post renders the identical comment twice running', () => {
   const b = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, showUrl: 'https://mwkshow.com/zz' });
   assert.equal(a.text, b.text);
 });
+
+/* --------------------------------------------- captions that carry the link -- */
+
+/*
+ * TikTok and X have no comments API we can use, so their caption is the ONLY
+ * place a link can go. Before this, a post there went out with his words and
+ * nothing else — no route to the sign-up page and nothing measurable. These
+ * pin the shape of what gets appended.
+ */
+const platformTable = require('../scripts/lib/platforms');
+
+test('exactly the platforms with no comments API take the link in the caption', () => {
+  const inCaption = Object.keys(platformTable.PLATFORMS)
+    .filter((p) => platformTable.get(p).linkPlacement === 'caption');
+  assert.deepStrictEqual(inCaption.sort(), ['tiktok', 'twitter']);
+  for (const p of inCaption) {
+    assert.equal(platformTable.get(p).commentsApi, false,
+      `${p} takes the link in its caption, so it must be because it cannot be commented on`);
+  }
+});
+
+test('a caption-link platform gets tags under its own cap', () => {
+  // TikTok has no meaningful cap: both fixed tags plus everything given.
+  assert.strictEqual(voice.tagLine('tiktok', ['Debugging', 'Prompting']),
+    '#MWKShow #PIY #Debugging #Prompting');
+  // X allows one, so the pair is truncated rather than the budget blown.
+  assert.strictEqual(voice.tagLine('twitter', ['Debugging', 'Prompting']), '#MWKShow');
+});
+
+test('a platform that can be commented on keeps its caption clean', () => {
+  for (const p of ['linkedin', 'instagram', 'facebook', 'youtube', 'threads']) {
+    assert.equal(platformTable.get(p).linkPlacement, 'comment',
+      `${p} must keep the link out of the body`);
+  }
+});

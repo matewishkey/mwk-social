@@ -157,6 +157,9 @@ async function main() {
 
     const result = await publish({
       text: item.body,
+      // So each queued post gets its own short code rather than sharing a
+      // generic per-platform one.
+      postKey: `queue:${item.id}`,
       accounts: usable.map((a) => a.id),
       all: false,
       media,

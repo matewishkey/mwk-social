@@ -105,6 +105,15 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
   (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
   **Alerting must key on `needsReconnect: true` or `status: error`**, never on `warning`.
+- **TikTok and X take the CTA in the CAPTION, and `post.js` now actually does it.** The platform
+  table declared `linkPlacement: 'caption'` from the start but nothing ever acted on it, so posts
+  there went out with his words alone — no route to the sign-up page and nothing measurable.
+  **They cannot share a request with the comment platforms** (one body, one caption), so publish()
+  sends one request for the comment group and **one per caption-link platform** — they need
+  different captions anyway, since each carries its own short code and X's tag cap is 1 against
+  TikTok's none. His words stay first and untouched; link and tags are appended.
+- **Do not claim the watcher will "pick up" TikTok or X.** It cannot — no comments API — and
+  post.js used to print exactly that. Only platforms with `commentsApi: true` are ever reached.
 - **X: the link goes in the post, not a comment.** Its comment endpoints 403 on this plan (read
   *and* reply, verified 2026-08-19), so the first-comment mechanic is impossible there. Two ways
   to get a link out — `platformSpecificData.threadItems` publishes a root tweet plus replies in
