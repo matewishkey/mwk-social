@@ -209,13 +209,37 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one mirrored
   post carrying a link.
 
-- **Three systemd --user timers, installed by `scripts/install-timers.sh`** (which replaced the
-  first-comment-only installer): `mwk-first-comment` at `*:00`, `mwk-mirror` at `*:10`, and
-  `mwk-ship-events` every 2 min. The
-  mirror runs `--apply --scheduled`, so **the pace lives in the script, not the cron cadence** —
-  the timer is a dumb hourly heartbeat and `whyNotNow()` says no most of the time. A hand run
-  obeys the same rules. `:10` keeps the mirror ten minutes behind the comment run so a freshly
-  mirrored clip has settled before the watcher looks for it.
+- **Six systemd --user timers, installed by `scripts/install-timers.sh`**: `mwk-first-comment`
+  at `*:00`, `mwk-mirror` at `*:10`, `mwk-queue` at `*:20`, `mwk-ship-stats` at `*:35`,
+  `mwk-ship-events` every 2 min, `mwk-yt-notes` daily at 05:40. The mirror runs
+  `--apply --scheduled`, so **the pace lives in the script, not the cron cadence** — the timer is
+  a dumb heartbeat and `whyNotNow()` says no most of the time. A hand run obeys the same rules.
+  `:10` keeps the mirror behind the comment run so a freshly mirrored clip has settled before the
+  watcher looks for it. Units are `Type=oneshot`, so `TimeoutStartUSec=infinity` — the show-notes
+  run takes ~13 min on a cold topics cache and will not be killed.
+- **The pace lives in `scripts/lib/pace.js`, and BOTH the mirror and the queue ask it.** 6/day,
+  09:00–21:00 Brisbane, 90 min minimum gap. It reads the ledger (what the mirror sent) *and* the
+  event log (`queue.posted`), because neither source can see the other's work — a shared budget
+  that read only one would not be shared. `nextSlot()` is bounded, not `while(true)`.
+- **The queue is a to-do list in D1, not a scheduler.** The dashboard form writes a row; the box
+  claims one at a time with a conditional UPDATE (so overlapping runs cannot both take it), and
+  the claim happens **before** the publish for the same reason the mirror writes its ledger
+  first. A failure puts the item back rather than burning it. Media uploads go to R2 and the box
+  pulls them back through `/media/<key>` on the ingest host with the same bearer token.
+- **LinkedIn: `accountsFor()` keeps native posts to the COMPANY page.** "linkedin" resolves to two
+  accounts and posting to both would native-post to the personal profile — the one thing the
+  playbook rules out, since the point is moving engagement onto the page. The personal account
+  only ever quote-reshares, and **the thought on top is his sentence or there is no reshare**.
+- **`/v1/analytics/posts` and `/v1/analytics/daily` are NOT REST routes** — Zernio answers an
+  unknown path with its marketing SPA, so a wrong path fails as "not JSON" rather than as a 404.
+  That is how a broken call in `yt-description.js` went unseen. `/v1/posts`, `/v1/accounts` and
+  `/v1/inbox/comments` are real; for analytics use `cli(['analytics:posts'…])`. **Positive-control
+  any new path against `/inbox/comments` before believing a failure.**
+- **YouTube show notes: `yt-description.js --sync`.** Empty description → written outright
+  (nothing to overwrite, original backed up anyway). Already has one → a **proposal** in D1 that
+  does nothing until approved on the dashboard. Both refuse to write while `voice.json` marks the
+  show blurb `PENDING` — it goes at the bottom of every description and it is still my paraphrase.
+  Re-drafting never un-approves: the upsert has `WHERE state = 'proposed'`.
 - **The posting window is the AUDIENCE's timezone, not the box's.** This machine is `Etc/UTC`; the
   window is `Australia/Brisbane` (`MWK_TZ` overrides). Unqualified, "09:00–21:00" would have put
   every post out between 19:00 and 07:00 Brisbane — the entire window overnight. Day boundaries for
@@ -225,13 +249,34 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   before the mirror ran" drops it from the day's pace count and the drip overshoots.
 
 - **The dashboard is `web/`, deployed with `web/deploy.sh` (locally, never on push).** One Worker
-  `mwk-social-log`, two custom domains — `internal.matewishkey.com` (Cloudflare Access, email OTP,
-  allowing mate@ and suzy@matewishkey.com) and `ingest.matewishkey.com` (bearer token). D1 database
-  `mwk-social`. **`workers_dev = false` is the load-bearing line**: Access binds to a *hostname*,
-  not to a script, so leaving it on would serve the whole dashboard ungated on
-  `*.workers.dev` beside the gated one. The Worker verifies the `Cf-Access-Jwt-Assertion` itself —
-  signature, `aud` **and** expiry; a signature alone would accept a token minted for a different
-  app in the same Access org.
+  `mwk-social-log`, **three** custom domains — `social.matewishkey.com` (Cloudflare Access, email
+  OTP, allowing mate@ and suzy@matewishkey.com), `ingest.matewishkey.com` (bearer token) and
+  `mwkshow.com` (public short links, **no Access application, ever**). D1 database `mwk-social`,
+  R2 bucket `mwk-social-media` for queued uploads. **`workers_dev = false` is the load-bearing
+  line**: Access binds to a *hostname*, not to a script, so leaving it on would serve the whole
+  dashboard ungated on `*.workers.dev` beside the gated one. The Worker verifies the
+  `Cf-Access-Jwt-Assertion` itself — signature, `aud` **and** expiry; a signature alone would
+  accept a token minted for a different app in the same Access org.
+- **`internal.matewishkey.com` is gone** (2026-08-20), hostname and Access app both. The D1 and
+  its whole event history were kept — only the names moved.
+- **Access gates a HOSTNAME and runs in front of the Worker, so a public path beside the gated
+  dashboard is impossible.** Measured: `/l/<code>` on `social.matewishkey.com` 302s to the Access
+  login page before any Worker code runs. That is *why* short links have their own domain — it is
+  not a stylistic choice, and a path-based shortener on the dashboard host cannot be made to work.
+- **Short links: `mwkshow.com/<code>`, one code per (platform, post).** Registered 2026-08-20
+  (~$10.46/yr, Cloudflare). Not a 3-letter domain on purpose — short names in new gTLDs are
+  usually registry-premium. A click stores the code, the time and the referring host: **no IP, no
+  user agent, no cookie**, which keeps a redirect out of consent territory. A miss redirects to
+  `LINK_FALLBACK` rather than 404ing, because a link printed in a public comment must never
+  dead-end. **Why it exists at all:** `clicks` comes back from Facebook (15/20 posts) and once
+  from LinkedIn; Instagram, YouTube, TikTok, Threads and X return 0 on every post, structurally —
+  so the first-comment mechanic had no scoreboard.
+- **Changing the CTA host is a breaking change, and `config/voice.json` says so in its own notes.**
+  The duplicate guard finds the CTA *in the comment text*, so a guard taught only the new host
+  would fail to recognise every comment written before the change and re-comment on all of them.
+  `markers[]` lists every substring that counts and `voice.carriesCta()` matches any; tests pin
+  both the old and the new. Minting is **idempotent** (a re-run must render the identical comment)
+  and **never fatal** (no dashboard → plain URL → the comment still goes out).
 - **No SQL projections.** The dashboard renders `mirror-ledger.json` shipped whole as a snapshot.
   The ledger is already the authoritative projection, computed by the thing that knows the truth,
   so rebuilding it in D1 would only add a way for the two to disagree.

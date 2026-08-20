@@ -55,12 +55,34 @@ at once, straight from a shell — these are the actual live posts:
   is actually about, never audience or marketing tags. Needs `OPENAI_API_KEY`
   and `GEMINI_API_KEY`; without them the comment still goes out, just untagged.
   Results are cached per post under `~/.local/state/mwk-social/topics/`.
-- `web/` — a small private dashboard on Cloudflare Workers + D1, behind an email
-  one-time PIN, showing which clip is on which platform and what the pipeline
-  has been doing. `scripts/ship-events.js` feeds it.
-- `scripts/install-timers.sh` — installs the three systemd `--user` timers: the
-  catch-all comment hourly, the mirror hourly, and the event uploader every two
-  minutes. The posting *pace* lives in the scripts, not the timers.
+- `web/` — the dashboard on Cloudflare Workers + D1, behind an email one-time
+  PIN at `social.matewishkey.com`. Five pages: what the pipeline has been doing
+  and what needs a human, the stats, the queue, YouTube show notes awaiting
+  approval, and a workflow map of what happens on each platform. Fed by
+  `scripts/ship-events.js` (every two minutes) and `scripts/ship-stats.js`
+  (hourly).
+- `scripts/lib/pace.js` — the one thing that decides *when* anything goes out:
+  the posting window in the audience's timezone, the daily cap, the minimum gap.
+  The mirror and the queue both ask it, so queueing five things at once produces
+  five posts spread over hours rather than five posts in a minute.
+- `scripts/run-queue.js` — takes one item off the dashboard queue and posts it,
+  if now is a good moment. Claims before publishing, and puts an item back
+  rather than burning it when something goes wrong.
+- `scripts/lib/shortlink.js` — mints the `mwkshow.com/<code>` link that every
+  call to action carries, one code per platform and post, so a click says which
+  channel and which clip earned it. Idempotent, and never fatal: with no
+  dashboard the plain URL goes out and the comment still happens.
+- `scripts/lib/reshare.js` — LinkedIn quote-reshare. The company page posts it,
+  the personal account shares it with a thought on top — his words, supplied
+  with the queued post, never generated.
+- `scripts/yt-description.js` — writes YouTube descriptions from each video's own
+  transcript. `--sync` fills in videos that have none and files a *proposal* for
+  anything that already has a description, which does nothing until it is
+  approved on the dashboard.
+- `scripts/install-timers.sh` — installs the six systemd `--user` timers: the
+  catch-all comment hourly, the mirror hourly, the queue hourly, the event
+  uploader every two minutes, analytics hourly, and the show-notes draft daily.
+  The posting *pace* lives in `lib/pace.js`, not the timers.
 
 ## Reproduce it
 
@@ -76,6 +98,23 @@ scripts/generate-assets.sh
 export ZERNIO_IMAGE_ACCOUNTS=<id1>,<id2>
 scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
 ```
+
+## What's worth measuring
+
+At this size, followers are not the scoreboard — seven of the nine connected
+channels are still in single digits. The stats page is built around five things
+instead, in this order:
+
+1. **reach / views** — did anyone see it
+2. **engagement rate** — did anyone care, normalised so it survives growth
+3. **link clicks** — the only number tied to the actual goal, guest sign-ups
+4. **cadence** — posts per week, the biggest lever fully within our control
+5. **follower growth** — last, and only where there is a base to grow
+
+Each channel card shows only the metrics that channel genuinely returns,
+measured across live posts rather than read off a docs page. Facebook reports
+clicks; Instagram, YouTube, TikTok, Threads and X report zero on every post,
+which is exactly why the CTA has its own short domain.
 
 ## Platform notes (the ones that bite)
 

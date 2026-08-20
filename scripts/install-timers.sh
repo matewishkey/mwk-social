@@ -99,8 +99,19 @@ if [[ "$want" == all || "$want" == ship-stats ]]; then
     'Ship MWK analytics to the dashboard'
 fi
 
+if [[ "$want" == all || "$want" == yt-notes ]]; then
+  # Daily, not hourly. It reads every video's current description through
+  # yt-dlp and transcribes the ones it has not seen, so a run is minutes rather
+  # than seconds — and a description does not change on its own between runs.
+  unit mwk-yt-notes \
+    'Draft YouTube show notes and file them for approval' \
+    "$repo/scripts/yt-description.js --sync" \
+    '05:40' \
+    'Draft MWK YouTube show notes'
+fi
+
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-mirror mwk-ship-events mwk-queue mwk-ship-stats; do
+for name in mwk-first-comment mwk-mirror mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done
