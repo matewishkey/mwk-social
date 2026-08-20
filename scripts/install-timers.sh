@@ -78,8 +78,29 @@ if [[ "$want" == all || "$want" == ship-events ]]; then
     'Ship new MWK events to Cloudflare'
 fi
 
+if [[ "$want" == all || "$want" == queue ]]; then
+  # At :20, ten minutes behind the mirror. Both obey the same pace module, so
+  # whichever runs first takes the slot and the other's whyNotNow() says no —
+  # the ordering only decides who gets first refusal, never how many go out.
+  unit mwk-queue \
+    'Post the next queued MWK item, if it is a good moment' \
+    "$repo/scripts/run-queue.js --scheduled" \
+    '*:20' \
+    'Check whether a queued post is due'
+fi
+
+if [[ "$want" == all || "$want" == ship-stats ]]; then
+  # Hourly, not every two minutes: these come from Zernio rather than off the
+  # disk, and a month of analytics is not worth re-fetching 30 times an hour.
+  unit mwk-ship-stats \
+    'Ship MWK analytics, follower counts and the platform table' \
+    "$repo/scripts/ship-stats.js" \
+    '*:35' \
+    'Ship MWK analytics to the dashboard'
+fi
+
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-mirror mwk-ship-events; do
+for name in mwk-first-comment mwk-mirror mwk-ship-events mwk-queue mwk-ship-stats; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done

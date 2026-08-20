@@ -161,8 +161,13 @@ async function waitForResults(postId) {
   return [];
 }
 
-async function main() {
-  const opts = parseArgs(process.argv.slice(2));
+/*
+ * Build the request body and publish it. Exported so the queue runner shares
+ * this exact path rather than growing a second one — the first comment, the
+ * TikTok consent flags and the platform routing are all decided here, and a
+ * copy of that logic would drift the first time one of them changed.
+ */
+async function publish(opts) {
   const accounts = resolveAccounts(opts);
   const wantComment = opts.firstComment;
 
@@ -192,17 +197,30 @@ async function main() {
 
   if (opts.dryRun) {
     console.log(JSON.stringify(body, null, 2));
-    return;
+    return { body, dryRun: true };
   }
 
-  const { post } = await api('POST', '/posts', { body });
+  // A publish carrying video regularly outlives the request. Zernio keeps
+  // going after the caller gives up, so a timeout here is *unknown*, never
+  // failure — the caller reconciles by searching for the caption it composed.
+  const { post } = await api('POST', '/posts', { body, timeout: 240000 });
   console.log(`post ${post._id} — ${post.status}`);
-  if (!opts.wait || opts.draft || opts.schedule) return;
+  if (!opts.wait || opts.draft || opts.schedule) return { post, platforms: [] };
 
-  for (const p of await waitForResults(post._id)) {
+  const results = await waitForResults(post._id);
+  for (const p of results) {
     const where = p.platformPostUrl || p.errorMessage || '';
     console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${where}`);
   }
+  return { post, platforms: results };
 }
 
-main().catch((err) => { console.error(err.message); process.exit(1); });
+async function main() {
+  await publish(parseArgs(process.argv.slice(2)));
+}
+
+if (require.main === module) {
+  main().catch((err) => { console.error(err.message); process.exit(1); });
+}
+
+module.exports = { publish, resolveAccounts, FIRST_COMMENT_PLATFORMS };
