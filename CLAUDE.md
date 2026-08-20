@@ -50,8 +50,8 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   that episode. If the feed is unreachable every comment falls back to a plain variant —
   freshness must never block a comment.
 - **Hashtag caps are enforced per platform in `voice.tagLine()`** — Instagram's 5 leaves room for
-  the two identity tags plus three topic tags, and a cap tighter than the identity pair (X's 1)
-  truncates the pair rather than blowing the budget.
+  `#PIY #MWKShow` plus three topic tags, and a cap tighter than that pair (X's 1) truncates it
+  rather than blowing the budget.
 - **`matewishkey.com/show` is the guest SIGN-UP page, not the stream** — the show goes out live on
   youtube.com/@matewishkey and twitch.tv/matewishkey. Don't conflate them in a CTA.
 - **Catch-all first-comment watcher**: `scripts/first-comment.js`, run hourly by the
@@ -71,7 +71,8 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
   (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that
   file hard-stops the mainstream AI/creator/hype tags whatever the model returns.
-  `#PromptItYourself` leads every comment, then ≤4 topic tags. **Keys come from `~/.secrets`,
+  `#PIY` and `#MWKShow` lead every comment, then ≤4 topic tags. "Prompt it Yourself" stays in
+  the comment TEXT where it reads as a sentence — it is not a tag. **Keys come from `~/.secrets`,
   which is why the systemd unit runs through `zsh -c 'source ~/.secrets && …'`** — systemd's
   `EnvironmentFile` cannot parse shell syntax. No keys → plain CTA, never a failed comment.
 - **YouTube needs a different transcript source**: `analytics:posts` returns a video mediaItem

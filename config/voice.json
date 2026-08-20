@@ -11,10 +11,8 @@
   "feed": "https://matewishkey.com/rss.xml",
 
   "tags": {
-    "identity": ["#PromptItYourself", "#PIY"],
-    "_identity": "Always emitted together and adjacent, in this order.",
-    "brand": "#MWKShow",
-    "_brand": "Show and episode content only, not every clip.",
+    "always": ["#PIY", "#MWKShow"],
+    "_always": "Every post, in this order. #PIY is the motto short form and #MWKShow is the brand. \"Prompt it Yourself\" stays in the comment TEXT where it reads as a sentence — it is not a tag.",
     "maxTopic": 4,
     "caps": { "instagram": 5, "twitter": 1, "tiktok": null, "threads": null, "facebook": null, "youtube": null },
     "_caps": "null = no meaningful cap. Instagram's 5 counts the caption AND the comments together.",

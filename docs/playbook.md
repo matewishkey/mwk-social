@@ -30,8 +30,9 @@ carries the marker — whoever put it there.
 hashtag caps, the blocklist, the YouTube blurb, the feed URL. Change it there or you'll change it
 in the wrong place.
 
-- **`#PromptItYourself` and `#PIY` always travel together, in that order.** `#MWKShow` is for show
-  and episode content, not every clip.
+- **`#PIY` and `#MWKShow` go on every post, in that order** — the motto short form and the brand.
+  "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
+  is just `#PIY`.
 - **Topic tags describe the video**, derived from its own transcript. If it's about trading it
   says `#Trading`. Never audience tags, never marketing, never `#AI` — there's a blocklist that
   enforces it whatever the model suggests.

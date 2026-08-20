@@ -46,8 +46,18 @@ test('instagram never exceeds five hashtags', () => {
   assert.strictEqual(line.split(' ').length, 5);
 });
 
-test('a cap tighter than the identity pair truncates the pair', () => {
-  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#PromptItYourself');
+test('a cap tighter than the always-on pair truncates the pair', () => {
+  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#PIY');
+});
+
+test('the brand tag is on every post that has room for it', () => {
+  for (const p of ['instagram', 'threads', 'tiktok', 'facebook']) {
+    assert.ok(voice.tagLine(p, ['Trading']).includes('#MWKShow'), `${p} lost the brand tag`);
+  }
+});
+
+test('PromptItYourself is not a tag any more', () => {
+  assert.ok(!voice.tagLine('threads', ['Trading']).includes('#PromptItYourself'));
 });
 
 test('blocked tags never get through', () => {

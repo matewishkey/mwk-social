@@ -38,8 +38,7 @@ function config() {
 }
 
 const marker = () => config().marker;
-const identityTags = () => config().tags.identity.slice();
-const brandTag = () => config().tags.brand;
+const alwaysTags = () => config().tags.always.slice();
 const blockedTags = () => new Set(config().tags.blocked);
 const maxTopicTags = () => config().tags.maxTopic;
 const capFor = (platform) => (config().tags.caps || {})[platform] ?? null;
@@ -128,29 +127,30 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
 }
 
 /**
- * Identity tags first and adjacent, then as many topic tags as the platform's
- * cap allows. Instagram's cap of 5 counts the caption too, so callers that put
- * hashtags in the caption must not use this for the comment as well.
+ * The always-on tags first — the motto short form and the brand — then as many
+ * topic tags as the platform's cap allows. Instagram's cap of 5 counts the
+ * caption too, so callers that put hashtags in the caption must not use this for
+ * the comment as well.
  */
 function tagLine(platform, topicTags = []) {
   const cfg = config();
   const cap = capFor(platform);
-  // A cap tighter than the identity pair wins: X allows one tag, so it gets the
-  // motto and nothing else rather than two tags on a one-tag budget.
-  const identity = cap === null ? cfg.tags.identity : cfg.tags.identity.slice(0, cap);
-  const room = cap === null ? cfg.tags.maxTopic : Math.max(0, cap - identity.length);
+  // A cap tighter than the always-on pair wins: X allows one tag, so it gets
+  // #PIY alone rather than two tags on a one-tag budget.
+  const always = cap === null ? cfg.tags.always : cfg.tags.always.slice(0, cap);
+  const room = cap === null ? cfg.tags.maxTopic : Math.max(0, cap - always.length);
   const blocked = blockedTags();
   const topics = topicTags
     .map((t) => String(t).replace(/^#/, ''))
     .filter((t) => t && !blocked.has(t.toLowerCase()))
     .slice(0, Math.min(room, cfg.tags.maxTopic))
     .map((t) => `#${t}`);
-  return [...identity, ...topics].join(' ');
+  return [...always, ...topics].join(' ');
 }
 
 const showBlurb = () => config().youtubeDescription.showBlurb;
 
 module.exports = {
-  config, marker, identityTags, brandTag, blockedTags, maxTopicTags, capFor,
+  config, marker, alwaysTags, blockedTags, maxTopicTags, capFor,
   firstComment, tagLine, latestEpisodes, showBlurb, hash, CONFIG_PATH,
 };
