@@ -37,11 +37,17 @@ custom_domain = true
 pattern = "ingest.matewishkey.com"
 custom_domain = true
 
+# The short-link domain. No Access application on this one, ever — it is the
+# public half, and every CTA we post points at it.
+[[routes]]
+pattern = "mwkshow.com"
+custom_domain = true
+
 [vars]
 INGEST_HOST = "ingest.matewishkey.com"
 DASHBOARD_HOST = "social.matewishkey.com"
-# Set to the short domain once it is registered, and add a matching route above.
-LINK_HOST = ""
+# The hostname short links are served from; matches the route above.
+LINK_HOST = "mwkshow.com"
 LINK_FALLBACK = "https://matewishkey.com/show"
 TZ_DISPLAY = "Australia/Brisbane"
 ACCESS_TEAM = "mergodon.cloudflareaccess.com"
