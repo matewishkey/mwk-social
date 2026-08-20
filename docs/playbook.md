@@ -116,6 +116,39 @@ Threads is the one exception worth stating: it never appears in `analytics:posts
 there only proves *we* have not mirrored it. That is still the thing we need to know, the ledger
 records it, and Threads posts can be deleted — so it publishes, flagged `weak`.
 
+## Publishing a mirror
+
+`mirror.js --apply` publishes the next missing post. One at a time unless you ask for more —
+`--count N` — because publishing is the step that cannot be taken back everywhere.
+
+Order is fixed and enforced, not just scheduled: **Threads → X → TikTok → Instagram**. Instagram
+refuses to run on a clip until every other target for that clip is done, because it is the one
+platform where nothing can be deleted or edited. A `--platforms instagram` run skips past the
+schedule's ordering, so the rule lives in the publish path itself.
+
+| Platform | Caption | Hashtags in caption | The CTA link |
+|---|---|---|---|
+| Threads | source opening, verbatim | none | first comment, from the hourly watcher |
+| X | source opening + link | 1 (`#PIY`) | in the post — cheaper than a thread |
+| TikTok | source opening + link | all | in the caption; no comment API exists |
+| Instagram | source opening | **zero** | native `firstComment`, spending all 5 tag slots |
+
+**TikTok's settings go in `tiktokSettings` at the top level of the request, not in
+`platformSpecificData`.** That is the one genuine special case in the API, and getting it wrong is
+silent: `platformSpecificData` stores any key you send it and echoes it back, so the response would
+look accepted while the post went out with no consent flags applied. All six flags are `required`
+with `default: false`, so all six are stated explicitly.
+
+**A publish that times out has not necessarily failed.** The very first live mirror proved it: the
+API call gave up at 60 s and the post was live on Threads regardless. Zernio keeps working after
+the request is abandoned, so a timeout means *unknown* — the publisher reconciles by looking for a
+post with the caption it just composed, and only then decides. Recording that first one as
+"failed" would have left a real post with the ledger denying it.
+
+The ledger is written **before** the request, never after: a process killed between the POST and
+its response must not look like "never posted" on the next run. And `--dry-run` writes nothing at
+all, including its own failures.
+
 ## Media
 
 `scripts/lib/media.js` fetches a clip once, caches it under

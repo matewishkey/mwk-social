@@ -20,14 +20,18 @@ function apiKey() {
 
 const apiBase = () => (process.env.ZERNIO_API_URL || 'https://zernio.com/api').replace(/\/$/, '');
 
-async function api(method, endpoint, { body, query } = {}) {
+// A publish carrying video takes Zernio well past a minute, so `timeout` is a
+// parameter. It is not a safety net either way: the request timing out does not
+// stop the work at the other end, so a caller that POSTs must reconcile rather
+// than assume failure.
+async function api(method, endpoint, { body, query, timeout = 60000 } = {}) {
   const url = new URL(`${apiBase()}/v1${endpoint}`);
   for (const [k, v] of Object.entries(query || {})) url.searchParams.set(k, v);
   const res = await fetch(url, {
     method,
     headers: { Authorization: `Bearer ${apiKey()}`, 'Content-Type': 'application/json' },
     body: body === undefined ? undefined : JSON.stringify(body),
-    signal: AbortSignal.timeout(60000),
+    signal: AbortSignal.timeout(timeout),
   });
   const text = await res.text();
   let json;

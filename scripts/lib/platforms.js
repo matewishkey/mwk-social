@@ -45,7 +45,7 @@ const PLATFORMS = {
     mediaUrlAvailable: false,      // platform_withheld
     consent: true,                 // six required flags, read from creator-info
     videoMinSec: 3,
-    videoMaxSec: 600,
+    videoMaxSec: 3600,        // creator-info's live value; read it per account rather than trusting this
   },
   twitter: {
     captionMax: 280,               // Premium raises this, but 280 keeps it portable

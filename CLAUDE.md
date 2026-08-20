@@ -176,6 +176,29 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   video aspect range as inclusive at both ends — applying the image edge there rejects a
   legitimate square reel.
 
+- **`mirror.js --apply` publishes; all four targets verified live 2026-08-20.** Threads
+  `DcP1ZQWD_Ly`, X `2090285587903160541`, TikTok `v_pub_url~v2-1.7675951303247562753`, Instagram
+  `DcP2BWJFR7y` (native first comment confirmed on it: CTA + exactly 5 tags, caption carries none).
+  Default is one post per run. **Instagram refuses to run on a clip until the other three targets
+  are done** — the schedule already orders it last, but `--platforms instagram` skips that, so the
+  rule lives in the publish path.
+- **TikTok settings go in `tiktokSettings` at the TOP LEVEL of the request body, not
+  `platformSpecificData`** (docs.zernio.com/platforms/tiktok). This is the one real special case,
+  and getting it wrong is silent — `platformSpecificData` stores and echoes any key, so it would
+  look accepted while the post went out with no consent flags. Six flags, all `required` with
+  `default: false`: `allow_comment`, `allow_duet`, `allow_stitch`, `content_preview_confirmed`,
+  `express_consent_given`, plus `privacy_level`. TikTok's live `maxVideoDurationSec` is **3600**,
+  not the 600 the static table assumed — read `accounts:tiktok-creator-info`.
+- **A publish call that times out has NOT necessarily failed.** Bitten on the first live mirror:
+  the request aborted at 60s and the post was live on Threads anyway. Zernio keeps processing after
+  the caller gives up, so a timeout is *unknown* — reconcile by searching `posts:list` for the
+  caption you just composed. The publish timeout is now 240s and the ledger is written **before**
+  the request.
+- **TikTok returns a publish token, not a video ID** (`v_pub_url~v2-1.…`); the real numeric ID
+  arrives later with the analytics sync. It also returns **no post URL at all**.
+- **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one mirrored
+  post carrying a link.
+
 ## Platform gotchas (verified against docs.zernio.com)
 
 - **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).
