@@ -33,6 +33,30 @@ const BOT_RE = new RegExp([
 
 const looksAutomated = (ua) => !ua || BOT_RE.test(ua);
 
+/*
+ * Which platform a referring host belongs to. A click can be attributed two
+ * ways: the code itself carries the platform it was minted for, and the referer
+ * says where the click actually came from. The second is a genuine fallback,
+ * because links minted before codes were per-platform have no platform at all —
+ * and it also catches a link shared on somewhere we never posted it.
+ */
+const REFERER_PLATFORM = [
+  [/(^|\.)facebook\.com$/, 'facebook'],
+  [/(^|\.)instagram\.com$/, 'instagram'],
+  [/(^|\.)threads\.(net|com)$/, 'threads'],
+  [/(^|\.)linkedin\.com$|^lnkd\.in$/, 'linkedin'],
+  [/(^|\.)youtube\.com$|^youtu\.be$/, 'youtube'],
+  [/(^|\.)tiktok\.com$/, 'tiktok'],
+  [/(^|\.)(twitter|x)\.com$|^t\.co$/, 'twitter'],
+];
+
+export function platformFromReferer(host) {
+  if (!host) return null;
+  const h = String(host).toLowerCase();
+  for (const [re, name] of REFERER_PLATFORM) if (re.test(h)) return name;
+  return null;
+}
+
 export async function redirect(request, env, url, ctx) {
   const code = url.pathname.replace(/^\/+/, '').toLowerCase();
   if (!code || code === 'favicon.ico') return Response.redirect(env.LINK_FALLBACK, 302);

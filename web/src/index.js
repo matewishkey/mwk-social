@@ -21,7 +21,7 @@
 
 import { accessIdentity } from './lib/access.js';
 import { api } from './api.js';
-import { redirect } from './links.js';
+import { redirect, platformFromReferer } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
 import { statsPage } from './pages/stats.js';
 import { configPage } from './pages/config.js';
@@ -132,9 +132,11 @@ async function stats(env, tz, snapshots, email) {
         JOIN (SELECT account_id, MAX(day) d FROM follower_point GROUP BY account_id) m
           ON m.account_id = f.account_id AND m.d = f.day`).all(),
     env.DB.prepare(
-      // bot = 0 only: a link-preview fetch is not a click.
-      `SELECT l.platform, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.platform ORDER BY n DESC`).bind(from).all(),
+      // bot = 0 only: a link-preview fetch is not a click. The referer is kept
+      // so a click on a code minted before codes were per-platform can still be
+      // attributed by where it came from.
+      `SELECT l.platform, c.referer_host, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.platform, c.referer_host`).bind(from).all(),
     // What people actually clicked, rather than only where from.
     env.DB.prepare(
       `SELECT l.target, COUNT(*) n, COUNT(DISTINCT l.code) codes
@@ -145,8 +147,18 @@ async function stats(env, tz, snapshots, email) {
       `SELECT bot, COUNT(*) n FROM click WHERE at >= ? GROUP BY bot`).bind(from).all(),
     env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
   ]);
+  // Fold the two attribution routes together: the code's own platform first,
+  // then where the click came from, and only then give up and say unattributed.
+  const byChannel = new Map();
+  for (const r of clicks.results || []) {
+    const name = r.platform || platformFromReferer(r.referer_host);
+    const key = name || 'unattributed';
+    byChannel.set(key, (byChannel.get(key) || 0) + r.n);
+  }
+  const folded = [...byChannel].map(([platform, n]) => ({ platform, n })).sort((a, b) => b.n - a.n);
+
   return statsPage({ email, tz, snapshots, days: STATS_DAYS,
-    daily: daily.results || [], followers: followers.results || [], clicks: clicks.results || [],
+    daily: daily.results || [], followers: followers.results || [], clicks: folded,
     targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0 });
 }
 

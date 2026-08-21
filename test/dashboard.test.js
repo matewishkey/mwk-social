@@ -341,3 +341,33 @@ test('the stats page names the destination, not just the channel', async () => {
   assert.match(html, /a video on YouTube/);
   assert.match(html, /What they clicked/);
 });
+
+/*
+ * "unattributed" on the links table. A code minted before codes were
+ * per-platform served all five comment platforms at once, so it carries no
+ * platform and never can. The referer is the second route to an answer — and
+ * it also catches a link clicked somewhere we never posted it.
+ */
+test('a referring host maps to the platform it belongs to', async () => {
+  const { platformFromReferer } = await src('links.js');
+  assert.strictEqual(platformFromReferer('www.facebook.com'), 'facebook');
+  assert.strictEqual(platformFromReferer('m.facebook.com'), 'facebook');
+  assert.strictEqual(platformFromReferer('l.instagram.com'), 'instagram');
+  assert.strictEqual(platformFromReferer('lnkd.in'), 'linkedin');
+  assert.strictEqual(platformFromReferer('youtu.be'), 'youtube');
+  assert.strictEqual(platformFromReferer('t.co'), 'twitter');
+  assert.strictEqual(platformFromReferer('x.com'), 'twitter');
+});
+
+// It must not claim a platform it cannot see. A lookalike domain matching
+// loosely would attribute clicks to the wrong channel, which is worse than
+// admitting we do not know.
+test('an unknown or absent referer stays unattributed', () => {
+  return src('links.js').then(({ platformFromReferer }) => {
+    assert.strictEqual(platformFromReferer('example.com'), null);
+    assert.strictEqual(platformFromReferer(''), null);
+    assert.strictEqual(platformFromReferer(null), null);
+    assert.strictEqual(platformFromReferer('notfacebook.com'), null, 'must anchor, not substring-match');
+    assert.strictEqual(platformFromReferer('facebook.com.evil.net'), null);
+  });
+});
