@@ -6,7 +6,8 @@
     "test": "node --test test/*.test.js"
   },
   "author": "matewishkey",
-  "license": "ISC",
+  "private": true,
+  "license": "UNLICENSED",
   "type": "commonjs",
   "devDependencies": {
     "@zernio/cli": "^0.4.0"

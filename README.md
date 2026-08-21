@@ -61,7 +61,8 @@ at once, straight from a shell — these are the actual live posts:
   against and nothing to guess about. Anything posted outside it is a one-off,
   handled by hand.
 - `scripts/lib/pace.js` — the one thing that decides *when* anything goes out:
-  the posting window in the audience's timezone, the daily cap, the minimum gap.
+  the daily cap (counted in the audience's timezone) and the minimum gap between
+  posts. No time-of-day window — the audience is in every timezone.
   Everything that publishes asks it, so queueing five things at once produces
   five posts spread over hours rather than five posts in a minute.
 - `scripts/run-queue.js` — takes one item off the dashboard queue and posts it,

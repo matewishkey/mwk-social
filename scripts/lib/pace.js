@@ -5,11 +5,14 @@
  * the queue, so the event log is the complete record of what we have sent — no
  * second source to reconcile against.
  *
- * Everything here is in the AUDIENCE's timezone, never the box's. This machine
- * runs Etc/UTC; unqualified, a 09:00-21:00 window would put every post out
- * between 19:00 and 07:00 Brisbane — the entire window overnight. Day
- * boundaries for the daily cap are zoned for the same reason, or the cap
- * resets twelve hours early.
+ * There is no time-of-day window (mate's call, 2026-08-21): the audience is
+ * spread across timezones and reads a post whenever it reaches them, so holding
+ * one back for a "good hour" only delays it. What is left is volume — a daily
+ * cap and a minimum gap — so the feed never gets a burst.
+ *
+ * The day boundary for that cap is still the AUDIENCE's, never the box's. This
+ * machine runs Etc/UTC; counting UTC days would reset the cap twelve hours
+ * early against a Brisbane audience.
  */
 'use strict';
 
@@ -17,8 +20,6 @@ const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
 
 const DEFAULTS = {
   perDay: 6,
-  startHour: 9,
-  endHour: 21,
   minGapMinutes: 90,
   tz: TZ,
 };
@@ -50,9 +51,6 @@ function sentTimes(events) {
 function whyNotNow(events = [], opts = {}, now = new Date()) {
   const cfg = { ...DEFAULTS, ...opts };
   const here = zoned(now, cfg.tz);
-  if (here.hour < cfg.startHour || here.hour > cfg.endHour) {
-    return `${here.hour}:00 ${cfg.tz} is outside the ${cfg.startHour}:00-${cfg.endHour}:00 window`;
-  }
   const sent = sentTimes(events);
   const todays = sent.filter((at) => zoned(new Date(at), cfg.tz).day === here.day);
   if (todays.length >= cfg.perDay) return `${todays.length} already went out today`;
@@ -77,17 +75,13 @@ function nextSlot(events = [], opts = {}, now = new Date()) {
   let at = new Date(Math.max(now.getTime(),
     last ? new Date(last).getTime() + cfg.minGapMinutes * 60000 : 0));
 
-  // Then walk forward over closed windows and full days. Bounded rather than
-  // while(true): a bad timezone or a silly cap must not spin.
+  // Then walk forward over full days. Bounded rather than while(true): a bad
+  // timezone or a silly cap must not spin.
   for (let guard = 0; guard < 96; guard++) {
     const here = zoned(at, cfg.tz);
     const todays = sent.filter((s) => zoned(new Date(s), cfg.tz).day === here.day).length;
-    if (todays >= cfg.perDay || here.hour > cfg.endHour) {
+    if (todays >= cfg.perDay) {
       at = new Date(at.getTime() + 60 * 60000);       // an hour at a time until the day turns
-      continue;
-    }
-    if (here.hour < cfg.startHour) {
-      at = new Date(at.getTime() + (cfg.startHour - here.hour) * 3600_000 - here.minute * 60000);
       continue;
     }
     return at.toISOString();
@@ -106,7 +100,6 @@ function status(events = [], opts = {}, now = new Date()) {
   return {
     perDay: cfg.perDay,
     today,
-    window: `${cfg.startHour}:00–${cfg.endHour}:00`,
     minGapMinutes: cfg.minGapMinutes,
     tz: cfg.tz,
     why,

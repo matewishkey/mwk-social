@@ -221,7 +221,7 @@ test('the queue shows the pace it does not itself decide', async () => {
   const html = queuePage({ email: 'm@x.com', tz: TZ,
     items: [{ id: 'q1', status: 'queued', body: 'a post', platforms: '["threads"]',
       first_comment: 1, priority: 0, created_at: new Date().toISOString() }],
-    pace: { perDay: 6, today: 2, window: '9:00–21:00', tz: TZ, nextAt: 'Fri 09:00', why: null } });
+    pace: { perDay: 6, today: 2, minGapMinutes: 90, tz: TZ, nextAt: 'Fri 09:00', why: null } });
   assert.match(html, /a post/);
   assert.match(html, /Fri 09:00/);
   assert.match(html, /of 6 sent today/);
@@ -232,7 +232,7 @@ test('queued text cannot inject markup either', async () => {
   const html = queuePage({ email: 'm@x.com', tz: TZ,
     items: [{ id: 'q1', status: 'queued', body: '<img src=x onerror=alert(1)>',
       platforms: '[]', first_comment: 0, priority: 0, created_at: new Date().toISOString() }],
-    pace: { perDay: 6, today: 0, window: '9:00–21:00', tz: TZ, nextAt: null, why: null } });
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
   assert.ok(!html.includes('<img src=x'), 'the raw tag must not survive');
 });
 

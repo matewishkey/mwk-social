@@ -222,6 +222,15 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
   (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
+- **"Post it" means QUEUE it. Only publish when he says publish** (mate's call, 2026-08-21). He
+  reviews on the dashboard and releases it himself; an item that went straight out took that
+  choice away from him. So the default action for any content request is a `queue_item`, and
+  `run-queue.js --now` or a direct `post.js` run needs him to have asked for it in those words.
+- **There is no time-of-day posting window** (mate's call, 2026-08-21) — his reasoning: the
+  audience is spread across timezones and someone in the US reads a post later regardless, so
+  holding one for a "good hour" only delays it. `lib/pace.js` still caps the day and spaces posts
+  ninety minutes apart; the day boundary is still the audience's timezone, or the cap would reset
+  twelve hours early against a UTC box.
 - **Everything publishes through the queue now (mate's call, 2026-08-20). The mirror is gone.**
   Restream clips are no longer used; content goes out from this pipeline only, so there is no
   second origin to reconcile against. Deleted with it: `scripts/mirror.js`, `scripts/lib/matcher.js`
@@ -312,6 +321,17 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **The IPv6 trap bites the dashboard hostnames too**: they resolve AAAA-first and this box has no
   IPv6 route, so plain `curl` fails to connect in ~14 ms and `fetch` times out. Use `curl -4` when
   testing by hand; `ship-events.js` sets `net.setDefaultAutoSelectFamilyAttemptTimeout(1000)`.
+
+## Cross-repo
+
+This repo is PUBLIC, so only the public connections are named here:
+
+- **`matewishkey/mwk-og-image-generator`** (public) — the AI image studio the show builds and posts
+  about; it produces the OG cards used in posts.
+
+Connected **private** repos are named in the internal state note, not in this file — naming them
+here would publish their existence. Read that note before filing a cross-repo issue, and file with
+`gh issue create -R <owner>/<repo>`. Never edit another repo directly.
 
 ## Platform gotchas (verified against docs.zernio.com)
 

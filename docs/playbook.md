@@ -140,14 +140,18 @@ because systemd's `EnvironmentFile` can read neither `~/.secrets` nor the sops-e
 env.
 
 **The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb hourly heartbeat and
-`whyNotNow()` says no most of the time — six a day, ninety minutes apart, inside a 09:00–21:00
-window. Keeping it in one module means a run by hand obeys the same rules, and it counts
-`queue.posted` events so there is one budget rather than one per caller.
+`whyNotNow()` says no most of the time — six a day, ninety minutes apart. Keeping it in one module
+means a run by hand obeys the same rules, and it counts `queue.posted` events so there is one
+budget rather than one per caller.
 
-**That window is the audience's timezone.** The box is `Etc/UTC` and the audience is in Brisbane,
-so an unqualified "09:00 to 21:00" would put every post out between 19:00 and 07:00 — the whole
-window overnight. `MWK_TZ` moves it. Day boundaries for the daily cap are zoned as well, or the
-cap resets twelve hours early.
+**There is no time-of-day window** (mate's call, 2026-08-21). There used to be a 09:00–21:00 one.
+The audience is spread across timezones — someone in the US reads a post hours after it goes up
+and is none the wiser — so holding a post for a "good hour" only delayed it. What is left is
+volume, not timing.
+
+**The daily cap is still counted in the audience's timezone.** The box is `Etc/UTC` and the
+audience is in Brisbane, so counting UTC days would reset the cap twelve hours early. `MWK_TZ`
+moves it.
 
 ## The dashboard
 

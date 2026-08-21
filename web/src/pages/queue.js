@@ -2,9 +2,10 @@
  * The queue: things waiting for a good moment to go out.
  *
  * Writing here does NOT decide when anything publishes. The box owns the pace —
- * the posting window in the audience's timezone, the daily cap, the minimum gap
- * between posts — and it claims from this list one at a time when its own rules
- * say it may. Two things deciding "is now a good time" would eventually
+ * the daily cap, counted in the audience's timezone, and the minimum gap between
+ * posts — and it claims from this list one at a time when its own rules say it
+ * may. There is no time-of-day window: a post reaches each timezone whenever it
+ * reaches it. Two things deciding "is now a good time" would eventually
  * disagree, and the one on the box is the one that already knows what else went
  * out today.
  */
@@ -109,13 +110,13 @@ export function queuePage({ email, tz, items, pace }) {
 
   const body = `
 <h1>Queue</h1>
-<p class="lede">Add as many as you like. They go out one at a time, in the window,
-spaced apart — so five things queued at once do not land as five posts in a minute.</p>
+<p class="lede">Add as many as you like. They go out one at a time, spaced apart —
+so five things queued at once do not land as five posts in a minute.</p>
 
 <div class="tiles">
   ${tile(waiting.length, 'waiting')}
   ${tile(pace.today, `of ${pace.perDay} sent today`, pace.today >= pace.perDay ? 'warn' : 'plain')}
-  ${tile(pace.window, 'posting window', 'plain', pace.tz)}
+  ${tile(pace.minGapMinutes ? `${pace.minGapMinutes} min` : '—', 'minimum gap', 'plain', pace.tz)}
   ${tile(pace.nextAt || '—', 'next slot', 'plain', pace.why || '')}
 </div>
 

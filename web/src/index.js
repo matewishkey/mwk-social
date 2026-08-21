@@ -166,7 +166,7 @@ async function queue(env, tz, snapshots, email) {
   const items = await env.DB.prepare('SELECT * FROM queue_item ORDER BY created_at DESC LIMIT 200').all();
   // The pace is the box's, shipped with the ledger — never recomputed here, or
   // the page and the publisher would eventually disagree about what today holds.
-  const pace = ((snapshots.pace || {}).body) || { perDay: '—', today: '—', window: '—', tz, nextAt: null, why: '' };
+  const pace = ((snapshots.pace || {}).body) || { perDay: '—', today: '—', minGapMinutes: null, tz, nextAt: null, why: '' };
   return queuePage({ email, tz, items: items.results || [], pace });
 }
 

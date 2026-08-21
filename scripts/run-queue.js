@@ -3,8 +3,8 @@
  * Take one thing off the dashboard queue and post it — if now is a good moment.
  *
  * The pace lives here, not in the Worker. The queue is a to-do list; this is
- * the only thing that decides WHEN, and it shares lib/pace.js with the mirror
- * so five things queued at once go out over hours rather than in a minute.
+ * the only thing that decides WHEN, so five things queued at once go out over
+ * hours rather than in a minute.
  *
  * Claiming is a conditional UPDATE at the far end, so two overlapping runs
  * cannot both take the same item. The claim happens BEFORE the publish, for the
@@ -15,7 +15,7 @@
  *   scripts/run-queue.js                # honour the pace, post at most one
  *   scripts/run-queue.js --scheduled    # same, and say nothing when it is not time
  *   scripts/run-queue.js --dry-run      # claim nothing, print what would go
- *   scripts/run-queue.js --now          # ignore the window (still one at a time)
+ *   scripts/run-queue.js --now          # ignore the pace (still one at a time)
  */
 'use strict';
 
@@ -109,11 +109,11 @@ async function main() {
   const argv = process.argv.slice(2);
   const dryRun = argv.includes('--dry-run');
   const scheduled = argv.includes('--scheduled');
-  const ignoreWindow = argv.includes('--now');
+  const ignorePace = argv.includes('--now');
 
   const api = endpoint();
 
-  if (!ignoreWindow) {
+  if (!ignorePace) {
     const why = pace.whyNotNow(events.read());
     if (why) { console.log(`not this run — ${why}`); return; }
   }

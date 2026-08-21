@@ -12,8 +12,8 @@
  *   POST /actions       file a your-turn item
  *
  * The queue is a to-do list, not a scheduler. The box decides WHEN — it already
- * owns the posting window, the daily cap and the minimum gap, and two things
- * deciding that would eventually disagree.
+ * owns the daily cap and the minimum gap, and two things deciding that would
+ * eventually disagree.
  */
 
 import { tokenOk, ulid, shortCode } from './lib/access.js';
