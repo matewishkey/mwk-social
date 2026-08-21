@@ -62,17 +62,25 @@ export async function queueAction(request, env, email) {
   const [mediaKey, mediaType] = await put(form.get('media'));
   const [mediaWideKey] = await put(form.get('mediaWide'));
 
+  // Every column the form can fill has to be NAMED here. Five of them were not
+  // (2026-08-21): the bindings for reshare, reshare_text, comment_text, topics
+  // and media_wide_key were passed but the column list stopped at first_comment,
+  // so fourteen values met nine placeholders. Whatever D1 does with the excess,
+  // those five were never stored — the same "declared and never read" shape as
+  // hashtagsInCaption. The test below counts the two and fails if they diverge.
   await env.DB.prepare(
     `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
-       media_key, media_url, media_type, first_comment, priority)
-     VALUES (?,?,?,'queued',?,?,?,?,?,?,0)`,
+       media_key, media_url, media_type, first_comment, priority,
+       reshare, reshare_text, comment_text, topics, media_wide_key)
+     VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?)`,
   ).bind(ulid(), new Date().toISOString(), email, text, JSON.stringify(platforms),
     mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0,
+    form.get('reshare') ? 1 : 0,
     String(form.get('reshareText') || '').trim() || null,
     String(form.get('commentText') || '').trim() || null,
     JSON.stringify(String(form.get('topics') || '').split(',')
-      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)), mediaWideKey,
-    form.get('reshare') ? 1 : 0).run();
+      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)),
+    mediaWideKey).run();
   return back;
 }
 

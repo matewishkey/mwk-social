@@ -227,6 +227,37 @@ test('the queue shows the pace it does not itself decide', async () => {
   assert.match(html, /of 6 sent today/);
 });
 
+// The bug this pins: fourteen bindings were passed at nine placeholders, and
+// the five columns they were meant for were missing from the column list. The
+// row still appeared, so the queue looked fine while reshare, its wording, a
+// custom comment, the topics and the landscape cut were all silently dropped.
+test('every value bound to the queue insert has a column to land in', async () => {
+  const { queueAction } = await src('pages/queue.js');
+  const seen = {};
+  const env = { DB: { prepare(sql) {
+    return { bind(...args) { seen.sql = sql; seen.args = args; return { run: async () => {} }; } };
+  } } };
+  const form = new FormData();
+  form.set('do', 'add');
+  form.set('body', 'a post');
+  form.set('p_linkedin', 'on');
+  form.set('reshare', 'on');
+  form.set('reshareText', 'my line on top');
+  form.set('commentText', 'a custom first comment');
+  form.set('topics', '#Invoicing, LatePayments');
+  const request = new Request('https://social.example/queue', { method: 'POST', body: form });
+  await queueAction(request, env, 'mate@matewishkey.com');
+
+  const placeholders = (seen.sql.match(/\?/g) || []).length;
+  assert.equal(seen.args.length, placeholders,
+    `${seen.args.length} values bound at ${placeholders} placeholders`);
+  for (const col of ['reshare', 'reshare_text', 'comment_text', 'topics', 'media_wide_key']) {
+    assert.match(seen.sql, new RegExp(`\\b${col}\\b`), `${col} must be named in the insert`);
+  }
+  assert.ok(seen.args.includes('my line on top'), 'his words must be bound');
+  assert.ok(seen.args.includes('["Invoicing","LatePayments"]'), 'topics must be bound, hash stripped');
+});
+
 test('queued text cannot inject markup either', async () => {
   const { queuePage } = await src('pages/queue.js');
   const html = queuePage({ email: 'm@x.com', tz: TZ,
