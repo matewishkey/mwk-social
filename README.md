@@ -150,6 +150,11 @@ which is exactly why the CTA has its own short domain.
 - **Hashtags go in the caption or the first comment, never both.** Facebook,
   YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and Threads
   keep the caption clean and spend them in the comment.
+- **X gets a thread, not a post.** X deprioritises whichever tweet holds an
+  external link, and Premium softens that rather than removing it — so the root
+  tweet carries his words, the clip and one hashtag, and a reply carries the
+  link. `platformSpecificData.threadItems` publishes both in one call, for 1.5c
+  more than a single tweet would have cost.
 - **Instagram's 5-hashtag cap counts the caption and the comments together.** That
   is why its caption carries none — the comment spends all five, two always-on
   tags and three describing the clip. Tags in both places would spend the budget

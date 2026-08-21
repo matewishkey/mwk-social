@@ -169,32 +169,40 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `/youtube/pending` returns what was last WRITTEN as well as what is approved, and a video already
   carrying exactly that is skipped. The upsert's `WHERE state = 'proposed'` was hiding the churn at
   the database level while the work still happened every run.
-- **TikTok and X take the CTA in the CAPTION, and `post.js` now actually does it.** The platform
-  table declared `linkPlacement: 'caption'` from the start but nothing ever acted on it, so posts
-  there went out with his words alone — no route to the sign-up page and nothing measurable.
-  **They cannot share a request with the comment platforms** (one body, one caption), so publish()
-  sends one request for the comment group and **one per caption-link platform** — they need
-  different captions anyway, since each carries its own short code and X's tag cap is 1 against
-  TikTok's none. His words stay first and untouched; link and tags are appended.
+- **TikTok takes the CTA in the CAPTION, and `post.js` now actually does it.** The platform table
+  declared `linkPlacement: 'caption'` from the start but nothing ever acted on it, so posts there
+  went out with his words alone — no route to the sign-up page and nothing measurable. **A platform
+  carrying its own link cannot share a request with the comment platforms** (one body, one
+  caption), so publish() sends one request for the comment group and one per platform that mints
+  its own short code — they need different captions anyway, since X's tag cap is 1 against TikTok's
+  none. His words stay first and untouched; link and tags are appended. X was in this group until
+  2026-08-21 and now takes its link in a thread reply instead — see below.
 - **Do not claim the watcher will "pick up" TikTok or X.** It cannot — no comments API — and
   post.js used to print exactly that. Only platforms with `commentsApi: true` are ever reached.
-- **X: the link goes in the post, not a comment.** Its comment endpoints 403 on this plan (read
-  *and* reply, verified 2026-08-19), so the first-comment mechanic is impossible there. Two ways
-  to get a link out — `platformSpecificData.threadItems` publishes a root tweet plus replies in
-  one call, or just put the link in the post. **The post is cheaper**: X bills
-  `content_create_with_url` at **$0.20** against $0.015 for a post without one, and the fee lands
-  on whichever tweet holds the URL — so a thread pays the $0.20 *plus* $0.015 for the extra
-  tweet. Measured, not inferred: 2 × $0.015 + 1 × $0.20 = the 23c on `usage:stats.spend.xSpendCents`.
-  (Zernio's `usage:x-pricing` lists `content_create_with_url` with an empty `triggeredBy`; that
-  metadata is wrong — the operation does fire.)
-- **X's link penalty is REDUCED by Premium, not removed — the old note here said otherwise and was
+  It has now been printed **twice**: the `later` filter keyed off `!linkInCaption`, so the promise
+  came back the moment X's link moved into a thread reply. It reads `commentsApi` directly now,
+  and a test pins `first-comment.js`'s hand-written `ALL_PLATFORMS` to exactly that set.
+- **X: the link goes in a THREAD REPLY, not the post and not a comment** (changed 2026-08-21).
+  Its comment endpoints 403 on this plan (read *and* reply, verified 2026-08-19), so the
+  first-comment mechanic is impossible there — but `platformSpecificData.threadItems` publishes a
+  root tweet plus its replies in one call, which gets the link out of the tweet that has to
+  travel. `linkPlacement: 'reply'` is the third value that field takes; only X uses it.
+  **threadItems REPLACES the top-level `content` for that platform** — the caption is published as
+  `threadItems[0]`, so the media has to ride there too, and a `content` left at the top level is
+  used for display and search only. It lives in `platformSpecificData` **on the PlatformTarget**,
+  same place as `firstComment`, not at the top level of the body.
+- **X's link penalty is REDUCED by Premium, not removed — an older note here said otherwise and was
   wrong** (corrected 2026-08-21 against current reporting). X deprioritises a post carrying an
   external link to keep people on-platform; non-Premium link posts are effectively invisible,
-  Premium ones get a fraction of normal engagement. Every X post this pipeline has made carries the
-  CTA in the caption (`linkPlacement: 'caption'`), so **every one of them has been in the penalised
-  class** — and so were the two mate posted by hand from the app. `platformSpecificData.threadItems`
-  would put the link in a reply and leave the root tweet clean, at 21.5c against 20c. Not changed
-  yet: see the open issue.
+  Premium ones get a fraction of normal engagement. **Every X post made before 2026-08-21 carried
+  the CTA in its caption and was therefore in the penalised class** — including the two mate posted
+  by hand from the app, both of which got 1 impression.
+- **A URL tweet costs 20c FLAT — the fee replaces the base charge, it does not add to it.**
+  Measured off `usage:stats`, not inferred: `content_create: 2` + `content_create_with_url: 5`
+  came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly. So a clean root plus a link
+  reply is **21.5c against 20c** — 1.5c to get the root tweet out of the penalised class, which
+  is why the thread won. (Zernio's `usage:x-pricing` lists `content_create_with_url` with an empty
+  `triggeredBy`; that metadata is wrong — the operation does fire.)
 - **Threads works like Instagram**: connected through the same Meta auth, comments readable and
   repliable, 500-char cap, video to 5 minutes. It is in the watcher's platform list.
 - **A caption that already carries the CTA link is left alone** — the watcher skips it rather than

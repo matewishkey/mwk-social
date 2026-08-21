@@ -200,6 +200,29 @@ const linkInCaption = (platform) => {
   try { return platformTable.get(platform).linkPlacement === 'caption'; } catch { return false; }
 };
 
+/*
+ * Does the link go in a thread reply rather than the post itself? Only X, and
+ * only because its comment endpoints 403: threadItems is the one way to get a
+ * link out of the root tweet without a comments API. See platforms.js for why
+ * that is worth 1.5c a post.
+ */
+const linkInReply = (platform) => {
+  try { return platformTable.get(platform).linkPlacement === 'reply'; } catch { return false; }
+};
+
+/*
+ * The root tweet and the reply that carries the link, as threadItems.
+ *
+ * Pure on purpose — the media and the link are resolved by the caller, so the
+ * shape that goes on the wire is testable without a network. The media rides on
+ * the ROOT: threadItems[0] is the tweet people see, and the reply is a link.
+ */
+function threadWithLink(caption, link, media) {
+  const root = { content: caption };
+  if (media && media.length) root.mediaItems = media;
+  return [root, { content: link }];
+}
+
 /** Does this platform take hashtags in the caption, or must they stay out of it? */
 const tagsInCaption = (platform) => {
   try { return platformTable.get(platform).hashtagsInCaption !== 0; } catch { return false; }
@@ -209,23 +232,33 @@ const tagsInCaption = (platform) => {
  * The caption for one platform. Three things vary, and every one of them is a
  * platform rule rather than a choice:
  *
- *   - the link, when there is no comments API to put it in (TikTok, X)
+ *   - the link, when there is no comments API to put it in (TikTok). X has
+ *     none either, but takes its link in a thread reply instead — see
+ *     linkInReply — so its caption stays as clean as anyone else's
  *   - the hashtags, when the platform takes them in the body (FB, YT, LI and
  *     the two above). Instagram and Threads must NOT have them in the caption:
  *     Instagram's cap of 5 counts caption and comments together, so tags there
  *     would spend the budget twice over
  *   - his words, which never vary
  */
+/*
+ * The tracked link this platform's post carries, wherever it ends up. A custom
+ * comment goes through whole, with every url in it given its own code; the
+ * default is the CTA short link. Never fatal — with no dashboard to mint
+ * against, the plain sign-up url goes out instead.
+ */
+async function linkFor(platform, opts) {
+  const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
+  if (opts.comment) return shortlink.trackLinks(opts.comment, { platform, postKey });
+  return (await shortlink.mint({ platform, postKey, label: opts.title || null }))
+    || voice.config().links.show;
+}
+
 async function captionForPlatform(platform, opts) {
   const parts = [opts.text];
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
 
-  if (linkInCaption(platform)) {
-    parts.push(opts.comment
-      ? await shortlink.trackLinks(opts.comment, { platform, postKey })
-      : await shortlink.mint({ platform, postKey, label: opts.title || null })
-        || voice.config().links.show);
-  }
+  if (linkInCaption(platform)) parts.push(await linkFor(platform, opts));
   if (tagsInCaption(platform)) {
     const tags = voice.tagLine(platform, opts.topics || []);
     if (tags) parts.push(tags);
@@ -271,6 +304,12 @@ async function publish(opts) {
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
         entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
+      if (linkInReply(a.platform)) {
+        // threadItems REPLACES the top-level content for this platform — the
+        // caption is published as threadItems[0], not as the post body.
+        entry.platformSpecificData = Object.assign(entry.platformSpecificData || {},
+          { threadItems: threadWithLink(caption, await linkFor(a.platform, opts), media) });
+      }
       b.platforms.push(entry);
     }
     const tt = accts.find((a) => a.platform === 'tiktok');
@@ -279,14 +318,24 @@ async function publish(opts) {
   }
 
   // Only platforms that HAVE a comments API are ever reached by the watcher.
+  // Keyed off commentsApi and nothing else: this used to read !linkInCaption,
+  // which quietly started promising the watcher would cover X the moment X's
+  // link moved into a thread reply.
+  const canBeCommented = (p) => {
+    try { return platformTable.get(p).commentsApi === true; } catch { return false; }
+  };
   const later = accounts.filter((a) => wantComment
-    && !FIRST_COMMENT_PLATFORMS.has(a.platform) && !linkInCaption(a.platform));
+    && !FIRST_COMMENT_PLATFORMS.has(a.platform) && canBeCommented(a.platform));
   if (later.length) {
     console.log(`note: ${later.map((a) => a.platform).join(', ')} take no native firstComment — the watcher adds it`);
   }
   const inCaption = accounts.filter((a) => linkInCaption(a.platform));
   if (inCaption.length) {
     console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
+  }
+  const inReply = accounts.filter((a) => linkInReply(a.platform));
+  if (inReply.length) {
+    console.log(`note: ${inReply.map((a) => a.platform).join(', ')} publish as a thread — clean root tweet, link in the reply`);
   }
   console.log(`${bodies.length} request(s): ${bodies.map((b) => b.platforms.map((p) => p.platform).join('+')).join(' | ')}`);
 
@@ -322,4 +371,4 @@ if (require.main === module) {
   main().catch((err) => { console.error(err.message); process.exit(1); });
 }
 
-module.exports = { publish, resolveAccounts, FIRST_COMMENT_PLATFORMS };
+module.exports = { publish, resolveAccounts, threadWithLink, FIRST_COMMENT_PLATFORMS };

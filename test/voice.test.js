@@ -160,24 +160,76 @@ test('the same post renders the identical comment twice running', () => {
 /* --------------------------------------------- captions that carry the link -- */
 
 /*
- * TikTok and X have no comments API we can use, so their caption is the ONLY
- * place a link can go. Before this, a post there went out with his words and
- * nothing else — no route to the sign-up page and nothing measurable. These
- * pin the shape of what gets appended.
+ * TikTok and X have no comments API we can use, so a link cannot go in a
+ * comment on either. TikTok has nowhere left but the caption. X has one more
+ * option — a thread reply — and takes it, because X penalises whichever tweet
+ * holds the link and the root tweet is the one that needs to travel.
  */
 const platformTable = require('../scripts/lib/platforms');
 
-test('exactly the platforms with no comments API take the link in the caption', () => {
-  const inCaption = Object.keys(platformTable.PLATFORMS)
-    .filter((p) => platformTable.get(p).linkPlacement === 'caption');
-  assert.deepStrictEqual(inCaption.sort(), ['tiktok', 'twitter']);
-  for (const p of inCaption) {
+test('a platform only carries its own link when it cannot be commented on', () => {
+  const ownLink = Object.keys(platformTable.PLATFORMS)
+    .filter((p) => ['caption', 'reply'].includes(platformTable.get(p).linkPlacement));
+  assert.deepStrictEqual(ownLink.sort(), ['tiktok', 'twitter']);
+  for (const p of ownLink) {
     assert.equal(platformTable.get(p).commentsApi, false,
-      `${p} takes the link in its caption, so it must be because it cannot be commented on`);
+      `${p} carries its own link, so it must be because it cannot be commented on`);
   }
 });
 
-test('a caption-link platform gets tags under its own cap', () => {
+/*
+ * The watcher's platform list is written out by hand in first-comment.js
+ * (the file runs on require, so it cannot be imported). It must be exactly the
+ * platforms with a comments API — post.js printed "the watcher adds it" for X
+ * the moment X's link moved out of the caption, which is a promise nothing can
+ * keep: X's comment endpoints 403 on this plan.
+ */
+test('the watcher covers exactly the platforms with a comments API', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  const m = src.match(/const ALL_PLATFORMS = \[([^\]]*)\]/);
+  assert.ok(m, 'ALL_PLATFORMS must still be a literal list in first-comment.js');
+  const listed = m[1].split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort();
+  const withApi = Object.keys(platformTable.PLATFORMS)
+    .filter((p) => platformTable.get(p).commentsApi).sort();
+  assert.deepStrictEqual(listed, withApi);
+});
+
+/*
+ * The link penalty is the half of X's silence that is ours. Pin the placement
+ * so nobody moves it back into the caption to save 1.5c.
+ */
+test('X is the only platform that puts its link in a thread reply', () => {
+  const inReply = Object.keys(platformTable.PLATFORMS)
+    .filter((p) => platformTable.get(p).linkPlacement === 'reply');
+  assert.deepStrictEqual(inReply, ['twitter']);
+  assert.equal(platformTable.get('twitter').supportsThread, true,
+    'a link in a reply is only possible where threadItems is');
+  assert.equal(platformTable.get('twitter').markerInCaption, false,
+    'the CTA is in the reply now — a caption claiming to carry it would be a lie');
+});
+
+test('the root tweet is clean and the link rides in the reply', () => {
+  const { threadWithLink } = require('../scripts/post.js');
+  const media = [{ url: 'https://example.test/clip.mp4', type: 'video' }];
+  const items = threadWithLink('his words\n\n#MWKShow', 'https://mwkshow.com/ab12', media);
+
+  assert.equal(items.length, 2);
+  assert.ok(!/https?:\/\//.test(items[0].content),
+    'a url in the root tweet is the whole thing we are avoiding');
+  assert.deepStrictEqual(items[0].mediaItems, media,
+    'the clip belongs on the tweet people actually see');
+  assert.equal(items[1].content, 'https://mwkshow.com/ab12');
+  assert.ok(!items[1].mediaItems, 'the reply is a link, nothing else');
+});
+
+test('a thread with no media leaves mediaItems off entirely', () => {
+  const { threadWithLink } = require('../scripts/post.js');
+  assert.deepStrictEqual(threadWithLink('words', 'https://mwkshow.com/x', []),
+    [{ content: 'words' }, { content: 'https://mwkshow.com/x' }]);
+});
+
+test('a platform carrying its own link gets tags under its own cap', () => {
   // TikTok has no meaningful cap: both fixed tags plus everything given.
   assert.strictEqual(voice.tagLine('tiktok', ['Xero', 'Invoicing']),
     '#MWKShow #PIY #Xero #Invoicing');

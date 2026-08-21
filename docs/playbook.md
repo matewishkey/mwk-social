@@ -77,7 +77,7 @@ in the wrong place.
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | Link goes in the caption. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
-| **X** | 403 on this plan | yes | Link goes in the post. Premium required or link posts get zero engagement |
+| **X** | 403 on this plan | yes | Link goes in a **thread reply**, never the root tweet — `platformSpecificData.threadItems`. X deprioritises whichever tweet holds an external link and Premium only softens that |
 
 ### The two that cost money or reach if you get them wrong
 
@@ -86,9 +86,20 @@ in the wrong place.
 So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
 always-on tags and three describing the clip.
 
-**X bills $0.20 for a post containing a URL, against $0.015 without.** The fee follows whichever
-post holds the link, so a thread pays the $0.20 *plus* $0.015 for the second post — the link goes
-in the post itself, never in a reply. Measured against real billing, not the price list.
+**X bills $0.20 for a tweet containing a URL, and that replaces the $0.015 base charge rather
+than adding to it.** Measured against real billing, not the price list: `content_create: 2` plus
+`content_create_with_url: 5` came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly.
+
+So the two shapes cost **20c for a single tweet carrying the link** and **21.5c for a clean root
+tweet plus a link reply**. We pay the 1.5c. X deprioritises a post with an external link to keep
+people on-platform — Premium reduces that, it does not remove it — and until 2026-08-21 every X
+post this pipeline made put the link in the caption, so every one of them was in the penalised
+class. The root tweet is the one that has to travel; the reply is where the link is free.
+
+**`threadItems` replaces the top-level `content` for that platform.** The caption is published as
+`threadItems[0]` and the media has to ride there with it; a top-level `content` is kept for
+display and search only. It goes in `platformSpecificData` on the **PlatformTarget**, the same
+place as `firstComment` — not at the top level of the request body.
 
 ## Media
 
@@ -188,7 +199,7 @@ correct, DST included.
    on one profile; Facebook, Instagram, LinkedIn-Ltd, Threads, X and YouTube on the other. A
    routine post crosses both, and no single queue can schedule it as one unit.
 3. **One of our posts is up to four Zernio posts.** `publish()` splits by the caption a platform
-   gets, and TikTok and X each carry their own tracked short code. Four requests would take four
+   gets, and TikTok and X each carry their own tracked short code (X's in a thread reply). Four requests would take four
    slots and land at four different times.
 4. **A queue schedules a post you have already built.** It does not probe the clip and drop
    platforms that would reject it, mint a short link per platform, derive topic tags from the

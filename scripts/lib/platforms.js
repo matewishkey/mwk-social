@@ -71,15 +71,27 @@ const PLATFORMS = {
     captionMax: 280,               // Premium raises this, but 280 keeps it portable
     urlLength: 23,                 // every URL counts as a t.co link
     hashtagsInCaption: 1,
-    linkPlacement: 'caption',      // comment endpoints 403, and the post is cheaper
-    markerInCaption: true,
+    // X deprioritises a post carrying an external link to keep people on
+    // platform, and Premium REDUCES that rather than removing it. Every X post
+    // this pipeline made before 2026-08-21 put the link in the caption and was
+    // therefore in the penalised class. threadItems publishes the root tweet
+    // and its replies in one call, so his words go out clean and the link
+    // lands underneath, where the penalty costs nothing.
+    linkPlacement: 'reply',
+    markerInCaption: false,        // it rides in the reply now, not the caption
+    supportsThread: true,          // platformSpecificData.threadItems, per PlatformTarget
     supportsFirstComment: false,
     deletable: true,
     // X is the only platform that refuses a non-AAC audio track, and it does so
     // at 99% of the upload rather than up front (2026-08-21). Everything else
     // published the same Opus-in-MP4 file without comment.
     audioCodecs: ['aac'],
-    estCostCents: 20,              // content_create_with_url, measured
+    // Measured off usage:stats, not inferred: 2 content_create + 5
+    // content_create_with_url came to xSpendCents 103, so a URL tweet is 20c
+    // FLAT (it replaces the 1.5c charge, it does not add to it). A clean root
+    // plus a link reply is therefore 21.5c against 20c — 1.5c to get the root
+    // tweet out of the penalised class.
+    estCostCents: 21.5,
   },
   facebook: {
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
@@ -152,10 +164,15 @@ function flowFor(name) {
       by: 'none', note: name === 'twitter' ? 'read and reply both 403 on this plan' : 'no comments API at all' });
   }
 
-  steps.push(p.linkPlacement === 'caption'
-    ? { step: 'the link', how: 'appended to the caption, with its own tracked code',
-        note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' }
-    : { step: 'the link', how: 'in the first comment, to keep it out of the body' });
+  if (p.linkPlacement === 'caption') {
+    steps.push({ step: 'the link', how: 'appended to the caption, with its own tracked code',
+      note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' });
+  } else if (p.linkPlacement === 'reply') {
+    steps.push({ step: 'the link', how: 'a second tweet in the same call, with its own tracked code',
+      note: 'X penalises whichever tweet holds the link — the root stays clean, for 1.5c' });
+  } else {
+    steps.push({ step: 'the link', how: 'in the first comment, to keep it out of the body' });
+  }
 
   if (p.reshare === 'api') steps.push({ step: 'reshare', how: 'quote-reshared from the personal account', by: 'api' });
   else if (p.reshare === 'manual') steps.push({ step: 'reshare', by: 'manual',
