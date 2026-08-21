@@ -127,7 +127,7 @@ const unescapeXml = (s) => s
  * @returns {{text: string, variant: string, index: number}}
  */
 function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
-  variantIndex = null, showUrl = null } = {}) {
+  variantIndex = null, showUrl = null, noTags = false } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
 
@@ -157,7 +157,10 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
     .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
     .replace(/\{episodeUrl\}/g, episode ? episode.url : '');
 
-  const tags = tagLine(platform, topicTags);
+  // noTags is for a platform whose CAPTION already carries them — repeating the
+  // list under the post shows it twice, and on Instagram would spend the cap
+  // twice, since its 5 counts caption and comments together.
+  const tags = noTags ? '' : tagLine(platform, topicTags);
   if (tags) text += `\n\n${tags}`;
 
   // Any known marker will do: with a short link the text carries mwkshow.com/…

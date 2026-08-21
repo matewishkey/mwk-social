@@ -124,7 +124,7 @@ async function overview(request, env, tz, snapshots, email, url) {
 
 async function stats(env, tz, snapshots, email) {
   const from = new Date(Date.now() - STATS_DAYS * 86400_000).toISOString().slice(0, 10);
-  const [daily, followers, clicks] = await Promise.all([
+  const [daily, followers, clicks, targets, split, links] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -135,9 +135,19 @@ async function stats(env, tz, snapshots, email) {
       // bot = 0 only: a link-preview fetch is not a click.
       `SELECT l.platform, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
         WHERE c.at >= ? AND c.bot = 0 GROUP BY l.platform ORDER BY n DESC`).bind(from).all(),
+    // What people actually clicked, rather than only where from.
+    env.DB.prepare(
+      `SELECT l.target, COUNT(*) n, COUNT(DISTINCT l.code) codes
+         FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
+    // The honest denominator: how much of the traffic was not a person.
+    env.DB.prepare(
+      `SELECT bot, COUNT(*) n FROM click WHERE at >= ? GROUP BY bot`).bind(from).all(),
+    env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
   ]);
   return statsPage({ email, tz, snapshots, days: STATS_DAYS,
-    daily: daily.results || [], followers: followers.results || [], clicks: clicks.results || [] });
+    daily: daily.results || [], followers: followers.results || [], clicks: clicks.results || [],
+    targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0 });
 }
 
 async function queue(env, tz, snapshots, email) {

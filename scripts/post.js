@@ -160,9 +160,9 @@ async function commentFor(platform, text, opts) {
   if (opts.comment) {
     // Every url in a custom comment gets its own code, on this platform.
     const body = await shortlink.trackLinks(opts.comment, { platform, postKey });
-    // Tags are appended rather than baked into the custom text, so each platform
-    // still gets them under its own cap.
-    const tags = voice.tagLine(platform, opts.topics || []);
+    // Tags only if the caption is not already carrying them, or the post would
+    // show the same list twice.
+    const tags = tagsInCaption(platform) ? '' : voice.tagLine(platform, opts.topics || []);
     return tags ? `${body}\n\n${tags}` : body;
   }
 
@@ -172,6 +172,7 @@ async function commentFor(platform, text, opts) {
   return voice.firstComment(postKey, {
     platform,
     topicTags: opts.topics,
+    noTags: tagsInCaption(platform),
     variantIndex: opts.commentVariant,
     showUrl,
   }).text;
@@ -199,25 +200,37 @@ const linkInCaption = (platform) => {
   try { return platformTable.get(platform).linkPlacement === 'caption'; } catch { return false; }
 };
 
+/** Does this platform take hashtags in the caption, or must they stay out of it? */
+const tagsInCaption = (platform) => {
+  try { return platformTable.get(platform).hashtagsInCaption !== 0; } catch { return false; }
+};
+
 /*
- * The caption for a platform that cannot carry a comment.
+ * The caption for one platform. Three things vary, and every one of them is a
+ * platform rule rather than a choice:
  *
- * TikTok and X have no comments API we can use, so a post there with a clean
- * caption is a dead end — nothing links back to the sign-up page and nothing
- * is measurable. His words stay first and untouched; the call to action and
- * the tags are appended, under that platform's own tag cap.
+ *   - the link, when there is no comments API to put it in (TikTok, X)
+ *   - the hashtags, when the platform takes them in the body (FB, YT, LI and
+ *     the two above). Instagram and Threads must NOT have them in the caption:
+ *     Instagram's cap of 5 counts caption and comments together, so tags there
+ *     would spend the budget twice over
+ *   - his words, which never vary
  */
-async function captionFor(platform, opts) {
-  // A custom comment cannot be posted here, so its links ride in the caption
-  // instead — otherwise the one thing he wanted people to click is missing on
-  // exactly the two platforms that cannot be commented on.
+async function captionForPlatform(platform, opts) {
+  const parts = [opts.text];
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
-  const body = opts.comment
-    ? await shortlink.trackLinks(opts.comment, { platform, postKey })
-    : await shortlink.mint({ platform, postKey, label: opts.title || null })
-      || voice.config().links.show;
-  const tags = voice.tagLine(platform, opts.topics || []);
-  return [opts.text, body, tags].filter(Boolean).join('\n\n');
+
+  if (linkInCaption(platform)) {
+    parts.push(opts.comment
+      ? await shortlink.trackLinks(opts.comment, { platform, postKey })
+      : await shortlink.mint({ platform, postKey, label: opts.title || null })
+        || voice.config().links.show);
+  }
+  if (tagsInCaption(platform)) {
+    const tags = voice.tagLine(platform, opts.topics || []);
+    if (tags) parts.push(tags);
+  }
+  return parts.filter(Boolean).join('\n\n');
 }
 
 async function publish(opts) {
@@ -225,63 +238,57 @@ async function publish(opts) {
   const wantComment = opts.firstComment;
   const media = resolveMedia(opts.media);
 
-  // Two shapes of post, and they cannot share a request: one caption is his
-  // words alone with the link in a comment, the other has the link appended.
-  // Sending one body would force the same caption on both.
-  const commentGroup = accounts.filter((a) => !linkInCaption(a.platform));
-  const captionGroup = accounts.filter((a) => linkInCaption(a.platform));
+  /*
+   * One request carries one caption, so platforms are grouped BY THE CAPTION
+   * THEY GET rather than by any fixed split. That falls out of the rules above:
+   * Instagram and Threads share a clean caption, Facebook/YouTube/LinkedIn
+   * share a tagged one, and TikTok and X each get their own because each
+   * carries its own tracked link.
+   */
+  const composed = [];
+  for (const a of accounts) {
+    composed.push({ account: a, caption: await captionForPlatform(a.platform, opts) });
+  }
 
-  const base = () => {
-    const b = {};
+  const groups = new Map();
+  for (const c of composed) {
+    if (!groups.has(c.caption)) groups.set(c.caption, []);
+    groups.get(c.caption).push(c.account);
+  }
+
+  const bodies = [];
+  for (const [caption, accts] of groups) {
+    const b = { content: caption };
     if (media.length) b.mediaItems = media;
     if (opts.title) b.title = opts.title;
     if (opts.draft) b.isDraft = true;
     else if (opts.schedule) b.scheduledFor = opts.schedule;
     else b.publishNow = true;
-    return b;
-  };
 
-  const bodies = [];
-
-  if (commentGroup.length) {
-    const b = { ...base(), content: opts.text };
     b.platforms = [];
-    for (const a of commentGroup) {
+    for (const a of accts) {
       const entry = { platform: a.platform, accountId: a.id };
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
         entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
       b.platforms.push(entry);
     }
+    const tt = accts.find((a) => a.platform === 'tiktok');
+    if (tt) b.tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
     bodies.push(b);
   }
 
-  // One request per caption-link platform: they need different captions anyway,
-  // since each gets its own tracked code and X's tag cap is 1 against TikTok's none.
-  for (const a of captionGroup) {
-    const b = { ...base(), content: await captionFor(a.platform, opts) };
-    b.platforms = [{ platform: a.platform, accountId: a.id }];
-    if (a.platform === 'tiktok') {
-      b.tiktokSettings = tiktokSettings(a.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
-    }
-    bodies.push(b);
-  }
-
-  if (commentGroup.some((a) => a.platform === 'tiktok')) {
-    const tt = commentGroup.find((a) => a.platform === 'tiktok');
-    bodies[0].tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
-  }
-
-  // Only platforms that HAVE a comments API get picked up by the watcher. Saying
-  // so for TikTok and X was wrong: nothing ever reaches them, which is exactly
-  // why the link is in their caption instead.
-  const later = commentGroup.filter((a) => wantComment && !FIRST_COMMENT_PLATFORMS.has(a.platform));
+  // Only platforms that HAVE a comments API are ever reached by the watcher.
+  const later = accounts.filter((a) => wantComment
+    && !FIRST_COMMENT_PLATFORMS.has(a.platform) && !linkInCaption(a.platform));
   if (later.length) {
     console.log(`note: ${later.map((a) => a.platform).join(', ')} take no native firstComment — the watcher adds it`);
   }
-  if (captionGroup.length) {
-    console.log(`note: ${captionGroup.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
+  const inCaption = accounts.filter((a) => linkInCaption(a.platform));
+  if (inCaption.length) {
+    console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
   }
+  console.log(`${bodies.length} request(s): ${bodies.map((b) => b.platforms.map((p) => p.platform).join('+')).join(' | ')}`);
 
   if (opts.dryRun) {
     for (const b of bodies) console.log(JSON.stringify(b, null, 2));

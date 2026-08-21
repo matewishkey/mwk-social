@@ -39,7 +39,8 @@ const RATE = (m) => {
   return seen ? (acts / seen) * 100 : null;
 };
 
-export function statsPage({ email, tz, daily, followers, clicks, snapshots, days = WINDOW_DAYS }) {
+export function statsPage({ email, tz, daily, followers, clicks, snapshots,
+  targets = [], split = [], links = 0, days = WINDOW_DAYS }) {
   const platformTable = ((snapshots.platforms || {}).body || {}).flows || [];
   const metricsFor = Object.fromEntries(platformTable.map((f) => [f.platform, (f.capabilities || {}).metrics || {}]));
 
@@ -79,6 +80,21 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
   const postedOn = dates.filter((d) => byDate[d].posts > 0).length;
   const cadence = spanDays ? postedOn / (spanDays / 7) : 0;
   const totalClicks = clicks.reduce((a, c) => a + c.n, 0);
+  const bySplit = Object.fromEntries(split.map((r) => [r.bot, r.n]));
+  const human = bySplit[0] || 0;
+  const crawler = bySplit[1] || 0;
+  const unknown = bySplit[2] || 0;
+
+  // A short, readable name for a destination — the whole url is noise in a table.
+  const label = (url) => {
+    try {
+      const u = new URL(url);
+      if (u.hostname.includes('matewishkey.com') && u.pathname.startsWith('/show')) return 'the sign-up page';
+      if (u.hostname.includes('github.com')) return `the repo${u.pathname.split('/')[2] ? ` · ${u.pathname.split('/')[2]}` : ''}`;
+      if (u.hostname.includes('youtube') || u.hostname.includes('youtu.be')) return 'a video on YouTube';
+      return u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname);
+    } catch { return url; }
+  };
 
   // ---- per-channel cards -------------------------------------------------
   const ORDER = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
@@ -112,13 +128,37 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
     .sort((a, b) => b.followers - a.followers);
   const tiny = followers.filter((f) => (f.followers || 0) < 10);
 
-  const clickRows = clicks.length ? `<table>
+  const clickRows = human ? `<table>
     <thead><tr><th>channel</th><th class="num">clicks</th></tr></thead>
     <tbody>${clicks.map((c) => `<tr><td>${esc(c.platform || 'unattributed')}</td>
       <td class="num">${c.n}</td></tr>`).join('')}</tbody></table>`
-    : `<p class="empty">No short links have been clicked yet — or none have been minted.
-       Until they are, no platform except Facebook reports clicks at all, so the call
-       to action has no scoreboard.</p>`;
+    : `<p class="empty">${crawler || unknown
+      ? 'Nothing here is a person yet — see the breakdown opposite.'
+      : `No short links have been clicked yet${links ? '' : ', and none have been minted'}.`}
+       Only Facebook reports clicks natively, so away from it these links are the whole scoreboard.</p>`;
+
+  const targetRows = targets.length ? `<table>
+    <thead><tr><th>they clicked</th><th class="num">clicks</th></tr></thead>
+    <tbody>${targets.map((t) => `<tr>
+      <td>${esc(label(t.target))}<div class="faint" style="font-size:.72rem">${esc(t.target.slice(0, 62))}</div></td>
+      <td class="num">${t.n}</td></tr>`).join('')}</tbody></table>`
+    : '<p class="empty">Nothing clicked yet.</p>';
+
+  const splitCard = (crawler || unknown || human) ? `
+    <table>
+      <thead><tr><th>traffic</th><th class="num">hits</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill p-ok">counted</span> looked like a person</td><td class="num">${human}</td></tr>
+        <tr><td><span class="pill p-plain">ignored</span> link-preview crawler</td><td class="num">${crawler}</td></tr>
+        ${unknown ? `<tr><td><span class="pill p-warn">ignored</span> logged before this was measured</td>
+          <td class="num">${unknown}</td></tr>` : ''}
+      </tbody>
+    </table>
+    <p class="note">A platform fetches a link to build its preview card, and every fetch hits the
+      redirect. The User-Agent is read to decide and then discarded — nothing about a visitor is
+      stored, only whether the hit counted.${unknown ? ` The ${unknown} unknown were recorded before
+      that existed; calling them people would be a guess.` : ''}</p>`
+    : '<p class="empty">No traffic yet.</p>';
 
   const body = `
 <h1>Stats</h1>
@@ -129,7 +169,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots, days
   ${tile(num(totals.views || 0), 'video views', 'plain')}
   ${tile(rate == null ? '—' : `${rate.toFixed(1)}%`, 'engagement rate',
     rate == null ? 'plain' : rate >= 5 ? 'ok' : rate >= 2 ? 'warn' : 'bad', 'did anyone care')}
-  ${tile(totalClicks, 'link clicks', totalClicks ? 'ok' : 'plain', 'sign-up CTA')}
+  ${tile(human, 'link clicks', human ? 'ok' : 'plain',
+    crawler || unknown ? `${crawler + unknown} not counted` : 'people, not crawlers')}
   ${tile(cadence.toFixed(1), 'days a week we post', cadence >= 5 ? 'ok' : cadence >= 3 ? 'warn' : 'bad', 'the lever we control')}
 </div>
 
@@ -140,7 +181,12 @@ ${card('Reach by day', bars(dates.map((d) => ({ label: d, value: byDate[d].reach
 <div class="chgrid">${channels || '<div class="card"><div class="card-body empty">No metrics shipped yet.</div></div>'}</div>
 
 <div class="two">
-  ${card('Link clicks', clickRows)}
+  ${card('Clicks by channel', clickRows)}
+  ${card('What they clicked', targetRows)}
+</div>
+
+<div class="two">
+  ${card('What counted, and what did not', splitCard)}
   ${card('Followers', withBase.length ? `<table>
       <thead><tr><th>channel</th><th></th><th class="num">followers</th></tr></thead>
       <tbody>${withBase.map((f) => `<tr>

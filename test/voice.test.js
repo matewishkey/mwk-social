@@ -231,3 +231,35 @@ test('an already-short link is left alone, the sign-up link is not', () => {
   // ...which is exactly why carriesCta() is the wrong test for "already shortened".
   assert.notStrictEqual(new URL(short).hostname, new URL(voice.config().links.show).hostname);
 });
+
+/* ------------------------------------------- where the hashtags go -------- */
+
+/*
+ * hashtagsInCaption was declared on the platform table from the beginning and
+ * never read by the publish path — so LinkedIn, Facebook and YouTube posts went
+ * out with no tags at all, and the tags only ever appeared in the comment.
+ * Same class of bug as linkPlacement was.
+ */
+test('exactly Instagram and Threads keep hashtags out of the caption', () => {
+  const { PLATFORMS, get } = require('../scripts/lib/platforms');
+  const clean = Object.keys(PLATFORMS).filter((p) => get(p).hashtagsInCaption === 0);
+  assert.deepStrictEqual(clean.sort(), ['instagram', 'threads']);
+});
+
+// Instagram's cap counts caption AND comments together, so tags in both places
+// would spend the budget twice for no extra reach.
+test('a comment carries no tags when its caption already does', () => {
+  const withTags = voice.firstComment('k', { platform: 'linkedin', noEpisode: true,
+    topicTags: ['Branding'], noTags: true });
+  assert.ok(!/#MWKShow/.test(withTags.text), 'the always-on pair must not repeat');
+  assert.ok(!/#Branding/.test(withTags.text));
+  assert.ok(voice.carriesCta(withTags.text), 'but it is still recognisably ours');
+});
+
+test('a comment does carry tags when its caption does not', () => {
+  const ig = voice.firstComment('k', { platform: 'instagram', noEpisode: true,
+    topicTags: ['Branding', 'SocialMedia', 'CreatingImages'] });
+  assert.match(ig.text, /#MWKShow #PIY #Branding #SocialMedia #CreatingImages/);
+  // Exactly five: Instagram's cap counts the caption too, and the caption is clean.
+  assert.strictEqual((ig.text.match(/#\w+/g) || []).length, 5);
+});

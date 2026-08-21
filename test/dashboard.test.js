@@ -210,7 +210,8 @@ test('the window is the real span, gaps included', async () => {
 test('with no clicks the page says why there is nothing to show', async () => {
   const { statsPage } = await src('pages/stats.js');
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [], snapshots: {} });
-  assert.match(html, /no platform except Facebook reports clicks/);
+  assert.match(html, /Only Facebook reports clicks natively/);
+  assert.match(html, /none have been minted/, 'with no links at all, say so');
 });
 
 /* ---------------------------------------------------------------- queue -- */
@@ -312,4 +313,31 @@ test('the vertical surfaces are exactly the ones that reject a landscape cut', a
     assert.deepStrictEqual(media.check(p, landscape), [],
       `${p} is marked landscapeOk so it must actually accept one`);
   }
+});
+
+// The click card must never present crawler traffic as people. It said "18
+// clicks" on the first live post when every one of them was a preview fetch.
+test('the stats page separates people from crawlers and says so', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    targets: [{ target: 'https://github.com/matewishkey/mwk-og-image-generator', n: 0, codes: 3 }],
+    split: [{ bot: 1, n: 1 }, { bot: 2, n: 37 }], links: 9, snapshots: {} });
+
+  assert.match(html, /<b>0<\/b>\s*<span>link clicks<\/span>/, 'zero people is what to show');
+  assert.match(html, /38 not counted/, 'and the ignored traffic is named, not hidden');
+  assert.match(html, /link-preview crawler/);
+  assert.match(html, /logged before this was measured/);
+  assert.ok(!/<b>38<\/b>\s*<span>link clicks/.test(html), 'the total must never be shown as clicks');
+});
+
+test('the stats page names the destination, not just the channel', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [],
+    clicks: [{ platform: 'instagram', n: 4 }],
+    targets: [{ target: 'https://matewishkey.com/show', n: 3, codes: 2 },
+      { target: 'https://www.youtube.com/watch?v=abc', n: 1, codes: 1 }],
+    split: [{ bot: 0, n: 4 }], links: 5, snapshots: {} });
+  assert.match(html, /the sign-up page/);
+  assert.match(html, /a video on YouTube/);
+  assert.match(html, /What they clicked/);
 });
