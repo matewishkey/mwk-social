@@ -29,7 +29,7 @@ anything else.
 ```sh
 systemctl --user list-timers 'mwk-*' --all --no-pager
 for u in mwk-queue mwk-first-comment mwk-ship-events mwk-ship-stats mwk-yt-notes; do
-  echo "=== $u ==="; journalctl --user -u "$u" -n 6 --no-pager -o cat
+  echo "=== $u ==="; journalctl --user -u "$u" -n 12 --no-pager -o cat
 done
 ```
 
@@ -37,7 +37,7 @@ Five units, all `Type=oneshot`. What each says when it is healthy:
 
 | Unit | Healthy looks like |
 |---|---|
-| `mwk-queue` | `nothing queued`, or `not this run — only N min since the last one` |
+| `mwk-queue` | **silence.** Under `--scheduled` it prints only when it actually posts — nine refusals an hour would drown the log |
 | `mwk-first-comment` | `N post(s) in window …, 0 without a recorded first comment` |
 | `mwk-ship-events` | `shipped N event(s)` or `nothing new, and the last heartbeat was N min ago` |
 | `mwk-ship-stats` | `shipped N daily row(s)` + `shipped the platform table, the voice and the pace` |
@@ -55,8 +55,8 @@ node -e 'const p=require("./scripts/lib/pace"),e=require("./scripts/lib/events")
   console.log(JSON.stringify(p.status(e.read()),null,1))'
 ```
 
-`why: null` means it could go out this minute; the timer fires at `*:20`. There is **no
-time-of-day window** — only six a day, ninety minutes apart.
+`why: null` means it could go out this minute, and the timer asks every five minutes from `*:05`
+to `*:45`. There is **no time-of-day window** — only six a day, ninety minutes apart.
 
 ## 4. The accounts
 

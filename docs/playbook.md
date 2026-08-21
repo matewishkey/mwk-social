@@ -73,7 +73,7 @@ in the wrong place.
 |---|---|---|---|
 | **Facebook** | yes | yes | Pages only, never personal timelines. ~60-day tokens |
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
-| **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, quote-reshare from personal |
+| **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, then repost from personal — plainly, no commentary, which is the default. A thought on top is optional and always his |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | Link goes in the caption. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
@@ -131,18 +131,23 @@ Five systemd `--user` timers, all from `scripts/install-timers.sh`:
 | Unit | When | What |
 |---|---|---|
 | `mwk-first-comment` | `*:00` | the CTA comment on anything that hasn't got one |
-| `mwk-queue` | `*:20` | `--scheduled` — publishes the next queued item, if this is a turn |
+| `mwk-queue` | `*:05`–`*:45`/5 | `--scheduled` — publishes the next queued item, if this is a turn |
 | `mwk-ship-events` | `*:0/2` | ships the event log to the dashboard |
 | `mwk-ship-stats` | `*:35` | analytics, follower counts, the platform table |
 | `mwk-yt-notes` | `05:40` | drafts YouTube show notes for approval |
 
-The queue runs twenty minutes after the comment check so a post has settled before the watcher
-goes looking for it. Every unit is `Type=oneshot` and runs through `scripts/with-secrets.sh`,
-because systemd's `EnvironmentFile` can read neither `~/.secrets` nor the sops-encrypted project
-env.
+The queue asks every five minutes, so something queued goes out within five rather than waiting
+up to an hour for a tick — it is safe to ask that often because `lib/pace.js`, not the timer, is
+what refuses. **It stops at `:45`, and that gap is load-bearing:** the comment watcher runs at
+`:00` and Zernio posts the native first comment seconds after a post goes live, so a post
+published at `:55` could be looked at before its own comment landed and get a second one.
 
-**The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb hourly heartbeat and
-`whyNotNow()` says no most of the time — six a day, ninety minutes apart. Keeping it in one module
+Every unit is `Type=oneshot` and runs through `scripts/with-secrets.sh`, because systemd's
+`EnvironmentFile` can read neither `~/.secrets` nor the sops-encrypted project env.
+
+**The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb heartbeat and
+`whyNotNow()` says no most of the time — six a day, ninety minutes apart. Under `--scheduled` it
+says so silently, or nine refusals an hour would drown the log. Keeping it in one module
 means a run by hand obeys the same rules, and it counts `queue.posted` events so there is one
 budget rather than one per caller.
 
@@ -236,6 +241,17 @@ again next run; replays are free because the sink is `INSERT OR IGNORE` on a sta
 uploader sends an **empty batch when idle**, at least every fifteen minutes — without that
 heartbeat, "nothing happened" and "the box is off" are the same picture, which is the one thing a
 status page must never do.
+
+## Being driven by something else
+
+Mate is building a CMS on the fleet's server to hold website data and recordings, and this pipeline
+has to be easy to drive from it. **The seam is one row: the CMS inserts a `queue_item` and
+everything else happens.** Nothing else needs to be exposed — the box claims it, probes the media,
+composes per platform, publishes, comments and records the outcome, and the dashboard shows all of
+it. `scripts/queue-add.js` is that same insert done from a terminal, and it is the worked example.
+
+Deliberately NOT part of the seam: deciding when. The pace is the box's and stays there, or two
+things would eventually disagree about what today already holds.
 
 ## Reading the API
 

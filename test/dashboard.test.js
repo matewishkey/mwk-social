@@ -62,8 +62,8 @@ test('text from a post cannot inject markup', async () => {
 
 test('a url in an event becomes a link, and one without stays text', async () => {
   const { overviewPage } = await src('pages/overview.js');
-  const withUrl = overviewPage(base({ events: [{ ts: new Date().toISOString(), kind: 'mirror.posted',
-    level: 'info', platform: 'threads', message: 'mirrored', url: 'https://example.com/p' }] }));
+  const withUrl = overviewPage(base({ events: [{ ts: new Date().toISOString(), kind: 'queue.posted',
+    level: 'info', platform: 'threads', message: 'posted', url: 'https://example.com/p' }] }));
   assert.match(withUrl, /<a href="https:\/\/example\.com\/p"/);
   const without = overviewPage(base({ events: [{ ts: new Date().toISOString(), kind: 'run.started',
     level: 'info', platform: null, message: 'started', url: null }] }));

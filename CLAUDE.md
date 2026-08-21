@@ -147,6 +147,8 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   be mixed either). So a vertical and a landscape cut are two posts, never one. `landscapeOk` on the
   platform table routes them: instagram/threads/tiktok are vertical-only, the rest take the wide
   cut. `queue_item.media_wide_key` carries the second one.
+- **`reshare.quoteReshare()` takes an account argument** — it is not hardwired to the one personal
+  profile, so adding LinkedIn accounts is a connection job, never a code change.
 - **A LinkedIn repost with no commentary needs `content` OMITTED, not empty.** The docs are explicit
   that commentary is optional and leaving it out gives a one-click repost. `queue_item.reshare` is a
   separate flag from `reshare_text` for exactly this: an empty comment used to mean "do not repost".

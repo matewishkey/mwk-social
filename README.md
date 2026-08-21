@@ -88,8 +88,9 @@ at once, straight from a shell — these are the actual live posts:
   anything that already has a description, which does nothing until it is
   approved on the dashboard.
 - `scripts/install-timers.sh` — installs the five systemd `--user` timers: the
-  comment check hourly, the queue hourly, the event uploader every two minutes,
-  analytics hourly, and the show-notes draft daily. The posting *pace* lives in
+  comment check hourly, the queue every five minutes (stopping at `:45`, to
+  leave the comment watcher a clear run at `:00`), the event uploader every two
+  minutes, analytics hourly, and the show-notes draft daily. The posting *pace* lives in
   `lib/pace.js`, not the timers.
 
 ## Reproduce it

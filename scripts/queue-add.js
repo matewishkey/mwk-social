@@ -86,6 +86,7 @@ function parse(argv) {
   };
   for (let i = 0; i < argv.length; i++) {
     switch (argv[i]) {
+      case '-h': case '--help': opt.help = true; break;
       case '--body': opt.body = take(i); i++; break;
       case '--body-file': opt.bodyFile = take(i); i++; break;
       case '--media': opt.media = take(i); i++; break;
@@ -99,6 +100,7 @@ function parse(argv) {
       default: throw new Error(`unknown argument: ${argv[i]}`);
     }
   }
+  if (opt.help) return opt;
   if (opt.body && opt.bodyFile) throw new Error('--body or --body-file, not both');
   if (opt.bodyFile) opt.body = fs.readFileSync(opt.bodyFile, 'utf8');
   opt.body = (opt.body || '').trim();
@@ -126,8 +128,16 @@ VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
 `;
 }
 
+/** The usage block at the top of this file, so there is one copy of it. */
+function usage() {
+  const src = fs.readFileSync(__filename, 'utf8');
+  const header = src.slice(src.indexOf('/*'), src.indexOf('*/'));
+  return header.replace(/^\/\*\n?/, '').replace(/^ ?\* ?/gm, '').trimEnd();
+}
+
 function main() {
   const opt = parse(process.argv.slice(2));
+  if (opt.help) { console.log(usage()); return; }
 
   let media = [null, null];
   if (opt.media && isUrl(opt.media)) {

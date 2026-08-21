@@ -1,10 +1,11 @@
 /*
  * Getting the actual video file for a clip, and knowing what it is.
  *
- * Facebook's media URLs are signed and die — two of the seven reels were
- * already 403 within a fortnight — so the mirror cannot treat "Zernio gave me a
- * URL" as "I have the video". Every clip we care about is also on YouTube,
- * where yt-dlp fetches it for free and forever, so that is the fallback.
+ * The media URLs Zernio hands back are signed and die — measured at "URL
+ * signature expired" on a two-week-old Facebook reel — so "Zernio gave me a
+ * URL" is never "I have the video". Every clip we care about is also on
+ * YouTube, where yt-dlp fetches it for free and forever, so that is the
+ * fallback.
  *
  * Files are cached under ~/.local/state/mwk-social/media/ and keyed by clip: a
  * clip goes to four platforms and must be downloaded once, not four times.

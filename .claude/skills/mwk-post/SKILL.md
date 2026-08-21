@@ -89,12 +89,14 @@ item with `--media-wide`.
   --topics ComputerProblems,CopyPaste
 ```
 
-`--dry-run` prints the SQL and writes nothing. `--help` is the header of the file. Leaving
-`--platforms` off means "wherever it fits". Local media goes to R2; a URL is stored as-is.
+`--dry-run` prints the SQL and writes nothing; `--help` prints the usage. Leaving `--platforms`
+off means "wherever it fits". Local media goes to R2; a URL is stored as-is.
 
-Before choosing platforms, **check whether the clip has run there before** — `analytics:posts
---source external` covers posts made in the apps. Instagram is the one to be careful with: it
-cannot be deleted, so a repeat inside a fortnight is a real cost.
+Before choosing platforms, **check whether the clip has run there before** — `posts:list` is the
+whole universe of what this pipeline has sent. Do NOT reintroduce an "is a copy already over
+there?" sweep across `analytics:posts --source external`; that existed only for the retired mirror
+and the playbook says so. Instagram and TikTok are the ones to be careful with: **neither can be
+deleted through the API**, so a repeat inside a fortnight is permanent.
 
 ## 5. Say what will actually happen
 

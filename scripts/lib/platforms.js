@@ -54,7 +54,9 @@ const PLATFORMS = {
     linkPlacement: 'caption',      // no comment API of any kind
     markerInCaption: true,
     supportsFirstComment: false,
-    deletable: true,
+    deletable: false,              // posts:unpublish → "TikTok does not support post deletion
+                                   // via API" (2026-08-21, against two real duplicates). Same as
+                                   // Instagram: every mistake here is permanent.
     consent: true,                 // six required flags, read from creator-info
     videoMinSec: 3,
     videoMaxSec: 3600,        // creator-info's live value; read it per account rather than trusting this

@@ -7,9 +7,9 @@
  * hours rather than in a minute.
  *
  * Claiming is a conditional UPDATE at the far end, so two overlapping runs
- * cannot both take the same item. The claim happens BEFORE the publish, for the
- * same reason the mirror writes its ledger first: a publish that times out has
- * not necessarily failed, and an unclaimed item would be posted twice.
+ * cannot both take the same item. The claim happens BEFORE the publish, and that
+ * order is the point: a publish that times out has not necessarily failed, and
+ * an unclaimed item would be posted twice.
  *
  * Usage:
  *   scripts/run-queue.js                # honour the pace, post at most one
@@ -61,8 +61,8 @@ async function call(path_, body, { origin, token }) {
 }
 
 /*
- * Pull the queued media down to disk. Through curl rather than fetch for the
- * same reason the mirror does: this box has no IPv6 route, the CDN hostnames
+ * Pull the queued media down to disk. Through curl rather than fetch, for the
+ * reason lib/media.js spells out: this box has no IPv6 route, the CDN hostnames
  * resolve AAAA-first, and undici's 250 ms Happy Eyeballs window expires before
  * it falls back — which looks exactly like an expired URL.
  */
@@ -146,7 +146,10 @@ async function main() {
 
   if (!ignorePace) {
     const why = pace.whyNotNow(events.read());
-    if (why) { console.log(`not this run — ${why}`); return; }
+    // --scheduled is the timer, which now asks nine times an hour. It says
+    // nothing when the answer is "not yet", exactly as the flag has always
+    // claimed; by hand it explains itself.
+    if (why) { if (!scheduled) console.log(`not this run — ${why}`); return; }
   }
 
   const claimed = await call('/queue/claim', {}, api);
