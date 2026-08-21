@@ -155,6 +155,48 @@ volume, not timing.
 audience is in Brisbane, so counting UTC days would reset the cap twelve hours early. `MWK_TZ`
 moves it.
 
+### Why the queue is ours and not Zernio's
+
+Zernio has a queue. We reviewed it properly on 2026-08-21 — read the API docs and created a real
+queue on the account to watch what it does, then deleted it — and decided against it. Writing the
+answer down so it is not re-derived every few months.
+
+**What Zernio's queue is:** a recurring *timetable* on a profile. Slots are `{dayOfWeek 0-6, time
+"HH:mm"}` in an IANA timezone; you create a post with `queuedFromProfile` instead of
+`scheduledFor` and it lands on the next free slot. Six endpoints under `/v1/queue/*`, all on the
+CLI as `queue:*`. Slot assignment is locked server-side — the docs warn explicitly against reading
+`next-slot` and passing it as `scheduledFor`, which bypasses the lock. Timezone handling is
+correct, DST included.
+
+**Why it does not fit, in the order the reasons bite:**
+
+1. **It is a timetable, not a pace.** Our rule is six a day, ninety minutes apart, at *any* hour.
+   A queue is precisely the time-of-day window that was deleted on 2026-08-21. Expressing "any
+   time, min ninety minutes apart" needs ~112 hand-maintained slots and still does not enforce a
+   daily cap.
+2. **A queue belongs to ONE profile, and our accounts span two.** LinkedIn-personal and TikTok sit
+   on one profile; Facebook, Instagram, LinkedIn-Ltd, Threads, X and YouTube on the other. A
+   routine post crosses both, and no single queue can schedule it as one unit.
+3. **One of our posts is up to four Zernio posts.** `publish()` splits by the caption a platform
+   gets, and TikTok and X each carry their own tracked short code. Four requests would take four
+   slots and land at four different times.
+4. **A queue schedules a post you have already built.** It does not probe the clip and drop
+   platforms that would reject it, mint a short link per platform, derive topic tags from the
+   transcript, or compose the first comment. That work has to happen before the post exists.
+5. **It has no "waiting on him" state.** `queuedFromProfile` means scheduled and going. Our queue
+   is a review surface behind Access with cancel, bump, and a preview of the clip.
+
+**What we give up by not using it:** if this box is off, nothing publishes. Mate's answer to that
+(2026-08-21) was "the box will be not off at all" — so it is a monitoring problem, not a queue
+problem. Alert on it; do not architect around it.
+
+**The same review covered moving the publisher into the Worker** and reached the same place: the
+publish path shells out to `ffprobe`, `ffmpeg` and Whisper, and a Worker runs no binaries. It
+*could* work if the probe and the tags were precomputed at queue time, and a Cron Trigger gets 15
+minutes of wall time with network waiting not counted against CPU — but four publish calls at the
+240s timeout is 16 minutes, over that ceiling. Real project, one benefit, permanent split across
+two runtimes. Not now.
+
 ## The dashboard
 
 `social.matewishkey.com` — five pages behind Cloudflare Access with an email one-time PIN:

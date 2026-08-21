@@ -222,6 +222,17 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
   (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
+- **The queue is OURS, not Zernio's, and that was reviewed rather than assumed** (2026-08-21).
+  Zernio's `/v1/queue/*` is a recurring *timetable* per profile; ours is a rate limit across
+  accounts that span two profiles, for posts that are up to four Zernio requests each. The full
+  reasoning, and the parallel finding that the publisher cannot move into the Worker (ffprobe,
+  ffmpeg and Whisper are binaries), is in `docs/playbook.md` — read it before proposing either
+  again.
+- **The heartbeat's period must stay UNDER the dashboard's stale threshold.** `ship-events.js`
+  beats every 10 minutes; `overview.js` calls the box stale at 15. They were both 15, so on a quiet
+  box the beat always landed just after the page had given up and the tile flickered red for
+  nothing. Two constants in two runtimes that only make sense as a pair — change one, look at the
+  other.
 - **An item that has put ANYTHING live is never queued again** (2026-08-21, learned expensively).
   `run-queue.js` publishes in groups — one request per distinct caption — and a throw in any group
   used to unwind the whole run and put the item back as `queued`. X's media upload failed at 99%
