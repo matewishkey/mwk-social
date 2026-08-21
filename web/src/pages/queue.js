@@ -67,7 +67,8 @@ export async function queueAction(request, env, email) {
      VALUES (?,?,?,'queued',?,?,?,?,?,?,0)`,
   ).bind(ulid(), new Date().toISOString(), email, text, JSON.stringify(platforms),
     mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0,
-    String(form.get('reshareText') || '').trim() || null).run();
+    String(form.get('reshareText') || '').trim() || null,
+    String(form.get('commentText') || '').trim() || null).run();
   return back;
 }
 
@@ -85,6 +86,7 @@ export function queuePage({ email, tz, items, pace }) {
           ${i.media_key || i.media_url ? ' · has media' : ''}
           ${i.first_comment ? ' · first comment' : ' · no first comment'}
           ${i.reshare_text ? ' · reshared from your personal account' : ''}
+          ${i.comment_text ? ' · custom first comment' : ''}
           ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}</div>
         ${i.note ? `<div class="faint meta">${esc(i.note)}</div>` : ''}</td>
       <td class="nowrap faint">${esc(when(i.created_at, tz))}<br><span style="font-size:.72rem">${esc(ago(i.created_at))}</span></td>
@@ -134,6 +136,13 @@ ${card('Queue something', `
   </div>
   <div class="field">
     <div class="checks"><label><input type="checkbox" name="firstComment" checked> Add the standard first comment</label></div>
+  </div>
+  <div class="field">
+    <label for="qcomment">First comment — override the standard one (optional)</label>
+    <textarea id="qcomment" name="commentText" style="min-height:5rem"
+      placeholder="Left empty, the rotating sign-up comment is used. Any link you put here is shortened and tracked."></textarea>
+    <p class="note">Use this to point at something specific — a repo, an episode. Every URL is
+      replaced with its own <code>mwkshow.com</code> code, so you can see which one people click.</p>
   </div>
   <div class="field">
     <label for="qreshare">LinkedIn — your thought, resharing it from your personal account (optional)</label>

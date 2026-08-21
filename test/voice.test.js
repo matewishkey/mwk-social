@@ -198,3 +198,25 @@ test('the show blurb carries no hashtags of its own', () => {
   assert.ok(!/#\w/.test(voice.showBlurb()),
     'tags in the blurb duplicate the tag line appended after it');
 });
+
+/* ------------------------------------------------- tracking every link -- */
+
+// "Can we add the repo link as well and track it?" — yes, and not only that
+// one: any url we publish gets its own code, so a click is attributable to the
+// link as well as the channel and the post.
+test('the url matcher takes the url and leaves the punctuation', () => {
+  const { URL_RE } = require('../scripts/lib/shortlink');
+  const found = (s) => s.match(new RegExp(URL_RE.source, 'g')) || [];
+  assert.deepStrictEqual(found('see https://github.com/a/b.'), ['https://github.com/a/b']);
+  assert.deepStrictEqual(found('see https://x.com/a — and'), ['https://x.com/a']);
+  assert.deepStrictEqual(found('(https://x.com/a)'), ['https://x.com/a']);
+  assert.deepStrictEqual(found('https://youtube.com/watch?v=-Lf97N091NI ok'),
+    ['https://youtube.com/watch?v=-Lf97N091NI'], 'a hyphenated video id must survive');
+  assert.deepStrictEqual(found('no links here'), []);
+});
+
+test('two urls in one comment are two separate links', () => {
+  const { URL_RE } = require('../scripts/lib/shortlink');
+  const s = 'repo https://github.com/a/b and the stream https://youtu.be/xyz';
+  assert.strictEqual((s.match(new RegExp(URL_RE.source, 'g')) || []).length, 2);
+});

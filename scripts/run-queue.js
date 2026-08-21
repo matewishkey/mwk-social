@@ -165,6 +165,7 @@ async function main() {
       media,
       title: null,
       firstComment: item.firstComment,
+      comment: item.commentText || null,
       topics: [],
       commentVariant: null,
       tiktokPrivacy: 'PUBLIC_TO_EVERYONE',

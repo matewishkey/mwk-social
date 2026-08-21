@@ -147,3 +147,9 @@ CREATE INDEX IF NOT EXISTS yt_state ON yt_proposal (state, proposed_at DESC);
 -- reshare: the thought on top is his to write, never one to generate, so the
 -- absence of words is a decision rather than a gap to fill.
 ALTER TABLE queue_item ADD COLUMN reshare_text TEXT;
+
+-- A custom first comment for one queued post, replacing the rotating CTA.
+-- Any url in it is swapped for a tracked short link before it goes out, so
+-- "which link earned this click" stays answerable for every link we publish,
+-- not only the call to action.
+ALTER TABLE queue_item ADD COLUMN comment_text TEXT;

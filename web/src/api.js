@@ -155,6 +155,7 @@ async function claim(body, env) {
         id: row.id, body: row.body, platforms: want, mediaUrl,
         mediaType: row.media_type, firstComment: !!row.first_comment,
         reshareText: row.reshare_text || null,
+        commentText: row.comment_text || null,
         createdAt: row.created_at, createdBy: row.created_by,
       },
     });

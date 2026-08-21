@@ -43,7 +43,8 @@ const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
     firstComment: true, draft: false, schedule: null, wait: true, dryRun: false,
-    topics: [], commentVariant: null, tiktokPrivacy: 'PUBLIC_TO_EVERYONE' };
+    topics: [], commentVariant: null, comment: null, postKey: null,
+    tiktokPrivacy: 'PUBLIC_TO_EVERYONE' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--text') opts.text = argv[++i];
@@ -53,6 +54,7 @@ function parseArgs(argv) {
     else if (a === '--title') opts.title = argv[++i];
     else if (a === '--topics') opts.topics = argv[++i].split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
     else if (a === '--comment-variant') opts.commentVariant = Number(argv[++i]);
+    else if (a === '--comment') opts.comment = argv[++i];
     else if (a === '--tiktok-privacy') opts.tiktokPrivacy = argv[++i];
     else if (a === '--no-first-comment') opts.firstComment = false;
     else if (a === '--draft') opts.draft = true;
@@ -145,6 +147,7 @@ function resolveMedia(items) {
 // here — the clip is a local file, not a published post with a media URL — so
 // they come in on --topics, named by whoever watched the video.
 function commentFor(platform, text, opts) {
+  if (opts.comment) return opts.comment;
   return voice.firstComment(`new:${voice.hash(text)}`, {
     platform,
     topicTags: opts.topics,
@@ -183,14 +186,24 @@ const linkInCaption = (platform) => {
  * the tags are appended, under that platform's own tag cap.
  */
 async function captionFor(platform, opts) {
-  const url = await shortlink.mint({ platform, postKey: opts.postKey || null,
-    label: opts.title || null }) || voice.config().links.show;
+  // A custom comment cannot be posted here, so its links ride in the caption
+  // instead — otherwise the one thing he wanted people to click is missing on
+  // exactly the two platforms that cannot be commented on.
+  const body = opts.comment
+    ? await shortlink.trackLinks(opts.comment, { platform, postKey: opts.postKey || null })
+    : await shortlink.mint({ platform, postKey: opts.postKey || null, label: opts.title || null })
+      || voice.config().links.show;
   const tags = voice.tagLine(platform, opts.topics || []);
-  return [opts.text, url, tags].filter(Boolean).join('\n\n');
+  return [opts.text, body, tags].filter(Boolean).join('\n\n');
 }
 
 async function publish(opts) {
   const accounts = resolveAccounts(opts);
+  // Every url we are about to publish gets its own code, not just the CTA.
+  if (opts.comment) {
+    opts = { ...opts, comment: await shortlink.trackLinks(opts.comment,
+      { postKey: opts.postKey || null }) };
+  }
   const wantComment = opts.firstComment;
   const media = resolveMedia(opts.media);
 
