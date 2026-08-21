@@ -293,6 +293,55 @@ test('no media means no empty preview box', async () => {
   assert.ok(!html.includes('class="prevs"'), 'no preview container without media');
 });
 
+/* ----------------------------------------------------------- retry half -- */
+
+/*
+ * Since 34db048 a partially-published item is marked `posted` and never
+ * re-queued — re-queueing would post again to the platforms that already have
+ * it. That left the failed half with no route back, which is what this covers.
+ */
+test('only the platforms that did not go are counted as failed', async () => {
+  const { failedPlatforms } = await src('pages/queue.js');
+  const row = { result: JSON.stringify([
+    { platform: 'facebook', status: 'published', url: 'https://fb/1' },
+    { platform: 'linkedin', status: 'published', url: 'https://li/1' },
+    { platform: 'twitter', status: 'failed', url: null },
+  ]) };
+  assert.deepEqual(failedPlatforms(row), ['twitter']);
+});
+
+// TikTok returns no url ever, and Threads sits at 'processing' for a while.
+// Reading either as a failure would repost to a platform that already has it —
+// and on TikTok that second copy cannot be deleted.
+test('no url is not a failure when the platform never gives one', async () => {
+  const { failedPlatforms } = await src('pages/queue.js');
+  assert.deepEqual(failedPlatforms({ result: JSON.stringify([
+    { platform: 'tiktok', status: 'published', url: null },
+    { platform: 'threads', status: 'processing', url: 'https://threads/1' },
+  ]) }), []);
+});
+
+test('a row with no recorded outcome offers no retry', async () => {
+  const { failedPlatforms } = await src('pages/queue.js');
+  for (const row of [{}, { result: null }, { result: 'not json' }, { result: '{}' }]) {
+    assert.deepEqual(failedPlatforms(row), []);
+  }
+});
+
+test('the retry button names what is missing and nothing else', async () => {
+  const { queuePage } = await src('pages/queue.js');
+  const html = queuePage({ email: 'm@x.com', tz: TZ, waiting: [], total: 1,
+    done: [{ id: 'q1', status: 'posted', body: 'a post', platforms: '["facebook","twitter"]',
+      first_comment: 1, priority: 0, created_at: new Date().toISOString(),
+      result: JSON.stringify([
+        { platform: 'facebook', status: 'published', url: 'https://fb/1' },
+        { platform: 'twitter', status: 'failed', url: null }]) }],
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
+  assert.match(html, /value="retry"/);
+  assert.match(html, /Retry 1/);
+  assert.match(html, /twitter did not go/);
+});
+
 test('queued text cannot inject markup either', async () => {
   const { queuePage } = await src('pages/queue.js');
   const html = queuePage({ email: 'm@x.com', tz: TZ,

@@ -235,8 +235,9 @@ async function main() {
         const result = await publish({
           text: item.body,
           // So each queued post gets its own short codes rather than sharing a
-          // generic per-platform one.
-          postKey: `queue:${item.id}`,
+          // generic per-platform one. A retry keys off the item it is retrying,
+          // not itself, or the same post's clicks land under two codes.
+          postKey: `queue:${item.retryOf || item.id}`,
           accounts: accts.map((a) => a.id),
           all: false,
           media: file ? [file] : [],

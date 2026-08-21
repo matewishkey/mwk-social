@@ -14,6 +14,20 @@ import { ulid } from '../lib/access.js';
 
 const POSTABLE = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
 
+/**
+ * The platforms on this row that did NOT go live, read off what run-queue
+ * recorded. A platform counts as live if it said `published` OR came back with
+ * a url — TikTok returns no url and Threads sits at `processing` for a while,
+ * and treating either as a failure would repost to somewhere that has it.
+ */
+export function failedPlatforms(row) {
+  let outcome;
+  try { outcome = JSON.parse(row.result || '[]'); } catch { return []; }
+  if (!Array.isArray(outcome)) return [];
+  const live = new Set(outcome.filter((o) => o.status === 'published' || o.url).map((o) => o.platform));
+  return [...new Set(outcome.map((o) => o.platform))].filter((p) => p && !live.has(p));
+}
+
 const STATUS = {
   queued:    ['p-plain', 'waiting'],
   claimed:   ['p-warn',  'going out'],
@@ -40,6 +54,32 @@ export async function queueAction(request, env, email) {
   if (doing === 'bump') {
     await env.DB.prepare('UPDATE queue_item SET priority = priority + 1 WHERE id = ?')
       .bind(String(form.get('id') || '')).run();
+    return back;
+  }
+
+  // Retry ONLY the platforms that failed. The whole reason this exists: since
+  // 34db048 a partially-published item is marked `posted` and never re-queued,
+  // because re-queueing would post again to the platforms that already have it.
+  // That left the failed half with no route back except retyping the post,
+  // which loses the short code and therefore splits the click history.
+  if (doing === 'retry') {
+    const id = String(form.get('id') || '');
+    const row = await env.DB.prepare('SELECT * FROM queue_item WHERE id = ?').bind(id).first();
+    if (!row) return back;
+    const failed = failedPlatforms(row);
+    if (!failed.length) return back;
+    await env.DB.prepare(
+      `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
+         media_key, media_url, media_type, first_comment, priority,
+         reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url, retry_of)
+       VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?,?,?)`,
+    ).bind(ulid(), new Date().toISOString(), email, row.body, JSON.stringify(failed),
+      row.media_key, row.media_url, row.media_type, row.first_comment,
+      // Never repost from the personal account a second time — that half
+      // succeeded, and LinkedIn 422s a duplicate anyway.
+      0, null,
+      row.comment_text, row.topics, row.media_wide_key, row.media_wide_url,
+      row.retry_of || row.id).run();
     return back;
   }
 
@@ -119,7 +159,9 @@ export function queuePage({ email, tz, waiting, done, pace,
             ? ' · reposted from your personal account, with your words'
             : ' · reposted from your personal account'}
           ${i.comment_text ? ' · custom first comment' : ''}
-          ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}</div>
+          ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}
+          ${i.retry_of ? ' · retry, same short code' : ''}
+          ${failedPlatforms(i).length ? ` · <b>${esc(failedPlatforms(i).join(', '))} did not go</b>` : ''}</div>
         ${i.note ? `<div class="faint meta">${esc(i.note)}</div>` : ''}</td>
       <td class="nowrap faint">${esc(when(i.created_at, tz))}<br><span style="font-size:.72rem">${esc(ago(i.created_at))}</span></td>
       <td class="nowrap">${showActions ? `
@@ -129,7 +171,11 @@ export function queuePage({ email, tz, waiting, done, pace,
           <input type="hidden" name="id" value="${esc(i.id)}"><button class="danger">Cancel</button></form>`
       : i.status === 'failed' || i.status === 'cancelled' ? `
         <form method="post" class="inline-form"><input type="hidden" name="do" value="requeue">
-          <input type="hidden" name="id" value="${esc(i.id)}"><button>Re-queue</button></form>` : ''}</td>
+          <input type="hidden" name="id" value="${esc(i.id)}"><button>Re-queue</button></form>`
+      : failedPlatforms(i).length ? `
+        <form method="post" class="inline-form"><input type="hidden" name="do" value="retry">
+          <input type="hidden" name="id" value="${esc(i.id)}"><button
+            title="Queue it again for ${esc(failedPlatforms(i).join(', '))} only">Retry ${failedPlatforms(i).length}</button></form>` : ''}</td>
     </tr>`;
   };
 

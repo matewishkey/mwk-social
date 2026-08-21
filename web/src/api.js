@@ -163,6 +163,7 @@ async function claim(body, env) {
         commentText: row.comment_text || null,
         topics: JSON.parse(row.topics || '[]'),
         mediaWideUrl,
+        retryOf: row.retry_of || null,
         createdAt: row.created_at, createdBy: row.created_by,
       },
     });

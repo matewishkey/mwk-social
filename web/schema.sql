@@ -179,3 +179,9 @@ ALTER TABLE queue_item ADD COLUMN media_wide_url TEXT;
 -- reshare_text on purpose: a plain repost with no commentary is the default, and
 -- an empty comment must not read as "do not repost".
 ALTER TABLE queue_item ADD COLUMN reshare INTEGER NOT NULL DEFAULT 1;
+
+-- A retry of an earlier item, carrying only the platforms that failed on it.
+-- The point of naming the original is the SHORT CODE: run-queue derives a post's
+-- tracked links from `queue:<id>`, so a retry under a fresh id would mint a
+-- different code for the same post and split its clicks in two.
+ALTER TABLE queue_item ADD COLUMN retry_of TEXT;
