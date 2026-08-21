@@ -8,10 +8,17 @@
  *      box offline — leaves it where it was and the same events go again next
  *      run. Duplicates cost nothing: the sink is INSERT OR IGNORE on a stable
  *      ULID, so a replayed batch is free.
- *   2. It sends an EMPTY batch when there is nothing to say, at least every 15
+ *   2. It sends an EMPTY batch when there is nothing to say, at least every 10
  *      minutes. Without that heartbeat "nothing happened" and "the box is off"
  *      are the same picture on the dashboard, which is the one thing a status
  *      page must never do.
+ *
+ *      TEN, not fifteen. The dashboard calls the box stale at fifteen
+ *      (HEARTBEAT_STALE_MS in web/src/pages/overview.js), and this used to
+ *      write at fifteen as well — so on a quiet box the beat always landed
+ *      just AFTER the page had already given up on it, and the tile flickered
+ *      red for a minute or two every quarter hour on a perfectly healthy box.
+ *      The writer's period has to be comfortably under the reader's patience.
  *
  *
  * Usage:
@@ -38,7 +45,7 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const events = require('./lib/events');
 
-const HEARTBEAT_MS = 15 * 60 * 1000;
+const HEARTBEAT_MS = 10 * 60 * 1000;   // under the dashboard's 15-min stale mark, on purpose
 const BATCH = 500;
 
 const statePath = () => process.env.MWK_SHIP_CURSOR ||

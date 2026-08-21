@@ -10,6 +10,8 @@
  * writer — and a frozen table is worse than no table.
  */
 import { esc, card, tile, layout, when, ago, pager } from '../lib/html.js';
+// Fifteen minutes, against a box that beats every ten. Keep the gap: if the two
+// numbers ever meet, a healthy quiet box reads as stale between beats.
 const HEARTBEAT_STALE_MS = 15 * 60 * 1000;
 
 export async function overviewAction(request, env, email) {
