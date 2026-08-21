@@ -75,6 +75,10 @@ const PLATFORMS = {
     markerInCaption: true,
     supportsFirstComment: false,
     deletable: true,
+    // X is the only platform that refuses a non-AAC audio track, and it does so
+    // at 99% of the upload rather than up front (2026-08-21). Everything else
+    // published the same Opus-in-MP4 file without comment.
+    audioCodecs: ['aac'],
     estCostCents: 20,              // content_create_with_url, measured
   },
   facebook: {

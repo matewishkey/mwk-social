@@ -18,7 +18,8 @@ const have = (cmd) => {
 };
 
 // A real 9:16 reel, near enough: the shape everything in this pipeline is.
-const REEL = { durationSec: 20, width: 720, height: 1280, aspect: 0.5625, bytes: 1 << 20, codec: 'h264', hasAudio: true };
+const REEL = { durationSec: 20, width: 720, height: 1280, aspect: 0.5625, bytes: 1 << 20,
+  codec: 'h264', hasAudio: true, audioCodec: 'aac' };
 
 test('a normal reel passes on every target', () => {
   for (const platform of ['threads', 'twitter', 'tiktok', 'instagram']) {
@@ -54,6 +55,27 @@ test('a silent or non-h264 file is flagged', () => {
   assert.deepEqual(media.check('tiktok', { ...REEL, codec: 'av01' }), ['codec av01, not h264']);
 });
 
+/*
+ * 2026-08-21. yt-dlp was asked for avc1 video and plain "best audio", which on
+ * YouTube is Opus, and --merge-output-format mp4 muxed it in. Facebook,
+ * LinkedIn, YouTube, TikTok and Threads all published it. X uploaded the whole
+ * 6.4 MB and failed at 99% with "media processing failed" — the expensive kind
+ * of no. Every clip X has accepted was AAC.
+ */
+test('an Opus track is refused by X and by nobody else', () => {
+  const opus = { ...REEL, audioCodec: 'opus' };
+  assert.deepEqual(media.check('twitter', opus), ['audio is opus, and twitter only takes aac']);
+  for (const platform of ['facebook', 'linkedin', 'youtube', 'tiktok', 'threads', 'instagram']) {
+    assert.deepEqual(media.check(platform, opus), [], `${platform} should not care`);
+  }
+});
+
+// The guard must not fire on a file we could not read an audio codec out of —
+// "unknown" is not "wrong", and refusing on it would drop X for no reason.
+test('an unknown audio codec is not treated as a wrong one', () => {
+  assert.deepEqual(media.check('twitter', { ...REEL, audioCodec: null }), []);
+});
+
 test('probe reports what is actually in the file', { skip: !have('ffmpeg') || !have('ffprobe') }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-media-test-'));
   const file = path.join(dir, 'clip.mp4');
@@ -68,6 +90,7 @@ test('probe reports what is actually in the file', { skip: !have('ffmpeg') || !h
     assert.equal(p.aspect, 0.5625);
     assert.equal(p.codec, 'h264');
     assert.equal(p.hasAudio, true);
+    assert.equal(p.audioCodec, 'aac');
     assert.ok(Math.abs(p.durationSec - 3) < 0.5, `duration was ${p.durationSec}`);
     assert.deepEqual(media.check('instagram', p), []);
   } finally {

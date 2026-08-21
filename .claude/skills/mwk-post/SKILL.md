@@ -67,12 +67,21 @@ An empty array is a pass. `check()` returns an ARRAY of problems, and the argume
 Pulling a clip off YouTube, two traps that bite every time:
 
 ```sh
-yt-dlp -q --no-warnings -f 'bv*[vcodec^=avc1]+ba/b[vcodec^=avc1]/b' \
-  --merge-output-format mp4 -o clip 'https://www.youtube.com/watch?v=<id>'
+yt-dlp -q --no-warnings --no-playlist --force-ipv4 --merge-output-format mp4 \
+  -f 'bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1]/b[ext=mp4]/b' \
+  -o clip 'https://www.youtube.com/watch?v=<id>'
 ```
 
-It **appends its own extension** (ask for `clip`, get `clip.mp4` — reading that as "downloaded
-nothing" has happened), and it **serves AV1 by default**, which Instagram and TikTok reject.
+That is the same format string `lib/media.js` uses — copy it, do not shorten it. **Constrain BOTH
+streams.** Three ways it bites:
+
+- It **appends its own extension** (ask for `clip`, get `clip.mp4` — reading that as "downloaded
+  nothing" has happened).
+- It **serves AV1 video by default**, which Instagram and TikTok reject.
+- It serves **Opus audio** by default, and `+ba` on its own takes it. Facebook, LinkedIn, YouTube,
+  TikTok and Threads all publish Opus-in-MP4 without complaint; **X uploads the entire file and
+  then fails at 99%** with "media processing failed". `+ba[ext=m4a]` is what gets AAC. This one
+  cost a post on 2026-08-21 — the shortened format string in this file is how it got in.
 
 Images: aspect must be 0.75–1.91:1 and **exactly 1.91 is rejected** (float edge, bitten live).
 Pad with the screenshot's own background colour — never crop.

@@ -246,10 +246,13 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   via API" (verified 2026-08-21 against two real duplicates). The playbook said `yes` for two
   weeks. TikTok and Instagram are both manual-only for deletion; every other platform we post to
   deletes cleanly through `posts:unpublish <id> --platform <p>`.
-- **X rejects a video that the other six accept.** `Twitter media upload failed: X (Twitter) media
-  processing failed: {"progress_percent":99,"state":"failed"}` on a 48s 1080x1920 H.264 clip that
-  Facebook, LinkedIn, YouTube, Threads and TikTok all took. It fails at 99%, so it costs the full
-  upload before it says no.
+- **X refuses a non-AAC audio track, and only at 99% of the upload** (root-caused 2026-08-21).
+  `Twitter media upload failed: … {"progress_percent":99,"state":"failed"}` on a clip whose audio
+  was **Opus**. Opus in an MP4 is legal and Facebook, LinkedIn, YouTube, TikTok and Threads all
+  published the same file; every clip X has accepted was AAC. It got in through yt-dlp: constrain
+  the video codec and leave `+ba` free and you get YouTube's best audio, which is Opus — the AV1
+  trap one stream down. `media.js` now reports `audioCodec` and `check('twitter', …)` refuses a
+  non-AAC track up front, so the platform is dropped before the bytes are paid for.
 - **Report every time to him in BRISBANE time** (mate's call, 2026-08-21, scoped to this project).
   The box stays on `Etc/UTC` — that is correct and is not to be changed — so `systemctl`,
   `journalctl` and every log stamp are UTC and quoting one verbatim is ten hours wrong to him.

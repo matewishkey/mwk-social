@@ -103,6 +103,11 @@ platform will not take costs the post otherwise, and the item is already claimed
   within a fortnight. Download when you see it, not when you publish.
 - **YouTube serves AV1 by default.** Instagram and TikTok want H.264 for a reel, so the format
   selector asks for `avc1` first and only falls through if there is none.
+- **yt-dlp serves Opus audio unless told otherwise, and X alone refuses it.** Constraining the
+  video codec and leaving `+ba` free takes YouTube's best audio, which is Opus; `--merge-output-format
+  mp4` muxes it in without complaint and so do five of the six platforms. X uploads the entire file
+  and fails at 99% with "media processing failed". Ask for `+ba[ext=m4a]`. `check()` now catches it
+  before the upload.
 - **yt-dlp appends its own extension to `-o`.** Asking for `x` and getting `x.mp4` reads as "the
   download produced nothing". It downloads into a scratch directory and takes whatever lands.
 - YouTube returns an **empty** media URL, so transcripts there come from `yt-dlp --write-auto-subs`

@@ -103,6 +103,7 @@ function probe(file) {
   const json = JSON.parse(raw);
   const video = (json.streams || []).find((s) => s.codec_type === 'video');
   if (!video) throw new Error(`${path.basename(file)} has no video stream`);
+  const audio = (json.streams || []).find((s) => s.codec_type === 'audio');
   const width = Number(video.width);
   const height = Number(video.height);
   const durationSec = Number(json.format.duration || video.duration || 0);
@@ -113,7 +114,8 @@ function probe(file) {
     aspect: Number((width / height).toFixed(4)),
     bytes: Number(json.format.size || fs.statSync(file).size),
     codec: video.codec_name,
-    hasAudio: (json.streams || []).some((s) => s.codec_type === 'audio'),
+    hasAudio: !!audio,
+    audioCodec: audio ? audio.codec_name : null,
   };
 }
 
@@ -169,6 +171,21 @@ function check(platform, p) {
   // Not a hard limit in any published spec, but every reel that has gone out
   // cleanly was H.264, and Meta re-encodes or rejects the rest.
   if (p.codec && !/^(h264|avc)/.test(p.codec)) problems.push(`codec ${p.codec}, not h264`);
+
+  // AUDIO codec, and it is X alone that cares (2026-08-21). An Opus track in an
+  // MP4 container is legal, and Facebook, LinkedIn, YouTube, TikTok and Threads
+  // all published one happily. X uploaded the whole file and then died at 99%
+  // with "media processing failed" — so this is the expensive kind of no: the
+  // bytes are paid for before it says it. Every clip X has ever accepted was
+  // AAC; the one it refused was Opus, which is the whole difference.
+  //
+  // It gets in through yt-dlp: constraining the VIDEO codec and leaving `+ba`
+  // free picks YouTube's best audio, which is Opus. Same shape as the AV1 trap,
+  // one stream down. downloadYouTube() asks for m4a; anything uploaded by hand
+  // is where this can still arrive.
+  if (cfg.audioCodecs && p.audioCodec && !cfg.audioCodecs.includes(p.audioCodec)) {
+    problems.push(`audio is ${p.audioCodec}, and ${platform} only takes ${cfg.audioCodecs.join('/')}`);
+  }
   return problems;
 }
 
