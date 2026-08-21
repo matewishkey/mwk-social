@@ -6,12 +6,18 @@ Everything here was learned by doing it live — where a rule exists, something 
 ## The shape of it
 
 ```
-Restream ──> Facebook · LinkedIn · YouTube · Twitch      (automatic, not ours)
-                │
-                └── the mirror ──> Instagram · TikTok · Threads · X
-                                          │
-first-comment.js (hourly) ────────────────┴──> the CTA comment, everywhere it can reach
+the queue (dashboard) ──> run-queue.js ──> Facebook · Instagram · YouTube · LinkedIn
+                              │            Threads · TikTok · X
+                              │                     │
+                              │            the CTA, in a comment or the caption
+                              │                     │
+first-comment.js (hourly) ────┴─────────────────────┘   fills anything the publish missed
 ```
+
+**Everything publishes from here** (2026-08-21). There used to be a second origin — Restream put
+clips on Facebook and a mirror copied them onward — which is why this file once carried a whole
+chapter on deciding whether a copy already existed somewhere. One origin means nothing to
+reconcile, and that chapter, `mirror.js` and `lib/matcher.js` are all gone.
 
 Two ways the call-to-action gets under a post:
 
@@ -71,95 +77,24 @@ in the wrong place.
 
 **Instagram caps hashtags at 5, counting the caption and the comments together.** Enforced since
 18 Dec 2025; over the cap and the post loses Explore, hashtag pages and Reels recommendations.
-So a mirrored Instagram caption carries *zero* hashtags and the comment spends the budget.
+So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
+always-on tags and three describing the clip.
 
 **X bills $0.20 for a post containing a URL, against $0.015 without.** The fee follows whichever
 post holds the link, so a thread pays the $0.20 *plus* $0.015 for the second post — the link goes
 in the post itself, never in a reply. Measured against real billing, not the price list.
 
-## Telling a mirror from a new clip
-
-The mirror only ever publishes something it can prove is missing. `scripts/lib/matcher.js` is
-where that proof is made, and it is the answer to the one real incident: a clip went to TikTok
-twice, once by hand at 10:59 and once from here at 20:29 the same day.
-
-**The caption is the only cross-platform signal that exists.** Measured over the whole corpus:
-`videoDurationSeconds` is populated on Instagram alone and only on some posts, and TikTok and X
-withhold media entirely. So the caption scores decisively on its own and everything else is
-corroboration around it. A balanced multi-signal score built from fields that are mostly `null`
-would look rigorous and be theatre.
-
-Three things the corpus taught that a reasonable-looking rule would have got wrong:
-
-- **Compare on the shorter caption's length, not a fixed 64 characters.** The manual TikTok
-  caption normalises to 45 characters — just the hook — where ours carries the hook plus the body.
-  A fixed-length key comparison misses the very duplicate it was written for.
-- **"Published before the source" needs a tolerance window.** That manual TikTok predates its own
-  Facebook source by one minute. Penalising anything earlier than the source would have republished
-  it.
-- **The mirror universe is Facebook *video* posts.** Seven of eighteen. The rest are image and text
-  posts, and are not reels.
-
-Four verdicts, and only one of them publishes:
-
-| | Means | Publishes |
-|---|---|---|
-| `duplicate` | a copy is already there | no |
-| `review` | the signals disagree | no |
-| `unknown` | we could not see clearly — no caption to match on, or the platform read failed | no |
-| `none` | genuinely missing | **yes** |
-
-**It fails closed.** A false duplicate costs one missed mirror, visible in the next `--plan`. A
-false new costs an Instagram post that no API can delete. Everything above follows from that.
-
-Threads is the one exception worth stating: it never appears in `analytics:posts`, so absence
-there only proves *we* have not mirrored it. That is still the thing we need to know, the ledger
-records it, and Threads posts can be deleted — so it publishes, flagged `weak`.
-
-## Publishing a mirror
-
-`mirror.js --apply` publishes the next missing post. One at a time unless you ask for more —
-`--count N` — because publishing is the step that cannot be taken back everywhere.
-
-Order is fixed and enforced, not just scheduled: **Threads → X → TikTok → Instagram**. Instagram
-refuses to run on a clip until every other target for that clip is done, because it is the one
-platform where nothing can be deleted or edited. A `--platforms instagram` run skips past the
-schedule's ordering, so the rule lives in the publish path itself.
-
-| Platform | Caption | Hashtags in caption | The CTA link |
-|---|---|---|---|
-| Threads | source opening, verbatim | none | first comment, from the hourly watcher |
-| X | source opening + link | 1 (`#PIY`) | in the post — cheaper than a thread |
-| TikTok | source opening + link | all | in the caption; no comment API exists |
-| Instagram | source opening | **zero** | native `firstComment`, spending all 5 tag slots |
-
-**TikTok's settings go in `tiktokSettings` at the top level of the request, not in
-`platformSpecificData`.** That is the one genuine special case in the API, and getting it wrong is
-silent: `platformSpecificData` stores any key you send it and echoes it back, so the response would
-look accepted while the post went out with no consent flags applied. All six flags are `required`
-with `default: false`, so all six are stated explicitly.
-
-**A publish that times out has not necessarily failed.** The very first live mirror proved it: the
-API call gave up at 60 s and the post was live on Threads regardless. Zernio keeps working after
-the request is abandoned, so a timeout means *unknown* — the publisher reconciles by looking for a
-post with the caption it just composed, and only then decides. Recording that first one as
-"failed" would have left a real post with the ledger denying it.
-
-The ledger is written **before** the request, never after: a process killed between the POST and
-its response must not look like "never posted" on the next run. And `--dry-run` writes nothing at
-all, including its own failures.
-
 ## Media
 
 `scripts/lib/media.js` fetches a clip once, caches it under
-`~/.local/state/mwk-social/media/`, and probes it with `ffprobe`. `mirror.js --media` runs the
-whole thing over every reel and reports what each target would make of it.
+`~/.local/state/mwk-social/media/`, and probes it with `ffprobe`. `run-queue.js` probes a queued
+upload before publishing and drops any platform that would reject it — a duration or aspect a
+platform will not take costs the post otherwise, and the item is already claimed by then.
 
-- Facebook's media URLs are **signed and expire** — two of seven were dead within a fortnight.
-  Download at detection, not at publish.
-- **YouTube is the fallback, and it is the better copy.** Both dead clips came back through
-  `yt-dlp` at 1080x1920, against Facebook's 720x1280. Same matcher as the dedupe finds the video,
-  so "this is the same clip" means one thing everywhere.
+- **Check before the platform does.** `check(platform, probe)` returns an array of reasons, empty
+  when the clip is fine. Note the argument order and the return shape.
+- Media URLs from a CDN are often **signed and expire** — two of seven Facebook clips were dead
+  within a fortnight. Download when you see it, not when you publish.
 - **YouTube serves AV1 by default.** Instagram and TikTok want H.264 for a reel, so the format
   selector asks for `avc1` first and only falls through if there is none.
 - **yt-dlp appends its own extension to `-o`.** Asking for `x` and getting `x.mp4` reads as "the
@@ -185,20 +120,25 @@ guessed.
 
 ## The pace, and what runs it
 
-Two systemd `--user` timers, both from `scripts/install-timers.sh`:
+Five systemd `--user` timers, all from `scripts/install-timers.sh`:
 
 | Unit | When | What |
 |---|---|---|
 | `mwk-first-comment` | `*:00` | the CTA comment on anything that hasn't got one |
-| `mwk-mirror` | `*:10` | `--apply --scheduled` — publishes if this is a turn |
+| `mwk-queue` | `*:20` | `--scheduled` — publishes the next queued item, if this is a turn |
+| `mwk-ship-events` | `*:0/2` | ships the event log to the dashboard |
+| `mwk-ship-stats` | `*:35` | analytics, follower counts, the platform table |
+| `mwk-yt-notes` | `05:40` | drafts YouTube show notes for approval |
 
-Ten minutes apart on purpose: a clip the mirror publishes has settled before the watcher goes
-looking for it.
+The queue runs twenty minutes after the comment check so a post has settled before the watcher
+goes looking for it. Every unit is `Type=oneshot` and runs through `scripts/with-secrets.sh`,
+because systemd's `EnvironmentFile` can read neither `~/.secrets` nor the sops-encrypted project
+env.
 
-**The pace is in the script, not the cadence.** The timer is a dumb hourly heartbeat and
-`whyNotNow()` says no most of the time — three a day, ninety minutes apart, inside a
-09:00–21:00 window. Keeping it there means the rules are readable in one place and a run by hand
-obeys them too.
+**The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb hourly heartbeat and
+`whyNotNow()` says no most of the time — six a day, ninety minutes apart, inside a 09:00–21:00
+window. Keeping it in one module means a run by hand obeys the same rules, and it counts
+`queue.posted` events so there is one budget rather than one per caller.
 
 **That window is the audience's timezone.** The box is `Etc/UTC` and the audience is in Brisbane,
 so an unqualified "09:00 to 21:00" would put every post out between 19:00 and 07:00 — the whole
@@ -207,16 +147,18 @@ cap resets twelve hours early.
 
 ## The dashboard
 
-`internal.matewishkey.com` — one page, behind Cloudflare Access with an email one-time PIN, showing
-what the pipeline is doing. `web/` holds it; `web/deploy.sh` ships it from this box, never on push.
+`social.matewishkey.com` — five pages behind Cloudflare Access with an email one-time PIN:
+overview, stats, the queue, YouTube show notes and the workflow map. `web/` holds it;
+`web/deploy.sh` ships it from this box, never on push.
 
 | | |
 |---|---|
-| Worker | `mwk-social-log`, one script |
-| Dashboard | `internal.matewishkey.com`, Access (OTP), 720h session |
+| Worker | `mwk-social-log`, one script, three hostnames |
+| Dashboard | `social.matewishkey.com`, Access (OTP), 720h session |
 | Ingest | `ingest.matewishkey.com`, bearer token |
-| Storage | D1 `mwk-social` — `event`, `snapshot`, `ingest_batch` |
-| Uploader | `scripts/ship-events.js`, every two minutes |
+| Short links | `mwkshow.com` — **public, no Access application, ever** |
+| Storage | D1 `mwk-social` (10 tables) + R2 `mwk-social-media` for queued uploads |
+| Uploader | `scripts/ship-events.js` every two minutes, `scripts/ship-stats.js` hourly |
 
 **`workers_dev = false` is the line that keeps it closed.** Access binds to a hostname, not to a
 Worker script, so leaving workers.dev on would publish the entire dashboard at
@@ -225,12 +167,17 @@ from it. The Worker also verifies the `Cf-Access-Jwt-Assertion` itself, checking
 audience *and* the expiry: a signature alone would accept a perfectly valid token minted for a
 different application in the same Access org.
 
-**Two hostnames, not one with path rules.** An Access application covers a hostname, so putting
-ingest behind the same one would 302 the uploader into a login page.
+**Separate hostnames, not one with path rules — and this is not a preference.** An Access
+application covers a HOSTNAME and runs in front of the Worker, so putting ingest behind the same
+one would 302 the uploader into a login page. Measured the same way for short links: a request to
+`/l/<code>` on the dashboard host 302s to the Access login page before any Worker code runs. That
+is why `mwkshow.com` is its own hostname with no Access application on it.
 
-**No SQL projections.** The dashboard renders `mirror-ledger.json`, shipped whole as a snapshot.
-That ledger is already the authoritative projection, computed on the box by the thing that knows
-the truth — rebuilding it in D1 would add nothing except a way for the two to disagree.
+**Snapshots where the box already knows the answer.** `platforms`, `voice` and `pace` are computed
+on the box and shipped whole, because the code that uses them is the code that computes them —
+rebuilding either in D1 would add nothing except a way for the two to disagree. What is a real
+table: the queue, links, clicks, daily metrics and follower points, because those are written at
+the far end or must outlive Zernio's ~12-month window.
 
 **The cursor advances only on a 2xx.** Anything else leaves it where it was and the same events go
 again next run; replays are free because the sink is `INSERT OR IGNORE` on a stable ULID. And the

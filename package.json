@@ -1,13 +1,11 @@
 {
   "name": "mwk-social",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Cross-platform social publishing for the Mate Wish Key show: a paced queue, first comments, tracked links and YouTube show notes.",
   "scripts": {
     "test": "node --test test/*.test.js"
   },
-  "keywords": [],
-  "author": "",
+  "author": "matewishkey",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {

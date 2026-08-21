@@ -80,12 +80,13 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   with no tag at all rather than reach for a technical word. That is the rule working.
 - **The comment's hashtags describe the video**: `scripts/lib/topic-tags.js` downloads the clip,
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
-  (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that
-  file hard-stops the mainstream AI/creator/hype tags whatever the model returns.
-  `#PIY`, `#MWKShow` and `#MWK` lead every comment, then ≤4 topic tags. "Prompt it Yourself" stays in
-  the comment TEXT where it reads as a sentence — it is not a tag. **Keys come from `~/.secrets`,
-  which is why the systemd unit runs through `zsh -c 'source ~/.secrets && …'`** — systemd's
-  `EnvironmentFile` cannot parse shell syntax. No keys → plain CTA, never a failed comment.
+  (Gemini, constrained) — in everyday words, under the rule above; `BLOCKED` in `voice.json` is the
+  hard stop whatever the model returns. `#MWKShow #PIY` lead every comment, then ≤4 topic tags.
+  "Prompt it Yourself" stays in the comment TEXT where it reads as a sentence — it is not a tag.
+  **Keys come from `~/.secrets`, which is why every systemd unit runs through
+  `scripts/with-secrets.sh`** — systemd's `EnvironmentFile` cannot parse shell syntax, and neither
+  `~/.secrets` nor the sops-encrypted project env is readable without a shell.
+  No keys → plain CTA, never a failed comment.
 - **Tags chosen for WHO they reach are allowed on a manual post** (mate's call, 2026-08-20),
   reversing the earlier subject-matter-only rule. The target is people currently paying providers
   who could build it themselves. Evidence gathered that day, worth not re-deriving: `#NoCode`

@@ -100,8 +100,9 @@ scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
 
 ## What's worth measuring
 
-At this size, followers are not the scoreboard — seven of the nine connected
-channels are still in single digits. The stats page is built around five things
+At this size, followers are not the scoreboard — five of the eight connected
+channels are still in single digits, and one (LinkedIn personal) holds almost
+all of the audience. The stats page is built around five things
 instead, in this order:
 
 1. **reach / views** — did anyone see it
