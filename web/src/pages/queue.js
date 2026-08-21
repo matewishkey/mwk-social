@@ -68,7 +68,9 @@ export async function queueAction(request, env, email) {
   ).bind(ulid(), new Date().toISOString(), email, text, JSON.stringify(platforms),
     mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0,
     String(form.get('reshareText') || '').trim() || null,
-    String(form.get('commentText') || '').trim() || null).run();
+    String(form.get('commentText') || '').trim() || null,
+    JSON.stringify(String(form.get('topics') || '').split(',')
+      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean))).run();
   return back;
 }
 
@@ -136,6 +138,12 @@ ${card('Queue something', `
   </div>
   <div class="field">
     <div class="checks"><label><input type="checkbox" name="firstComment" checked> Add the standard first comment</label></div>
+  </div>
+  <div class="field">
+    <label for="qtopics">Hashtags describing the clip (optional, comma separated)</label>
+    <input type="text" id="qtopics" name="topics" placeholder="Branding, SocialMedia, CreatingImages">
+    <p class="note">Everyday words only — what an ordinary person would call it. #MWKShow and #PIY
+      are always added. Instagram takes three more, X takes none.</p>
   </div>
   <div class="field">
     <label for="qcomment">First comment — override the standard one (optional)</label>

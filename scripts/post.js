@@ -147,7 +147,13 @@ function resolveMedia(items) {
 // here — the clip is a local file, not a published post with a media URL — so
 // they come in on --topics, named by whoever watched the video.
 function commentFor(platform, text, opts) {
-  if (opts.comment) return opts.comment;
+  if (opts.comment) {
+    // The tag line is appended here rather than baked into the custom text, so
+    // each platform still gets tags under its own cap. Without this a custom
+    // comment went out with no hashtags at all.
+    const tags = voice.tagLine(platform, opts.topics || []);
+    return tags ? `${opts.comment}\n\n${tags}` : opts.comment;
+  }
   return voice.firstComment(`new:${voice.hash(text)}`, {
     platform,
     topicTags: opts.topics,

@@ -166,7 +166,7 @@ async function main() {
       title: null,
       firstComment: item.firstComment,
       comment: item.commentText || null,
-      topics: [],
+      topics: item.topics || [],
       commentVariant: null,
       tiktokPrivacy: 'PUBLIC_TO_EVERYONE',
       draft: false, schedule: null, wait: true, dryRun: false,

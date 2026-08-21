@@ -156,6 +156,7 @@ async function claim(body, env) {
         mediaType: row.media_type, firstComment: !!row.first_comment,
         reshareText: row.reshare_text || null,
         commentText: row.comment_text || null,
+        topics: JSON.parse(row.topics || '[]'),
         createdAt: row.created_at, createdBy: row.created_by,
       },
     });

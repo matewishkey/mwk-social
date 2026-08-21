@@ -57,6 +57,8 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
 }
 
 
+const host = (u) => { try { return new URL(u).hostname.toLowerCase(); } catch { return ''; } };
+
 // Bare http(s) urls. Trailing punctuation is excluded so a link at the end of a
 // sentence does not swallow the full stop.
 const URL_RE = /https?:\/\/[^\s<>"')\]]+[^\s<>"')\].,;:!?]/g;
@@ -76,8 +78,10 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
 
   let out = body;
   for (const url of urls) {
-    // Already one of ours — minting a code that points at a code would be silly.
-    if (voice.carriesCta(url)) continue;
+    // Skip only a link that is ALREADY shortened — a code pointing at a code.
+    // Not carriesCta(): that matches the sign-up destination as well, which is
+    // precisely the link we most want to measure.
+    if (host(url) === (voice.shortLink().host || '').toLowerCase()) continue;
     const short = await mint({ platform, postKey, clipId, target: url, label: url.slice(0, 120) });
     if (short) out = out.split(url).join(short);
   }

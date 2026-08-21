@@ -220,3 +220,14 @@ test('two urls in one comment are two separate links', () => {
   const s = 'repo https://github.com/a/b and the stream https://youtu.be/xyz';
   assert.strictEqual((s.match(new RegExp(URL_RE.source, 'g')) || []).length, 2);
 });
+
+// The guard must skip an ALREADY-shortened link, not the sign-up destination —
+// which is the one link most worth measuring. It skipped both at first.
+test('an already-short link is left alone, the sign-up link is not', () => {
+  const sl = require('../scripts/lib/shortlink');
+  const short = `https://${voice.shortLink().host}/ab12x`;
+  assert.ok(voice.carriesCta(short), 'a short link does read as ours');
+  assert.ok(voice.carriesCta(voice.config().links.show), 'and so does the destination');
+  // ...which is exactly why carriesCta() is the wrong test for "already shortened".
+  assert.notStrictEqual(new URL(short).hostname, new URL(voice.config().links.show).hostname);
+});

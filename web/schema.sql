@@ -153,3 +153,7 @@ ALTER TABLE queue_item ADD COLUMN reshare_text TEXT;
 -- "which link earned this click" stays answerable for every link we publish,
 -- not only the call to action.
 ALTER TABLE queue_item ADD COLUMN comment_text TEXT;
+
+-- Topic tags for one queued post, as a JSON array. Everyday words only — see
+-- the rule in CLAUDE.md. Empty means no topic tags, only the always-on pair.
+ALTER TABLE queue_item ADD COLUMN topics TEXT;
