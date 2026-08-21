@@ -63,6 +63,21 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `~/.local/state/mwk-social/first-comments.json`. `--dry-run`, `--seed`, `--hours N`, `--all`,
   `--platforms`, `--limit N`, `--no-topics`, `--message`. Pings `$MWK_COMMENT_HC_URL` (and `/fail`)
   when set — the hook exists, no check is provisioned yet.
+- **HASHTAGS ARE FOR NORMAL HUMANS, NEVER FOR TECH PEOPLE** (mate's call, 2026-08-21, absolute).
+  His words: "#xero is well known, #cloudflare is not at all. #AIHallucination is borderline."
+  **The test to apply to every tag: would someone who does NOT work in technology already know this
+  word and use it themselves?** If they would have to look it up, it is wrong. Name the everyday
+  thing — the job (Invoicing, Bookkeeping), the tool people already use by name (Xero, Canva,
+  Dropbox), or the problem they recognise (LatePayments, ComputerProblems) — never the technology
+  used to solve it. Backtested over 23 real videos: **79% of the tags we had already published (54
+  of 68) are tech jargon the new rule rejects.** The prompt in `topic-tags.js` is the primary
+  defence and the `blocked` list in `voice.json` is the hard backstop under it; the backstop only
+  had to catch 1 of 45 on the rerun, but it is what stops a bad day from going out.
+- **A product name is fine when ordinary people know the product.** #Xero, #Canva, #Dropbox,
+  #StreamDeck yes; #Cloudflare, #GitHub, #Docker no. That distinction is the rule, not an exception
+  to it.
+- **Fewer good tags beat more weak ones, and none is an acceptable answer.** One of the 23 came back
+  with no tag at all rather than reach for a technical word. That is the rule working.
 - **The comment's hashtags describe the video**: `scripts/lib/topic-tags.js` downloads the clip,
   strips the audio (ffmpeg), transcribes it (Whisper) and names the subjects it covers
   (Gemini, constrained). Subject matter only — no audience tags, no marketing; `BLOCKED` in that

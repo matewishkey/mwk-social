@@ -133,18 +133,41 @@ async function callModel(transcript) {
 }
 
 function nameSubjectsPrompt(transcript) {
-  return `Below is the transcript of a short video. Name what it is ABOUT, as hashtags.
+  return `Below is the transcript of a video. Name what it is about, as hashtags — in the words an
+ORDINARY PERSON would use. Not a developer, not an IT person. Someone who runs a shop, does their
+own books, or has an idea and no idea how to build it.
 
-Rules:
-- Subject matter only. If it is about trading say Trading; about SEO say SEO; about spreadsheets say Spreadsheets; about debugging say Debugging.
-- ${MAX_TAGS} tags maximum, fewer if the video only covers one or two things.
-- No audience tags (nothing about mums, beginners, small business owners).
-- No marketing, hype or engagement-bait words. Nothing flashy.
-- No generic AI or tech tags — those say nothing about this particular video.
-- The point is that a person reading the tags can tell what was discussed.
-- CamelCase, no spaces, no punctuation, no leading #.
+THE ONE TEST, apply it to every tag before you return it:
+  "Would someone who does NOT work in technology already know this word, and use it themselves?"
+If they would have to look it up, it is the wrong tag. No exceptions.
 
-Return JSON only: {"tags":["Trading","RiskManagement"],"summary":"one plain sentence on what the video covers"}
+Name the everyday thing:
+- the JOB someone is trying to get done — Invoicing, Bookkeeping, Scheduling, Budgeting
+- the TOOL ordinary people already use by name — Xero, Excel, Shopify, WordPress, Canva, Gmail
+- the PROBLEM they would recognise in themselves — LatePayments, DoubleBooking, Paperwork
+
+Never name the technology used to solve it. Say what a normal person would say instead:
+  Cloudflare, DNS, hosting        -> Website, DomainName
+  WebDevelopment, frontend        -> Website
+  Observability, monitoring       -> Downtime, Uptime
+  ErrorReporting, debugging       -> Troubleshooting is still too technical: name what broke
+  GenerativeEngineOptimization    -> GettingFound, Google
+  WorkflowAutomation              -> the actual chore being automated, e.g. Invoicing
+  APIs, webhooks, integrations    -> the two things being joined, if people know them by name
+
+Also banned:
+- Anything about AI, prompting, models, coding or software as a category. Those describe the
+  method, not the subject, and every video here would carry them.
+- Audience tags — nothing about mums, beginners, small business owners, entrepreneurs.
+- Marketing words, hype, engagement bait, anything flashy.
+
+Fewer good tags beat more weak ones. ${MAX_TAGS} maximum, and returning one or two is fine.
+Return NOTHING rather than reach for a technical word.
+
+CamelCase, no spaces, no punctuation, no leading #.
+
+Return JSON only:
+{"tags":["Xero","Invoicing"],"summary":"one plain sentence on what the video covers"}
 
 TRANSCRIPT:
 ${transcript.slice(0, 12000)}`;
@@ -193,4 +216,4 @@ async function topicsFor(key, source) {
   return result;
 }
 
-module.exports = { topicsFor, clean, cleanVtt, BLOCKED, MAX_TAGS };
+module.exports = { topicsFor, clean, cleanVtt, BLOCKED, MAX_TAGS, callModel };

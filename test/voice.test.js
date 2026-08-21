@@ -179,10 +179,10 @@ test('exactly the platforms with no comments API take the link in the caption', 
 
 test('a caption-link platform gets tags under its own cap', () => {
   // TikTok has no meaningful cap: both fixed tags plus everything given.
-  assert.strictEqual(voice.tagLine('tiktok', ['Debugging', 'Prompting']),
-    '#MWKShow #PIY #Debugging #Prompting');
+  assert.strictEqual(voice.tagLine('tiktok', ['Xero', 'Invoicing']),
+    '#MWKShow #PIY #Xero #Invoicing');
   // X allows one, so the pair is truncated rather than the budget blown.
-  assert.strictEqual(voice.tagLine('twitter', ['Debugging', 'Prompting']), '#MWKShow');
+  assert.strictEqual(voice.tagLine('twitter', ['Xero', 'Invoicing']), '#MWKShow');
 });
 
 test('a platform that can be commented on keeps its caption clean', () => {
