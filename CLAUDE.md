@@ -131,6 +131,42 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
   (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
   **Alerting must key on `needsReconnect: true` or `status: error`**, never on `warning`.
+- **A CAPTION IS COMPOSED PER PLATFORM, and `publish()` groups by the caption a platform gets** —
+  not by any fixed split. Three things vary and each is a platform rule, not a choice: the link
+  (caption where there is no comments API), the hashtags (`hashtagsInCaption`), and nothing else.
+  His words never vary. Today that yields: instagram+threads clean, facebook+youtube+linkedin
+  tagged, tiktok and twitter one request each because each carries its own tracked link.
+- **`hashtagsInCaption` was declared from the beginning and never read** — so LinkedIn, Facebook and
+  YouTube posted with no hashtags at all until 2026-08-21. **Third field on that table to be
+  decorative** after `linkPlacement` and `landscapeOk`. When adding a field there, wire it or do not
+  add it: the config page renders them, which makes an unread field look implemented.
+- **Tags go in the caption OR the comment, never both.** `voice.firstComment(..., { noTags: true })`
+  suppresses them for a platform whose caption already carries them. On Instagram both would spend
+  the 5-cap twice, since it counts caption and comments together.
+- **One video per post, on every platform** (Facebook's docs are explicit; images and videos cannot
+  be mixed either). So a vertical and a landscape cut are two posts, never one. `landscapeOk` on the
+  platform table routes them: instagram/threads/tiktok are vertical-only, the rest take the wide
+  cut. `queue_item.media_wide_key` carries the second one.
+- **A LinkedIn repost with no commentary needs `content` OMITTED, not empty.** The docs are explicit
+  that commentary is optional and leaving it out gives a one-click repost. `queue_item.reshare` is a
+  separate flag from `reshare_text` for exactly this: an empty comment used to mean "do not repost".
+- **`zernio media:upload` infers the content type from the FILE EXTENSION** and rejects a file
+  without one. The download cache names files from a hash, so the extension has to be put back from
+  the media type. Same shape as the yt-dlp trap: the download succeeds and the upload fails.
+- **A click is attributed platform-first, referer-second, and only then unattributed.** Codes minted
+  before they were per-platform served all five comment platforms at once and can never be
+  attributed by code — but the referer still answers it. Referer matching is **anchored**, so
+  `notfacebook.com` maps to nothing: naming the wrong channel is worse than admitting we cannot tell.
+  It also catches a link clicked somewhere we never posted it.
+- **`click.bot`: 0 counted, 1 crawler, 2 unknown.** A platform fetches a url to build its preview
+  card and every fetch hits the redirect — the first live post logged 18 "clicks" on one link in
+  three minutes. The User-Agent is read to DECIDE and then discarded; only the flag is stored, so
+  nothing personal is kept. **Only `bot = 0` is ever shown as a click.**
+- **The show-notes loop did not converge**: `build()` regenerates the opening with a model every
+  run, so an applied description never matches byte for byte and immediately re-proposed itself.
+  `/youtube/pending` returns what was last WRITTEN as well as what is approved, and a video already
+  carrying exactly that is skipped. The upsert's `WHERE state = 'proposed'` was hiding the churn at
+  the database level while the work still happened every run.
 - **TikTok and X take the CTA in the CAPTION, and `post.js` now actually does it.** The platform
   table declared `linkPlacement: 'caption'` from the start but nothing ever acted on it, so posts
   there went out with his words alone — no route to the sign-up page and nothing measurable.
