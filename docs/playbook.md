@@ -24,7 +24,7 @@ Two ways the call-to-action gets under a post:
 | | How | Where |
 |---|---|---|
 | **At publish time** | `platformSpecificData.firstComment`, posted by Zernio seconds after the post | Facebook, Instagram, LinkedIn, YouTube |
-| **Afterwards** | `scripts/first-comment.js`, hourly, for anything we didn't publish | + Threads |
+| **Afterwards** | `scripts/first-comment.js`, hourly — Threads has no native field, and it also catches a native comment that silently failed | + Threads |
 | **In the caption** | no comment API exists | TikTok, X |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
@@ -36,7 +36,12 @@ carries the marker — whoever put it there.
 hashtag caps, the blocklist, the YouTube blurb, the feed URL. Change it there or you'll change it
 in the wrong place.
 
-- **`#PIY` and `#MWKShow` go on every post, in that order** — the motto short form and the brand.
+- **`#MWKShow` and `#PIY` go on every post, in that order** — the brand and the motto short form.
+  A cap tighter than the pair truncates it, so X's one tag is `#MWKShow`.
+- **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
+  table decides: Facebook, YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and
+  Threads keep the caption clean, because Instagram's cap of 5 counts caption and comments together
+  and putting them in both would spend the budget twice.
   "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
   is just `#PIY`.
 - **Topic tags describe the video**, derived from its own transcript. If it's about trading it
@@ -53,7 +58,6 @@ in the wrong place.
 |---|---|
 | Comment calls take the **platform-native** post ID, never Zernio's `_id` | The Zernio id 404s on every `inbox:` call |
 | Never pass a post ID as a CLI positional | A YouTube ID starting with `-` is read as a flag; the CLI printed its help and the script logged a failure. Hence `scripts/lib/api.js` |
-| Check the target before posting | We put a clip on TikTok that was already there. An assumed list of "what Restream covers" will always drift |
 | Secrets never in `argv` | `ps` is world-readable |
 | Alert on `needsReconnect` or `error`, never on `warning` | Tokens refresh lazily; `warning` is a normal state to pass through |
 | Write state after **every** decision | A backfill killed at two minutes had posted 13 comments and recorded none |
@@ -187,8 +191,15 @@ status page must never do.
 
 ## Reading the API
 
-`posts:list` has a pipeline post the instant it publishes. `analytics:posts` lags minutes behind
-but is the only place natively-authored posts ever appear. **Read both.**
+`posts:list` has a pipeline post the instant it publishes, and since everything publishes from
+here it is the whole universe — **read it alone**. `analytics:posts` lags minutes behind and is
+only worth reading for its numbers; it used to be swept per platform because it was the one place
+app-authored posts appeared, and that went with the mirror.
+
+Neither `/v1/analytics/posts` nor `/v1/analytics/daily` is a REST route — Zernio answers an unknown
+path with its marketing site, so a wrong one fails as "not JSON" rather than as a 404. Use the CLI
+for analytics, and positive-control any new path against `/v1/inbox/comments` before believing a
+failure.
 
 A comment read on a post the account doesn't own returns success with an empty list — "no
 comments" never proves "not commented".

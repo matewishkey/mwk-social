@@ -44,8 +44,8 @@ at once, straight from a shell — these are the actual live posts:
   a video Instagram or TikTok would reject costs the post otherwise.
 - `scripts/lib/topic-tags.js` — works out what a video was about so the comment
   can say so. Downloads the clip, strips the audio with ffmpeg, transcribes it,
-  and names the subjects it covers — `#Debugging`, `#Trading`, whatever the clip
-  is actually about, never audience or marketing tags. Needs `OPENAI_API_KEY`
+  and names the subjects it covers — `#Invoicing`, `#Xero`, whatever the clip is
+  actually about, in words an ordinary person would use rather than technical ones. Needs `OPENAI_API_KEY`
   and `GEMINI_API_KEY`; without them the comment still goes out, just untagged.
   Results are cached per post under `~/.local/state/mwk-social/topics/`.
 - `web/` — the dashboard on Cloudflare Workers + D1, behind an email one-time
@@ -69,11 +69,13 @@ at once, straight from a shell — these are the actual live posts:
   rather than burning it when something goes wrong.
 - `scripts/lib/shortlink.js` — mints the `mwkshow.com/<code>` link that every
   call to action carries, one code per platform and post, so a click says which
-  channel and which clip earned it. Idempotent, and never fatal: with no
-  dashboard the plain URL goes out and the comment still happens.
-- `scripts/lib/reshare.js` — LinkedIn quote-reshare. The company page posts it,
-  the personal account shares it with a thought on top — his words, supplied
-  with the queued post, never generated.
+  channel and which clip earned it. Every link we post gets one, not just the
+  CTA. Idempotent, and never fatal: with no dashboard the plain URL goes out and
+  the comment still happens. **Link-preview fetches are not counted as clicks** —
+  a platform fetching the URL to build its card would otherwise read as traffic.
+- `scripts/lib/reshare.js` — LinkedIn reposting. The company page posts it, the
+  personal account reposts that — plainly, with no commentary, which is the usual
+  case. A thought on top is optional and always his words, never generated.
 - `scripts/yt-description.js` — writes YouTube descriptions from each video's own
   transcript. `--sync` fills in videos that have none and files a *proposal* for
   anything that already has a description, which does nothing until it is
@@ -130,15 +132,23 @@ which is exactly why the CTA has its own short domain.
 - **First comments are a native field**, `platformSpecificData.firstComment`, on
   Facebook, Instagram, LinkedIn and YouTube — but not TikTok, and not from the
   CLI, so `post.js` calls the REST API directly.
-- **Posts made in the apps show up on a delay** — the external-post sync runs
-  roughly every 90 minutes, so the catch-all comment lands within about that.
+- **A post made outside this pipeline never gets its comment.** The per-platform
+  sweep that used to find app-authored posts went when the mirror did — those are
+  now one-offs, handled by hand. Everything published from here is covered.
 - **YouTube won't take comments on a private video** — the API 403s and a
   `firstComment` never appears. Unlisted works fine.
 - **Instagram can't be deleted or edited through any API.** Every mistake there
   is permanent, so a clip is checked against its limits before anything is sent.
-- **Instagram's 5-hashtag cap counts the caption and the comments together.** So
-  the caption carries none and the first comment spends all five — two always-on
-  tags and three describing the clip.
+- **Hashtags go in the caption or the first comment, never both.** Facebook,
+  YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and Threads
+  keep the caption clean and spend them in the comment.
+- **Instagram's 5-hashtag cap counts the caption and the comments together.** That
+  is why its caption carries none — the comment spends all five, two always-on
+  tags and three describing the clip. Tags in both places would spend the budget
+  twice for nothing.
+- **One video per post, on every platform.** So a vertical cut and a landscape cut
+  are two separate posts: the reel goes to Instagram, TikTok and Threads, the wide
+  one to Facebook, YouTube, LinkedIn and X.
 - **TikTok's settings go in `tiktokSettings` at the top level** of the request,
   not in `platformSpecificData` — which would look accepted and silently apply
   none of them, because that field stores and echoes any key you send it.

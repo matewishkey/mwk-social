@@ -191,9 +191,11 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   repliable, 500-char cap, video to 5 minutes. It is in the watcher's platform list.
 - **A caption that already carries the CTA link is left alone** — the watcher skips it rather than
   posting a comment repeating the same URL.
-- **Two sources, and you need both**: `posts:list` carries a pipeline post the instant it
-  publishes, while `analytics:posts` lags several minutes behind it — but `analytics:posts` is
-  the only place natively-authored posts ever appear. `first-comment.js` reads both.
+- **`posts:list` is the whole universe now.** It carries a pipeline post the instant it publishes,
+  where `analytics:posts` lags minutes behind. The watcher used to read both because
+  `analytics:posts` was the only place app-authored posts appeared — that sweep went with the
+  mirror, so a post made outside the pipeline is never commented on. That is deliberate: it is a
+  one-off, handled by hand.
 - **A comment read for a video the account doesn't own returns `success` with an empty list**,
   not an error — confirmed 2026-08-19 against a Short on the unconnected @matewishkey channel.
   So "no comments" never proves "not yet commented"; only go by posts the API actually lists.
@@ -319,16 +321,16 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (−40–50%) — hence the first-comment mechanic. Reshare/quote-repost an existing post via REST
   `platformSpecificData.reshareUrl` + `content` (not exposed as a `posts:create` flag;
   exercised live 2026-08-17). **Posting playbook: post natively to the COMPANY page, then
-  quote-reshare from the personal account with a thought on top** — never native-post to
-  personal. Goal: build company-page engagement/followers to unlock LinkedIn Live there.
+  repost from the personal account** — plainly, no commentary, which is the default since
+  2026-08-21; a thought on top is optional and always his. Never native-post to personal. Goal: build company-page engagement/followers to unlock LinkedIn Live there.
 - **Instagram**: business account required; media mandatory; caption folds at ~125 chars;
   no delete/edit via API. Image aspect must be 0.75–1.91:1 and an image at *exactly* 1.91:1
   gets rejected (float edge, bitten live) — pad wide screenshots to ~1.78:1 with the
   screenshot's own bg color instead of cropping. Tall grabs (phone/email screenshots) fall off the
   other end — pad up to 4:5 (0.8) the same way, don't crop.
 - **TikTok**: `accounts:tiktok-creator-info <accountId> --mediaType <video|photo>` returns the
-  live privacy options and posting limits — read it instead of guessing the cap. A manually
-  posted TikTok has been verified arriving via the external-post sync.
+  live privacy options and posting limits — read it instead of guessing the cap. A manually posted TikTok was once
+  verified arriving via the external-post sync — historic only: nothing reads that sweep now.
 - **TikTok**: API posts have their own strict daily cap (separate from the app); consent flags
   required per post; no comments/DMs/FYP analytics via API; 9:16 video 3s–10min or carousels.
 - **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails

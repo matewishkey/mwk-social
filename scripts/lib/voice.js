@@ -181,7 +181,8 @@ function tagLine(platform, topicTags = []) {
   const cfg = config();
   const cap = capFor(platform);
   // A cap tighter than the always-on pair wins: X allows one tag, so it gets
-  // #PIY alone rather than two tags on a one-tag budget.
+  // #MWKShow alone — the brand, since slice() keeps the first — rather than two
+  // tags on a one-tag budget.
   const always = cap === null ? cfg.tags.always : cfg.tags.always.slice(0, cap);
   const room = cap === null ? cfg.tags.maxTopic : Math.max(0, cap - always.length);
   const blocked = blockedTags();
