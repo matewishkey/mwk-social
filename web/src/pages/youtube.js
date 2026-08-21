@@ -8,7 +8,7 @@
  * nothing until it is approved. Overwriting words someone chose is not a thing
  * to do quietly, however reversible it is.
  */
-import { esc, card, tile, layout, when, ago } from '../lib/html.js';
+import { esc, card, tile, layout, when, ago, pager } from '../lib/html.js';
 
 const STATE = {
   proposed: ['p-warn', 'waiting on you'],
@@ -29,10 +29,9 @@ export async function youtubeAction(request, env, email) {
   return Response.redirect(new URL('/youtube', request.url).toString(), 303);
 }
 
-export function youtubePage({ email, tz, proposals, snapshots }) {
+export function youtubePage({ email, tz, waiting, settled, snapshots, byState = {},
+  page = 1, size = 25, total = 0, params = '' }) {
   const blurbReady = ((snapshots.voice || {}).body || {}).blurbChosen;
-  const waiting = proposals.filter((p) => p.state === 'proposed');
-  const settled = proposals.filter((p) => p.state !== 'proposed');
 
   const item = (p) => {
     const [cls, label] = STATE[p.state] || ['p-plain', p.state];
@@ -72,14 +71,15 @@ ${blurbReady === false ? `<div class="card warnbox"><div class="card-body">
 
 <div class="tiles">
   ${tile(waiting.length, 'waiting on you', waiting.length ? 'warn' : 'ok')}
-  ${tile(proposals.filter((p) => p.state === 'applied').length, 'written')}
-  ${tile(proposals.filter((p) => p.state === 'rejected').length, 'left alone')}
+  ${tile(byState.applied || 0, 'written')}
+  ${tile(byState.rejected || 0, 'left alone')}
 </div>
 
 ${card(`Waiting on you (${waiting.length})`, waiting.length
   ? waiting.map(item).join('') : '<p class="empty">Nothing to review.</p>')}
 
-${settled.length ? card('Settled', settled.slice(0, 25).map(item).join('')) : ''}
+${total ? card(`Settled (${total})`, settled.map(item).join('')
+  + pager({ path: '/youtube', params, page, size, total, noun: 'proposals' })) : ''}
 
 <style>
 .warnbox { border-color:var(--warn); background:var(--warn-soft); }

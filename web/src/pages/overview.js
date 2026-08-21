@@ -9,9 +9,7 @@
  * ledger. Everything publishes through the queue now, so that ledger has no
  * writer — and a frozen table is worse than no table.
  */
-import { esc, card, tile, layout, when, ago } from '../lib/html.js';
-
-const EVENT_PAGE = 200;
+import { esc, card, tile, layout, when, ago, pager } from '../lib/html.js';
 const HEARTBEAT_STALE_MS = 15 * 60 * 1000;
 
 export async function overviewAction(request, env, email) {
@@ -23,7 +21,8 @@ export async function overviewAction(request, env, email) {
   return Response.redirect(new URL('/', request.url).toString(), 303);
 }
 
-export function overviewPage({ email, tz, beat, snapshots, events, counts, kind, level, actions, queue }) {
+export function overviewPage({ email, tz, beat, snapshots, events, counts, kind, level,
+  actions, queue, page = 1, size = 100, total = 0, params = '' }) {
   const stale = !beat || Date.now() - new Date(beat.at).getTime() > HEARTBEAT_STALE_MS;
   const pace = ((snapshots.pace || {}).body) || {};
   const q = queue || { waiting: 0, failed: 0 };
@@ -70,8 +69,9 @@ ${card('Events', `
       : esc(e.message)}</td>
   </tr>`).join('') : '<tr><td colspan="4" class="empty">Nothing yet.</td></tr>'}</tbody>
 </table></div>
-<p class="note">Newest ${EVENT_PAGE}. The box ships every two minutes and sends an empty batch
-when idle, so "stale" means the box, not the pipeline.</p>`)}
+${pager({ path: '/', params, page, size, total, noun: 'events' })}
+<p class="note">The box ships every two minutes and sends an empty batch when idle, so "stale"
+means the box, not the pipeline.</p>`)}
 
 <style>
 .lvl-error { color:var(--bad); } .lvl-warn { color:var(--warn); }

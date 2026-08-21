@@ -9,7 +9,7 @@
  * disagree, and the one on the box is the one that already knows what else went
  * out today.
  */
-import { esc, card, layout, when, ago, tile } from '../lib/html.js';
+import { esc, card, layout, when, ago, tile, pager } from '../lib/html.js';
 import { ulid } from '../lib/access.js';
 
 const POSTABLE = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
@@ -84,9 +84,8 @@ export async function queueAction(request, env, email) {
   return back;
 }
 
-export function queuePage({ email, tz, items, pace }) {
-  const waiting = items.filter((i) => i.status === 'queued' || i.status === 'claimed');
-  const done = items.filter((i) => !['queued', 'claimed'].includes(i.status));
+export function queuePage({ email, tz, waiting, done, pace,
+  page = 1, size = 25, total = 0, params = '' }) {
 
   const row = (i, showActions) => {
     const [cls, label] = STATUS[i.status] || ['p-plain', i.status];
@@ -190,9 +189,10 @@ ${card(`Waiting (${waiting.length})`, waiting.length ? `<div class="wrap"><table
   <tbody>${waiting.map((i) => row(i, true)).join('')}</tbody></table></div>`
   : '<p class="empty">Nothing waiting.</p>', '')}
 
-${done.length ? card(`Been and gone (${done.length})`, `<div class="wrap"><table>
+${total ? card(`Been and gone (${total})`, `<div class="wrap"><table>
   <thead><tr><th>status</th><th>post</th><th>queued</th><th></th></tr></thead>
-  <tbody>${done.slice(0, 40).map((i) => row(i, false)).join('')}</tbody></table></div>`) : ''}
+  <tbody>${done.map((i) => row(i, false)).join('')}</tbody></table></div>
+${pager({ path: '/queue', params, page, size, total, noun: 'posts' })}`) : ''}
 
 <style>
 .body { white-space:pre-wrap; max-width:60ch; font-size:.87rem; }

@@ -20,6 +20,7 @@
  */
 
 import { accessIdentity } from './lib/access.js';
+import { pageOf } from './lib/html.js';
 import { api } from './api.js';
 import { redirect, platformFromReferer } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
@@ -28,7 +29,8 @@ import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
 import { youtubePage, youtubeAction } from './pages/youtube.js';
 
-const EVENT_PAGE = 200;
+const EVENT_PAGE = 100;
+const HISTORY_PAGE = 25;
 const STATS_DAYS = 30;
 
 export default {
@@ -84,8 +86,8 @@ async function dashboard(request, env, url) {
   switch (url.pathname) {
     case '/stats':   return html(await stats(env, tz, snapshots, email));
     case '/config':  return html(configPage({ email, tz, snapshots }));
-    case '/queue':   return html(await queue(env, tz, snapshots, email));
-    case '/youtube': return html(await youtube(env, tz, snapshots, email));
+    case '/queue':   return html(await queue(env, tz, snapshots, email, url));
+    case '/youtube': return html(await youtube(env, tz, snapshots, email, url));
     case '/':        return html(await overview(request, env, tz, snapshots, email, url));
     default:         return new Response('not found', { status: 404 });
   }
@@ -107,18 +109,29 @@ async function loadSnapshots(env) {
 async function overview(request, env, tz, snapshots, email, url) {
   const kind = url.searchParams.get('kind') || '';
   const level = url.searchParams.get('level') || '';
-  const [beat, events, counts, actions, queue] = await Promise.all([
+  // The count is taken under the SAME filter as the rows. Counting the whole
+  // table would page an unfiltered total over a filtered list and offer pages
+  // that come back empty.
+  const [beat, counts, actions, queue, total] = await Promise.all([
     env.DB.prepare('SELECT at, count FROM ingest_batch ORDER BY at DESC LIMIT 1').first(),
-    env.DB.prepare(
-      `SELECT * FROM event WHERE (?1 = '' OR kind = ?1) AND (?2 = '' OR level = ?2)
-        ORDER BY ts DESC LIMIT ${EVENT_PAGE}`).bind(kind, level).all(),
     env.DB.prepare('SELECT kind, COUNT(*) n FROM event GROUP BY kind ORDER BY n DESC').all(),
     env.DB.prepare('SELECT * FROM manual_action WHERE done_at IS NULL ORDER BY created_at DESC LIMIT 50').all(),
     env.DB.prepare(
       `SELECT SUM(status IN ('queued','claimed')) waiting, SUM(status = 'failed') failed FROM queue_item`).first(),
+    env.DB.prepare(
+      `SELECT COUNT(*) n FROM event WHERE (?1 = '' OR kind = ?1) AND (?2 = '' OR level = ?2)`)
+      .bind(kind, level).first(),
   ]);
+  const rows = (total && total.n) || 0;
+  const page = pageOf(url, EVENT_PAGE, rows);
+  const events = await env.DB.prepare(
+    `SELECT * FROM event WHERE (?1 = '' OR kind = ?1) AND (?2 = '' OR level = ?2)
+      ORDER BY ts DESC LIMIT ?3 OFFSET ?4`)
+    .bind(kind, level, EVENT_PAGE, (page - 1) * EVENT_PAGE).all();
+
   return overviewPage({ email, tz, beat, snapshots, events: events.results || [],
     counts: counts.results || [], kind, level, actions: actions.results || [],
+    page, size: EVENT_PAGE, total: rows, params: url.searchParams,
     queue: { waiting: (queue && queue.waiting) || 0, failed: (queue && queue.failed) || 0 } });
 }
 
@@ -162,15 +175,48 @@ async function stats(env, tz, snapshots, email) {
     targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0 });
 }
 
-async function queue(env, tz, snapshots, email) {
-  const items = await env.DB.prepare('SELECT * FROM queue_item ORDER BY created_at DESC LIMIT 200').all();
+// What is still waiting is never paged — it is short, and it is the half he
+// acts on. Only the history behind it grows without bound, so that is the half
+// that gets a pager.
+async function queue(env, tz, snapshots, email, url) {
+  const [waiting, total] = await Promise.all([
+    env.DB.prepare(
+      `SELECT * FROM queue_item WHERE status IN ('queued','claimed')
+        ORDER BY priority DESC, created_at`).all(),
+    env.DB.prepare(
+      `SELECT COUNT(*) n FROM queue_item WHERE status NOT IN ('queued','claimed')`).first(),
+  ]);
+  const rows = (total && total.n) || 0;
+  const page = pageOf(url, HISTORY_PAGE, rows);
+  const done = await env.DB.prepare(
+    `SELECT * FROM queue_item WHERE status NOT IN ('queued','claimed')
+      ORDER BY created_at DESC LIMIT ?1 OFFSET ?2`)
+    .bind(HISTORY_PAGE, (page - 1) * HISTORY_PAGE).all();
+
   // The pace is the box's, shipped with the ledger — never recomputed here, or
   // the page and the publisher would eventually disagree about what today holds.
   const pace = ((snapshots.pace || {}).body) || { perDay: '—', today: '—', minGapMinutes: null, tz, nextAt: null, why: '' };
-  return queuePage({ email, tz, items: items.results || [], pace });
+  return queuePage({ email, tz, waiting: waiting.results || [], done: done.results || [],
+    pace, page, size: HISTORY_PAGE, total: rows, params: url.searchParams });
 }
 
-async function youtube(env, tz, snapshots, email) {
-  const rows = await env.DB.prepare('SELECT * FROM yt_proposal ORDER BY proposed_at DESC LIMIT 100').all();
-  return youtubePage({ email, tz, snapshots, proposals: rows.results || [] });
+async function youtube(env, tz, snapshots, email, url) {
+  // The tiles count the whole table, not the page in front of him — "written"
+  // meaning "written on this page" would shrink every time he paged forward.
+  const [waiting, total, states] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM yt_proposal WHERE state = 'proposed' ORDER BY proposed_at DESC`).all(),
+    env.DB.prepare(`SELECT COUNT(*) n FROM yt_proposal WHERE state != 'proposed'`).first(),
+    env.DB.prepare('SELECT state, COUNT(*) n FROM yt_proposal GROUP BY state').all(),
+  ]);
+  const byState = Object.fromEntries((states.results || []).map((r) => [r.state, r.n]));
+  const rows = (total && total.n) || 0;
+  const page = pageOf(url, HISTORY_PAGE, rows);
+  const settled = await env.DB.prepare(
+    `SELECT * FROM yt_proposal WHERE state != 'proposed'
+      ORDER BY proposed_at DESC LIMIT ?1 OFFSET ?2`)
+    .bind(HISTORY_PAGE, (page - 1) * HISTORY_PAGE).all();
+
+  return youtubePage({ email, tz, snapshots, waiting: waiting.results || [],
+    settled: settled.results || [], byState,
+    page, size: HISTORY_PAGE, total: rows, params: url.searchParams });
 }

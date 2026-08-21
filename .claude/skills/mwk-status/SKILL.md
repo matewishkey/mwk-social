@@ -84,6 +84,11 @@ Used files belong in `input/archive/<YYYY-MM-DD>/`.
 
 ## 6. Report
 
+**Every time you quote is Brisbane time.** The box runs `Etc/UTC`, so `systemctl`, `journalctl`
+and the timestamps in the logs are all UTC — reading one out verbatim is ten hours wrong to him.
+`TZ=Australia/Brisbane date '+%H:%M %Z'` is the current time; convert the rest as you write them.
+The dashboard already displays Brisbane, so a time from the page needs no conversion.
+
 Lead with the answer — green or not — then the table. Say plainly what is **waiting on him** (a
 decision, an issue, a queued item about to go) versus what is **waiting on us**. A queued item
 that is about to publish is the single most important line: give him the caption, the time, and

@@ -45,6 +45,58 @@ export const num = (n) => {
   return String(n);
 };
 
+/**
+ * Paging for a list that outgrows one screen.
+ *
+ * Offset paging, not a cursor. The lists here are hundreds of rows, not
+ * millions, and a cursor would buy correctness under concurrent inserts that
+ * nothing on this dashboard can observe — the events table is append-only from
+ * one shipper and the queue is claimed one item at a time.
+ *
+ * Every existing query parameter is carried through. Losing the kind/level
+ * filter on "older" would silently widen what is being read, which is worse
+ * than no pager at all.
+ *
+ * @param {object} o
+ * @param {string} o.path     the page's own path, e.g. '/'
+ * @param {URLSearchParams|object} o.params  what is already in the query string
+ * @param {number} o.page     1-based
+ * @param {number} o.size     rows per page
+ * @param {number} o.total    rows there are altogether
+ * @param {string} [o.noun]   what is being counted, for the caption
+ */
+export function pager({ path, params, page, size, total, noun = 'rows' }) {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const here = Math.min(Math.max(1, page), pages);
+  const first = total === 0 ? 0 : (here - 1) * size + 1;
+  const last = Math.min(total, here * size);
+
+  const href = (n) => {
+    const q = new URLSearchParams(params);
+    if (n <= 1) q.delete('p'); else q.set('p', String(n));
+    const s = q.toString();
+    return esc(s ? `${path}?${s}` : path);
+  };
+
+  // One page of results still says how many there are — "12 of 12" is an
+  // answer, where a bare list leaves you wondering what was cut off.
+  const nav = pages > 1 ? `
+    <nav class="pager">
+      ${here > 1 ? `<a href="${href(here - 1)}">← newer</a>` : '<span>← newer</span>'}
+      <b>page ${here} of ${pages}</b>
+      ${here < pages ? `<a href="${href(here + 1)}">older →</a>` : '<span>older →</span>'}
+    </nav>` : '';
+
+  return `<p class="note">${first === 0 ? `No ${esc(noun)} yet` : `${first}–${last} of ${total} ${esc(noun)}`}.</p>${nav}`;
+}
+
+/** Which page was asked for, clamped to something sane. */
+export const pageOf = (url, size, total) => {
+  const asked = Number.parseInt(url.searchParams.get('p') || '1', 10);
+  const pages = Math.max(1, Math.ceil((total || 0) / size));
+  return Number.isFinite(asked) ? Math.min(Math.max(1, asked), pages) : 1;
+};
+
 const NAV = [
   ['/', 'Overview'],
   ['/stats', 'Stats'],
@@ -162,6 +214,12 @@ td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
 .filters a.on { color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
 .empty { color:var(--faint); font-size:.88rem; padding:.5rem 0; }
 .note { font-size:.8rem; color:var(--faint); margin:.7rem 0 0; }
+.pager { display:flex; align-items:center; gap:.8rem; margin:.5rem 0 0; flex:none; }
+.pager a, .pager span, .pager b { font-size:.8rem; padding:.3rem .6rem; border-radius:.4rem; }
+.pager a { color:var(--accent); background:var(--accent-soft); text-decoration:none; }
+.pager a:hover { background:var(--line2); color:var(--fg); }
+.pager span { color:var(--faint); }
+.pager b { color:var(--muted); font-weight:600; }
 
 /* ---- forms ---- */
 label { display:block; font-size:.78rem; font-weight:600; color:var(--muted); margin:0 0 .3rem; }

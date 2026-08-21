@@ -66,13 +66,20 @@ if [[ "$want" == all || "$want" == ship-events ]]; then
 fi
 
 if [[ "$want" == all || "$want" == queue ]]; then
-  # At :20, well clear of the comment run at :00 so a post has settled before
-  # the watcher looks for it. The pace lives in lib/pace.js, not here: this is a
-  # dumb hourly heartbeat and whyNotNow() says no most of the time.
+  # Every five minutes, so something queued goes out within five rather than
+  # waiting up to an hour for a tick. This is safe to run often because the pace
+  # lives in lib/pace.js, not here: whyNotNow() says no most of the time and this
+  # is a dumb heartbeat asking it.
+  #
+  # It STOPS at :45, and that gap is load-bearing. The comment watcher runs at
+  # :00, and Zernio posts the native first comment seconds after a post goes
+  # live — so a post published at :55 could be looked at before its own comment
+  # had landed, and the watcher, seeing no marker, would post a second one.
+  # Fifteen minutes of clearance is what stops that.
   unit mwk-queue \
     'Post the next queued MWK item, if it is a good moment' \
     "$repo/scripts/run-queue.js --scheduled" \
-    '*:20' \
+    '*:05,10,15,20,25,30,35,40,45' \
     'Check whether a queued post is due'
 fi
 

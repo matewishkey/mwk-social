@@ -219,8 +219,9 @@ test('with no clicks the page says why there is nothing to show', async () => {
 test('the queue shows the pace it does not itself decide', async () => {
   const { queuePage } = await src('pages/queue.js');
   const html = queuePage({ email: 'm@x.com', tz: TZ,
-    items: [{ id: 'q1', status: 'queued', body: 'a post', platforms: '["threads"]',
+    waiting: [{ id: 'q1', status: 'queued', body: 'a post', platforms: '["threads"]',
       first_comment: 1, priority: 0, created_at: new Date().toISOString() }],
+    done: [], total: 0,
     pace: { perDay: 6, today: 2, minGapMinutes: 90, tz: TZ, nextAt: 'Fri 09:00', why: null } });
   assert.match(html, /a post/);
   assert.match(html, /Fri 09:00/);
@@ -261,8 +262,9 @@ test('every value bound to the queue insert has a column to land in', async () =
 test('queued text cannot inject markup either', async () => {
   const { queuePage } = await src('pages/queue.js');
   const html = queuePage({ email: 'm@x.com', tz: TZ,
-    items: [{ id: 'q1', status: 'queued', body: '<img src=x onerror=alert(1)>',
+    waiting: [{ id: 'q1', status: 'queued', body: '<img src=x onerror=alert(1)>',
       platforms: '[]', first_comment: 0, priority: 0, created_at: new Date().toISOString() }],
+    done: [], total: 0,
     pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
   assert.ok(!html.includes('<img src=x'), 'the raw tag must not survive');
 });
@@ -271,8 +273,8 @@ test('queued text cannot inject markup either', async () => {
 
 test('a description proposal shows both versions and does nothing on its own', async () => {
   const { youtubePage } = await src('pages/youtube.js');
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, snapshots: {},
-    proposals: [{ video_id: 'abc123', title: 'Episode 3', current_text: 'old words',
+  const html = youtubePage({ email: 'm@x.com', tz: TZ, snapshots: {}, settled: [], total: 0,
+    waiting: [{ video_id: 'abc123', title: 'Episode 3', current_text: 'old words',
       proposed: 'new words', state: 'proposed', proposed_at: new Date().toISOString() }] });
   assert.match(html, /old words/);
   assert.match(html, /new words/);
@@ -283,9 +285,63 @@ test('a description proposal shows both versions and does nothing on its own', a
 // Auto-fill must not ship my paraphrase of the show to the channel.
 test('auto-fill announces itself as paused until the blurb is chosen', async () => {
   const { youtubePage } = await src('pages/youtube.js');
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, proposals: [],
+  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting: [], settled: [], total: 0,
     snapshots: { voice: { body: { blurbChosen: false } } } });
   assert.match(html, /Auto-fill is paused/);
+});
+
+/* --------------------------------------------------------------- pager -- */
+
+/*
+ * A pager that loses the filter is worse than no pager: "older" would quietly
+ * widen what is being read from errors-only back to everything, and the page
+ * would look like it had simply found more errors.
+ */
+test('paging carries every filter with it', async () => {
+  const { pager } = await src('lib/html.js');
+  const html = pager({ path: '/', params: new URLSearchParams('kind=queue.posted&level=error'),
+    page: 2, size: 100, total: 350, noun: 'events' });
+  assert.match(html, /kind=queue\.posted/);
+  assert.match(html, /level=error/);
+  assert.match(html, /101–200 of 350 events/);
+  assert.match(html, /page 2 of 4/);
+});
+
+test('page one drops the parameter rather than writing p=1', async () => {
+  const { pager } = await src('lib/html.js');
+  const html = pager({ path: '/', params: new URLSearchParams(''), page: 2, size: 10, total: 30 });
+  assert.match(html, /href="\/"/, 'newer from page 2 goes back to the bare path');
+  assert.ok(!/p=1\b/.test(html), 'no p=1 in any link');
+});
+
+test('the ends of the list are not links', async () => {
+  const { pager } = await src('lib/html.js');
+  const first = pager({ path: '/', params: '', page: 1, size: 10, total: 30 });
+  assert.match(first, /<span>← newer<\/span>/);
+  const last = pager({ path: '/', params: '', page: 3, size: 10, total: 30 });
+  assert.match(last, /<span>older →<\/span>/);
+});
+
+// One page still says how many there are; a bare list leaves you guessing.
+test('a single page says the total and offers no navigation', async () => {
+  const { pager } = await src('lib/html.js');
+  const html = pager({ path: '/queue', params: '', page: 1, size: 25, total: 12, noun: 'posts' });
+  assert.match(html, /1–12 of 12 posts/);
+  assert.ok(!html.includes('older →'));
+});
+
+test('an empty list says so rather than counting to zero', async () => {
+  const { pager } = await src('lib/html.js');
+  assert.match(pager({ path: '/', params: '', page: 1, size: 25, total: 0, noun: 'events' }),
+    /No events yet/);
+});
+
+test('a page beyond the end clamps rather than showing an empty table', async () => {
+  const { pageOf } = await src('lib/html.js');
+  const url = new URL('https://social.example/?p=99');
+  assert.equal(pageOf(url, 25, 30), 2);
+  assert.equal(pageOf(new URL('https://social.example/?p=nonsense'), 25, 30), 1);
+  assert.equal(pageOf(new URL('https://social.example/?p=-4'), 25, 30), 1);
 });
 
 /*
