@@ -191,3 +191,10 @@ test('a platform that can be commented on keeps its caption clean', () => {
       `${p} must keep the link out of the body`);
   }
 });
+
+// build() in yt-description.js appends voice.tagLine() after the blurb, so any
+// tag inside the blurb itself prints a second time. It did, live, on one video.
+test('the show blurb carries no hashtags of its own', () => {
+  assert.ok(!/#\w/.test(voice.showBlurb()),
+    'tags in the blurb duplicate the tag line appended after it');
+});
