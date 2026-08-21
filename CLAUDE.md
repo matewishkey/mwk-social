@@ -187,8 +187,14 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   tweet. Measured, not inferred: 2 × $0.015 + 1 × $0.20 = the 23c on `usage:stats.spend.xSpendCents`.
   (Zernio's `usage:x-pricing` lists `content_create_with_url` with an empty `triggeredBy`; that
   metadata is wrong — the operation does fire.)
-- **X link suppression is a non-Premium problem** — Premium accounts post links normally, so with
-  the subscription live there is no reason to keep links out of the post.
+- **X's link penalty is REDUCED by Premium, not removed — the old note here said otherwise and was
+  wrong** (corrected 2026-08-21 against current reporting). X deprioritises a post carrying an
+  external link to keep people on-platform; non-Premium link posts are effectively invisible,
+  Premium ones get a fraction of normal engagement. Every X post this pipeline has made carries the
+  CTA in the caption (`linkPlacement: 'caption'`), so **every one of them has been in the penalised
+  class** — and so were the two mate posted by hand from the app. `platformSpecificData.threadItems`
+  would put the link in a reply and leave the root tweet clean, at 21.5c against 20c. Not changed
+  yet: see the open issue.
 - **Threads works like Instagram**: connected through the same Meta auth, comments readable and
   repliable, 500-char cap, video to 5 minutes. It is in the watcher's platform list.
 - **A caption that already carries the CTA link is left alone** — the watcher skips it rather than
