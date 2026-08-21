@@ -258,6 +258,13 @@ const pending = async (_body, env) => json({
   items: (await env.DB.prepare(
     `SELECT video_id, title, proposed FROM yt_proposal WHERE state = 'approved' ORDER BY decided_at`,
   ).all()).results || [],
+  // What we last wrote, so a re-draft can tell "unchanged" from "never done".
+  // Without this the loop never converges: the opening paragraph is generated
+  // and never matches byte for byte, so every applied description immediately
+  // proposes itself again — 17 fresh proposals a day, for ever.
+  applied: (await env.DB.prepare(
+    `SELECT video_id, proposed FROM yt_proposal WHERE state = 'applied'`,
+  ).all()).results || [],
 });
 
 async function applied(body, env) {

@@ -125,7 +125,10 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
 
   // Anything approved since last time goes out first — he has already decided,
   // and making him wait a cycle for a decision he made is just rude.
-  const { items: approved } = await call('/youtube/pending', {});
+  const { items: approved, applied = [] } = await call('/youtube/pending', {});
+  // Videos already carrying exactly what we wrote. Re-proposing those is churn,
+  // not a change: build() regenerates the opening every run and it never matches.
+  const alreadyWritten = new Map(applied.map((a) => [a.video_id, (a.proposed || '').trim()]));
   const written = [];
   for (const item of approved) {
     if (!blurbChosen()) { console.log(`hold  ${item.video_id} — approved, but the show blurb is still PENDING`); continue; }
@@ -133,6 +136,7 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
     try {
       backup(item.video_id, currentDescription(item.video_id), item.title || '');
       await setDescription(item.video_id, item.proposed);
+      alreadyWritten.set(item.video_id, (item.proposed || '').trim());
       written.push(item.video_id);
       console.log(`wrote ${item.video_id} — approved (previous backed up)`);
     } catch (err) {
@@ -152,6 +156,7 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
   for (const id of ids) {
     try {
       const existing = currentDescription(id);
+      if (alreadyWritten.get(id) === existing.trim()) continue;   // exactly what we wrote
       if (existing.trim()) {
         // Already has words someone chose. Draft, file, and touch nothing.
         const { title, description } = await build(id);

@@ -27,6 +27,7 @@ test('the words he named land on the right side of the line', () => {
 test('the tech tags we actually published are now blocked', () => {
   for (const tag of ['Cloudflare', 'DomainTransfer', 'WebDevelopment', 'Observability',
     'GenerativeEngineOptimization', 'ErrorReporting', 'Debugging', 'Troubleshooting',
+    'TechSupport',
     'Prompting', 'UserInterfaces', 'UserExperience', 'UXDesign', 'SEO',
     'ProductDifferentiation', 'NicheStrategy', 'WorkflowAutomation', 'SoftwareInteraction']) {
     assert.ok(!survives(tag), `${tag} is developer vocabulary and must not go out`);
