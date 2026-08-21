@@ -174,3 +174,8 @@ ALTER TABLE click ADD COLUMN bot INTEGER NOT NULL DEFAULT 0;
 -- rest, as separate posts.
 ALTER TABLE queue_item ADD COLUMN media_wide_key TEXT;
 ALTER TABLE queue_item ADD COLUMN media_wide_url TEXT;
+
+-- Whether the personal LinkedIn account reposts the company post. Separate from
+-- reshare_text on purpose: a plain repost with no commentary is the default, and
+-- an empty comment must not read as "do not repost".
+ALTER TABLE queue_item ADD COLUMN reshare INTEGER NOT NULL DEFAULT 1;

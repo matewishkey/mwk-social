@@ -159,6 +159,7 @@ async function claim(body, env) {
         id: row.id, body: row.body, platforms: want, mediaUrl,
         mediaType: row.media_type, firstComment: !!row.first_comment,
         reshareText: row.reshare_text || null,
+        reshare: row.reshare !== 0,
         commentText: row.comment_text || null,
         topics: JSON.parse(row.topics || '[]'),
         mediaWideUrl,

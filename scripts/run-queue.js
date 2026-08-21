@@ -230,10 +230,13 @@ async function main() {
     // wrote the words. A reshare that fails must not fail the post, which is
     // already live and correct.
     const li = outcome.find((o) => o.platform === 'linkedin' && o.url);
-    if (li && item.reshareText) {
+    // reshare === false means "do not"; anything else reposts, with his words
+    // on top only if he wrote some.
+    if (li && item.reshare !== false) {
       try {
         const shared = await reshare.quoteReshare(li.url, item.reshareText);
-        console.log(`reshared from the personal account — ${shared ? shared._id : 'skipped'}`);
+        console.log(`reposted from the personal account${item.reshareText ? ' with your words' : ' (plain repost)'}`
+          + ` — ${shared ? shared._id : 'skipped'}`);
         events.emit('linkedin.reshared', { message: 'quote-reshared from the personal account',
           platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}` });
       } catch (err) {

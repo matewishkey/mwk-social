@@ -8,8 +8,14 @@
  * a real audience (thousands against the company page's handful), and the goal
  * is to move that engagement onto the page.
  *
- * The commentary is never generated. It is his sentence or there is no reshare:
- * words attributed to a person have to be that person's.
+ * Two shapes, and the difference matters:
+ *
+ *   - a PLAIN repost, no text at all. `content` omitted entirely — the docs are
+ *     explicit that commentary is optional and an empty one gives a one-click
+ *     repost. This is the default.
+ *   - a QUOTE repost, with a thought on top. Only ever HIS thought: words
+ *     published under a person's name have to be that person's, so commentary
+ *     is never generated — it is supplied or there is none.
  */
 'use strict';
 
@@ -26,29 +32,29 @@ function linkedinAccounts() {
 }
 
 /**
- * @param {string} postUrl  the company post to quote
- * @param {string} comment  his words, going out as him
+ * @param {string} postUrl  the company post to repost
+ * @param {string} [comment] his words. Omitted or blank gives a plain repost.
+ * @param {object} [account] which account reposts; defaults to the personal one.
  */
-async function quoteReshare(postUrl, comment) {
-  if (!postUrl) throw new Error('nothing to reshare — no company post url');
-  if (!comment || !comment.trim()) return null;      // no words, no reshare
+async function quoteReshare(postUrl, comment, account = null) {
+  if (!postUrl) throw new Error('nothing to reshare — no post url');
 
-  const { personal } = linkedinAccounts();
-  if (!personal) throw new Error('no personal LinkedIn account in accounts:list');
+  const who = account || linkedinAccounts().personal;
+  if (!who) throw new Error('no personal LinkedIn account in accounts:list');
 
   // reshareUrl is not exposed as a posts:create flag, so this goes to REST.
-  const { post } = await api('POST', '/posts', {
-    body: {
-      content: comment,
-      platforms: [{
-        platform: 'linkedin',
-        accountId: personal._id || personal.id,
-        platformSpecificData: { reshareUrl: postUrl },
-      }],
-      publishNow: true,
-    },
-    timeout: 120000,
-  });
+  const body = {
+    platforms: [{
+      platform: 'linkedin',
+      accountId: who._id || who.id,
+      platformSpecificData: { reshareUrl: postUrl },
+    }],
+    publishNow: true,
+  };
+  // Omitted, not empty: the docs say leave content out for a plain repost.
+  if (comment && comment.trim()) body.content = comment.trim();
+
+  const { post } = await api('POST', '/posts', { body, timeout: 120000 });
   return post;
 }
 

@@ -70,7 +70,8 @@ export async function queueAction(request, env, email) {
     String(form.get('reshareText') || '').trim() || null,
     String(form.get('commentText') || '').trim() || null,
     JSON.stringify(String(form.get('topics') || '').split(',')
-      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)), mediaWideKey).run();
+      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)), mediaWideKey,
+    form.get('reshare') ? 1 : 0).run();
   return back;
 }
 
@@ -88,7 +89,9 @@ export function queuePage({ email, tz, items, pace }) {
           ${i.media_key || i.media_url ? ' · has media' : ''}
           ${i.media_wide_key || i.media_wide_url ? ' + landscape cut' : ''}
           ${i.first_comment ? ' · first comment' : ' · no first comment'}
-          ${i.reshare_text ? ' · reshared from your personal account' : ''}
+          ${i.reshare === 0 ? '' : i.reshare_text
+            ? ' · reposted from your personal account, with your words'
+            : ' · reposted from your personal account'}
           ${i.comment_text ? ' · custom first comment' : ''}
           ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}</div>
         ${i.note ? `<div class="faint meta">${esc(i.note)}</div>` : ''}</td>
@@ -161,11 +164,14 @@ ${card('Queue something', `
       replaced with its own <code>mwkshow.com</code> code, so you can see which one people click.</p>
   </div>
   <div class="field">
-    <label for="qreshare">LinkedIn — your thought, resharing it from your personal account (optional)</label>
+    <div class="checks"><label><input type="checkbox" name="reshare" checked>
+      Repost it from your personal LinkedIn account</label></div>
+    <label for="qreshare" style="margin-top:.7rem">…with a thought on top (optional)</label>
     <textarea id="qreshare" name="reshareText" style="min-height:5rem"
-      placeholder="Left empty, nothing is reshared. These words go out as you, quoting the company page."></textarea>
-    <p class="note">The company post goes out first, then your personal account quote-reshares it
-      with this on top. LinkedIn is the only platform where resharing works through the API.</p>
+      placeholder="Leave empty for a plain repost, no text. Anything here goes out as you."></textarea>
+    <p class="note">The company page posts it, then your personal account reposts that — which is
+      where the audience is. Empty means a plain repost, which is the usual case. LinkedIn is the
+      only platform where reposting works through the API at all.</p>
   </div>
   <button class="primary" type="submit">Queue it</button>
 </form>`)}
