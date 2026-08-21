@@ -30,6 +30,17 @@ const MAX_AUDIO_SECONDS = 900;
 const MAX_TAGS = voice.maxTopicTags();
 const BLOCKED = voice.blockedTags();
 
+/*
+ * Bump this whenever the tag RULE changes, not when the code does. A cached
+ * result carries the version it was named under, so a bump re-derives every
+ * video from its stored transcript — one model call each, no re-transcription.
+ *
+ *   1  subject-matter tags, whatever vocabulary the model reached for
+ *   2  2026-08-21: everyday words only, never developer or infrastructure
+ *      vocabulary. #Xero yes, #Cloudflare no.
+ */
+const RULES_VERSION = 2;
+
 const sh = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
 
 function cachePath(key) {
@@ -194,26 +205,36 @@ function clean(tags) {
 async function topicsFor(key, source) {
   const { videoUrl, youtubeId } = source || {};
   const cached = readCache(key);
-  if (cached) return cached;
-  if (!videoUrl && !youtubeId) return null;
-  if (!process.env.GEMINI_API_KEY) return null;
+  // A cache hit is only a hit if it was produced under the CURRENT tag rule.
+  // Without this the 2026-08-21 rework would have changed nothing for any video
+  // already processed: every one of them would have kept its old tech tags for
+  // ever, and the cache is the whole point of not re-transcribing.
+  if (cached && cached.rules === RULES_VERSION) return cached;
 
-  // Captions first — free and complete. Whisper only when there are none.
-  let transcript = youtubeId ? transcribeYouTube(youtubeId) : null;
+  // The transcript does not go stale — only the naming does. Re-deriving from a
+  // cached transcript costs one model call instead of a download and a Whisper run.
+  let transcript = (cached && cached.transcript) || null;
   if (!transcript) {
-    if (!videoUrl || !process.env.OPENAI_API_KEY) return null;
-    transcript = await transcribe(videoUrl);
+    if (!videoUrl && !youtubeId) return null;
+    // Captions first — free and complete. Whisper only when there are none.
+    transcript = youtubeId ? transcribeYouTube(youtubeId) : null;
+    if (!transcript) {
+      if (!videoUrl || !process.env.OPENAI_API_KEY) return null;
+      transcript = await transcribe(videoUrl);
+    }
   }
+  if (!process.env.GEMINI_API_KEY) return cached || null;
   if (!transcript) throw new Error('transcript came back empty');
   const named = await callModel(transcript);
   const result = {
     tags: clean(named.tags),
     summary: String(named.summary || '').slice(0, 300),
     transcript,
+    rules: RULES_VERSION,
     at: new Date().toISOString(),
   };
   writeCache(key, result);
   return result;
 }
 
-module.exports = { topicsFor, clean, cleanVtt, BLOCKED, MAX_TAGS, callModel };
+module.exports = { topicsFor, clean, cleanVtt, BLOCKED, MAX_TAGS, callModel, RULES_VERSION };

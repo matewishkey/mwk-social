@@ -139,9 +139,10 @@ function flowFor(name) {
       by: 'none', note: name === 'twitter' ? 'read and reply both 403 on this plan' : 'no comments API at all' });
   }
 
-  steps.push({ step: 'the link', how: p.linkPlacement === 'caption'
-    ? 'in the post itself — there is nowhere else to put it'
-    : 'in the first comment, to keep it out of the body' });
+  steps.push(p.linkPlacement === 'caption'
+    ? { step: 'the link', how: 'appended to the caption, with its own tracked code',
+        note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' }
+    : { step: 'the link', how: 'in the first comment, to keep it out of the body' });
 
   if (p.reshare === 'api') steps.push({ step: 'reshare', how: 'quote-reshared from the personal account', by: 'api' });
   else if (p.reshare === 'manual') steps.push({ step: 'reshare', by: 'manual',

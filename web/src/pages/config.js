@@ -93,10 +93,7 @@ the body cuts reach by 40–50%, and the same habit keeps every other caption cl
 ${v.shortLinkHost ? `<p>Every comment carries a <b>${esc(v.shortLinkHost)}</b> link with its own code —
   one per platform per post — so a click tells you which channel and which video earned it. Only
   Facebook reports clicks natively; everywhere else this is the only way to know.</p>` : ''}
-<p>Tags: <code>${esc((v.always || []).join(' '))}</code> on every comment, then up to
-  ${esc(v.maxTopic ?? 4)} describing what the video is actually about, worked out from its transcript.
-  <b>Instagram's cap of 5 counts the caption and the comments together</b>, so there the two fixed
-  tags leave exactly three.</p>
+<p>Tags come from the video's own transcript, in words ordinary people use — the rule is below.</p>
 `)}
 
 ${card('How resharing works', `
@@ -130,18 +127,33 @@ ${flows.length ? `<div class="flowgrid">${flowCards(flows)}</div>` : `
     The box has not shipped the platform table yet. It goes with the hourly metrics run.
   </div></div>`}
 
-${voice ? card('What every post says', `
-  <div class="field"><label>Always-on tags</label>
-    <code>${esc((voice.always || []).join(' '))}</code></div>
-  <div class="field"><label>Call to action</label>
-    <code>${esc(voice.marker || '—')}</code>
-    <p class="note">${voice.variants ?? 0} comment variants in rotation,
-      roughly ${Math.round((voice.episodeMixRatio ?? 0) * 100)}% of them quoting a real guest wish from the feed.</p></div>
-  <div class="field"><label>Per-platform hashtag caps</label>
-    ${Object.entries(voice.caps || {}).map(([p, n]) =>
-      `<span class="pill p-plain">${esc(p)} ${n == null ? '—' : esc(n)}</span>`).join(' ')}
-    <p class="note">Instagram's 5 counts the caption and the comments together, so the
-      three always-on tags leave exactly two topic slots there.</p></div>
+${voice ? card('How the hashtags are chosen', `
+<p>Tags are for <b>ordinary people, never for technical people</b>. The test applied to every one:
+  <i>would someone who does not work in technology already know this word, and use it themselves?</i>
+  If they would have to look it up, it does not go out.</p>
+<p>Every comment opens with <code>${esc((voice.always || []).join(' '))}</code>, then up to
+  ${esc(voice.maxTopic ?? 4)} describing what the video is actually about — worked out from its own
+  transcript, not from the caption.</p>
+<div class="egs">
+  <div><b class="ok">Goes out</b>
+    <p>The job being done, the tool people already use by name, or the problem they would recognise
+       in themselves.</p>
+    <span class="tags">#Xero #Invoicing #Paperwork #Canva #Website #GettingFound #Passwords
+      #FindingCustomers #ComputerProblems</span></div>
+  <div><b class="bad">Never</b>
+    <p>The technology used to solve it, and anything naming the method rather than the subject —
+       every video here is made the same way, so those would ride on all of them and distinguish
+       nothing.</p>
+    <span class="tags">#Cloudflare #WebDevelopment #Observability #SEO #Debugging #API #AI
+      #Prompting #NoCode</span></div>
+</div>
+<p class="note">A product name is fine when ordinary people know the product — #Xero and #Canva yes,
+  #Cloudflare no. Fewer good tags beat more weak ones, and no tag at all is an acceptable answer:
+  the model is told to return nothing rather than reach for a technical word.
+  ${voice.blockedCount ? `A ${esc(voice.blockedCount)}-word blocklist is the hard stop underneath.` : ''}</p>
+<p class="note"><b>Instagram's cap of 5 counts the caption and the comments together</b>, so there the
+  two fixed tags leave exactly three. On X the cap is 1, so the pair is truncated rather than the
+  budget blown.</p>
 `) : ''}
 
 ${snap ? `<p class="note">Shipped ${esc(ago(snap.updatedAt))}.</p>` : ''}
@@ -153,6 +165,14 @@ ${snap ? `<p class="note">Shipped ${esc(ago(snap.updatedAt))}.</p>` : ''}
 ul.plain { list-style:none; margin:0 0 .7rem; padding:0; }
 ul.plain li { padding:.35rem 0 .35rem .9rem; border-left:2px solid var(--line); margin-bottom:.3rem; font-size:.88rem; }
 ul.plain b.ok { color:var(--ok); } ul.plain b.warn { color:var(--warn); } ul.plain b.bad { color:var(--bad); }
+.egs { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:.9rem; margin:.2rem 0 .8rem; }
+.egs > div { border:1px solid var(--line); border-radius:10px; padding:.7rem .8rem; }
+.egs b { font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
+.egs b.ok { color:var(--ok); } .egs b.bad { color:var(--bad); }
+.egs p { font-size:.83rem; color:var(--muted); margin:.3rem 0 .5rem; }
+.egs .tags { display:block; font-size:.82rem; line-height:1.9; word-spacing:.2rem; }
+.egs > div:first-child .tags { color:var(--ok); }
+.egs > div:last-child .tags { color:var(--bad); text-decoration:line-through; opacity:.75; }
 .flowgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(330px,1fr)); gap:1.1rem; }
 .flowgrid .card { margin:0; }
 .flow { list-style:none; margin:0; padding:0; counter-reset:s; }

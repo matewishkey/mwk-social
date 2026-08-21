@@ -108,6 +108,16 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   failure. There is no `--` escape that works. `scripts/lib/api.js` calls
   `GET/POST /v1/inbox/comments/{postId}` directly instead; verified against hyphenated YouTube
   IDs, LinkedIn `urn:li:share:…` and Facebook composite IDs.
+- **`RULES_VERSION` in `topic-tags.js` is what makes a tag-rule change take effect.** The cache is
+  keyed per post and `topicsFor` returned a hit unconditionally, so the 2026-08-21 rework would have
+  changed **nothing** for any already-processed video — every one would have kept its old tech tags
+  for ever. A cache hit now only counts if `cached.rules === RULES_VERSION`; a bump re-derives from
+  the **stored transcript**, which is one model call and no re-transcription. **Bump it when the
+  RULE changes, never when the code does.**
+- **Anything already drafted from a cached result is stale too.** The 16 YouTube proposals sitting
+  on the dashboard carried the old paraphrased blurb, the old `#MWK` trio and the old tech tags —
+  approving one would have published exactly what had just been fixed. Discarded and redrafted.
+  **After any voice or tag change, check what is already queued for approval.**
 - **Cache the transcript, and process promptly**: the media URLs Zernio returns are signed and
   expire, so a reel that isn't fetched soon after the sync sees it can never be transcribed.
   Results are cached per post in `~/.local/state/mwk-social/topics/` — transcription costs money

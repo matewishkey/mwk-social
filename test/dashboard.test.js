@@ -255,3 +255,38 @@ test('auto-fill announces itself as paused until the blurb is chosen', async () 
     snapshots: { voice: { body: { blurbChosen: false } } } });
   assert.match(html, /Auto-fill is paused/);
 });
+
+/*
+ * The hashtag rule is the thing most likely to drift back, because it is a
+ * judgement call the model makes on every post. The page states it, so the
+ * page should assert it.
+ */
+test('the workflows page states the hashtag rule, with both sides of it', async () => {
+  const { configPage } = await src('pages/config.js');
+  const { flows } = require('../scripts/lib/platforms.js');
+  const voice = require('../scripts/lib/voice.js');
+  const cfg = voice.config();
+  const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
+    platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() },
+    voice: { body: { always: cfg.tags.always, maxTopic: cfg.tags.maxTopic,
+      blockedCount: cfg.tags.blocked.length, shortLinkHost: 'mwkshow.com' } } } });
+
+  assert.match(html, /<b>ordinary people, never for technical people<\/b>/);
+  assert.match(html, /would someone who does not work in technology/i);
+  assert.match(html, /#Xero/, 'the good example he gave');
+  assert.match(html, /#Cloudflare/, 'the bad example he gave');
+  assert.match(html, /no tag at all is an acceptable answer/);
+});
+
+// TikTok and X were publishing into a dead end; the page must not imply
+// otherwise now that it is fixed.
+test('the workflows page shows the caption-link platforms carrying a tracked link', async () => {
+  const { configPage } = await src('pages/config.js');
+  const { flows } = require('../scripts/lib/platforms.js');
+  const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
+    platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() } } });
+
+  const tiktok = html.split('<h2>tiktok</h2>')[1].split('</section>')[0];
+  assert.match(tiktok, /appended to the caption, with its own tracked code/);
+  assert.ok(!/first-comment|watcher adds/.test(tiktok), 'nothing may suggest a comment reaches TikTok');
+});

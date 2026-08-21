@@ -98,6 +98,7 @@ function voiceSnapshot() {
     episodeVariants: (cfg.firstComment.episode || []).length,
     shortLinkHost: (cfg.shortLink && cfg.shortLink.enabled) ? cfg.shortLink.host : null,
     maxTopic: cfg.tags.maxTopic,
+    blockedCount: (cfg.tags.blocked || []).length,
     episodeMixRatio: cfg.firstComment.episodeMixRatio,
     // The blurb goes at the bottom of every YouTube description. While it is
     // still a paraphrase rather than his own words, auto-fill stays paused —
