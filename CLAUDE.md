@@ -222,6 +222,27 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (Meta limit) — post stories manually; insights stay readable live + cached after 24h expiry
   (`instagram:get-story-insights`). TikTok likewise better manual (sound library, no API cap).
 
+- **An item that has put ANYTHING live is never queued again** (2026-08-21, learned expensively).
+  `run-queue.js` publishes in groups — one request per distinct caption — and a throw in any group
+  used to unwind the whole run and put the item back as `queued`. X's media upload failed at 99%
+  after Facebook, LinkedIn, YouTube, Threads and TikTok had all published; the next tick reposted
+  everything, three times over before it was stopped by hand. Each group is now caught where it
+  happens, and `verdict()` returns `posted` with the failures named whenever anything is live.
+  **A retry after a partial publish is a human's decision, not the code's.**
+- **TikTok has NO delete API** — `posts:unpublish` returns "TikTok does not support post deletion
+  via API" (verified 2026-08-21 against two real duplicates). The playbook said `yes` for two
+  weeks. TikTok and Instagram are both manual-only for deletion; every other platform we post to
+  deletes cleanly through `posts:unpublish <id> --platform <p>`.
+- **X rejects a video that the other six accept.** `Twitter media upload failed: X (Twitter) media
+  processing failed: {"progress_percent":99,"state":"failed"}` on a 48s 1080x1920 H.264 clip that
+  Facebook, LinkedIn, YouTube, Threads and TikTok all took. It fails at 99%, so it costs the full
+  upload before it says no.
+- **Report every time to him in BRISBANE time** (mate's call, 2026-08-21, scoped to this project).
+  The box stays on `Etc/UTC` — that is correct and is not to be changed — so `systemctl`,
+  `journalctl` and every log stamp are UTC and quoting one verbatim is ten hours wrong to him.
+  Convert as you write: `TZ=Australia/Brisbane date '+%H:%M %Z'`. The dashboard already renders
+  Brisbane (`TZ_DISPLAY`), so a time read off the page needs nothing done to it. AEST is UTC+10
+  year round — Queensland has no DST, so the offset never moves.
 - **"Post it" means QUEUE it. Only publish when he says publish** (mate's call, 2026-08-21). He
   reviews on the dashboard and releases it himself; an item that went straight out took that
   choice away from him. So the default action for any content request is a `queue_item`, and

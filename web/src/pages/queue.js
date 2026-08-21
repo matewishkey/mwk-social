@@ -87,12 +87,30 @@ export async function queueAction(request, env, email) {
 export function queuePage({ email, tz, waiting, done, pace,
   page = 1, size = 25, total = 0, params = '' }) {
 
+  // What is actually going out, not the words "has media". A queued clip is the
+  // one thing he cannot check anywhere else before it publishes — it is not on a
+  // platform yet and it is not on his machine.
+  const preview = (i) => {
+    const src = (key, url) => (key ? `/media/${encodeURIComponent(key)}` : url);
+    const one = (key, url, label) => {
+      const href = src(key, url);
+      if (!href) return '';
+      const video = (i.media_type || '').startsWith('video') || /\.(mp4|mov|webm)(\?|$)/i.test(href);
+      return `<figure class="prev">${video
+        ? `<video src="${esc(href)}" controls preload="metadata" playsinline></video>`
+        : `<img src="${esc(href)}" alt="">`}<figcaption>${esc(label)}</figcaption></figure>`;
+    };
+    const shots = one(i.media_key, i.media_url, 'vertical')
+      + one(i.media_wide_key, i.media_wide_url, 'landscape');
+    return shots ? `<div class="prevs">${shots}</div>` : '';
+  };
+
   const row = (i, showActions) => {
     const [cls, label] = STATUS[i.status] || ['p-plain', i.status];
     const platforms = JSON.parse(i.platforms || '[]');
     return `<tr>
       <td><span class="pill ${cls}">${esc(label)}</span></td>
-      <td><div class="body">${esc(i.body)}</div>
+      <td>${preview(i)}<div class="body">${esc(i.body)}</div>
         <div class="faint meta">${platforms.length ? esc(platforms.join(' · ')) : 'wherever it fits'}
           ${i.media_key || i.media_url ? ' · has media' : ''}
           ${i.media_wide_key || i.media_wide_url ? ' + landscape cut' : ''}
@@ -196,6 +214,11 @@ ${pager({ path: '/queue', params, page, size, total, noun: 'posts' })}`) : ''}
 
 <style>
 .body { white-space:pre-wrap; max-width:60ch; font-size:.87rem; }
+.prevs { display:flex; gap:.5rem; margin:0 0 .5rem; flex-wrap:wrap; }
+.prev { margin:0; }
+.prev video, .prev img { width:120px; max-height:200px; border-radius:8px; background:#000;
+  border:1px solid var(--line); display:block; }
+.prev figcaption { font-size:.7rem; color:var(--faint); text-align:center; margin-top:.15rem; }
 .meta { font-size:.75rem; margin-top:.2rem; }
 input[type=file] { font-size:.85rem; padding:.45rem 0; }
 td form + form { margin-left:.25rem; }

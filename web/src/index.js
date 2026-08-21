@@ -72,6 +72,22 @@ async function dashboard(request, env, url) {
   }
   if (url.pathname === '/health') return Response.json({ ok: true, email });
 
+  // The same R2 object the box pulls with a bearer token, served to HIM behind
+  // Access instead. Without this the queue page could only say "has media" — it
+  // could not show him WHICH clip is about to go out, which is the one thing he
+  // would want to check before it does.
+  if (url.pathname.startsWith('/media/')) {
+    if (!env.MEDIA) return new Response('no media store', { status: 404 });
+    const object = await env.MEDIA.get(decodeURIComponent(url.pathname.slice('/media/'.length)));
+    if (!object) return new Response('not found', { status: 404 });
+    return new Response(object.body, {
+      headers: {
+        'content-type': object.httpMetadata?.contentType || 'application/octet-stream',
+        'cache-control': 'private, max-age=3600',
+      },
+    });
+  }
+
   const tz = env.TZ_DISPLAY || 'UTC';
 
   if (request.method === 'POST') {

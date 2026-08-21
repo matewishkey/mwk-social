@@ -259,6 +259,40 @@ test('every value bound to the queue insert has a column to land in', async () =
   assert.ok(seen.args.includes('["Invoicing","LatePayments"]'), 'topics must be bound, hash stripped');
 });
 
+// "has media" is not a preview. A queued clip is the only thing he cannot check
+// anywhere else before it publishes — not on a platform yet, not on his machine.
+test('a queued clip is shown, not just announced', async () => {
+  const { queuePage } = await src('pages/queue.js');
+  const html = queuePage({ email: 'm@x.com', tz: TZ, done: [], total: 0,
+    waiting: [{ id: 'q1', status: 'queued', body: 'a post', platforms: '[]',
+      media_key: 'queue/2026-08-21-clip.mp4', media_type: 'video/mp4',
+      first_comment: 1, priority: 0, created_at: new Date().toISOString() }],
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
+  assert.match(html, /<video src="\/media\/queue%2F2026-08-21-clip\.mp4"/);
+  assert.match(html, /controls/);
+});
+
+test('a landscape cut is shown beside the vertical one', async () => {
+  const { queuePage } = await src('pages/queue.js');
+  const html = queuePage({ email: 'm@x.com', tz: TZ, done: [], total: 0,
+    waiting: [{ id: 'q1', status: 'queued', body: 'a post', platforms: '[]',
+      media_key: 'queue/tall.mp4', media_wide_key: 'queue/wide.mp4', media_type: 'video/mp4',
+      first_comment: 1, priority: 0, created_at: new Date().toISOString() }],
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
+  assert.match(html, /queue%2Ftall\.mp4/);
+  assert.match(html, /queue%2Fwide\.mp4/);
+  assert.match(html, /landscape/);
+});
+
+test('no media means no empty preview box', async () => {
+  const { queuePage } = await src('pages/queue.js');
+  const html = queuePage({ email: 'm@x.com', tz: TZ, done: [], total: 0,
+    waiting: [{ id: 'q1', status: 'queued', body: 'text only', platforms: '[]',
+      first_comment: 1, priority: 0, created_at: new Date().toISOString() }],
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null } });
+  assert.ok(!html.includes('class="prevs"'), 'no preview container without media');
+});
+
 test('queued text cannot inject markup either', async () => {
   const { queuePage } = await src('pages/queue.js');
   const html = queuePage({ email: 'm@x.com', tz: TZ,

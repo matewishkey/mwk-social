@@ -64,6 +64,8 @@ in the wrong place.
 | A caption that already has the link gets no comment | Otherwise the same URL appears twice under one post |
 | Wait for the transcript rather than posting untagged | The comment is one-shot; it can't be edited later |
 | No `--flag` on `post-everywhere.sh` | A stray `--dry-run` was read as the video argument and published for real |
+| An item that has put **anything** live is never queued again | X's media upload failed at 99%; the exception unwound past four platforms that had already published, the item went back to `queued`, and the next tick posted the lot again — three copies on TikTok, Facebook and LinkedIn before it was stopped by hand |
+| Each publish group is caught where it happens | One group throwing used to abandon the groups behind it *and* discard the record of the ones in front |
 
 ## What each platform allows
 
@@ -74,7 +76,7 @@ in the wrong place.
 | **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, quote-reshare from personal |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
-| **TikTok** | **none at all** | yes | Link goes in the caption. Consent flags required per post. Its own daily cap |
+| **TikTok** | **none at all** | **no** | Link goes in the caption. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | 403 on this plan | yes | Link goes in the post. Premium required or link posts get zero engagement |
 
 ### The two that cost money or reach if you get them wrong

@@ -105,6 +105,37 @@ function accountsFor(want) {
     .map((a) => ({ id: a._id || a.id, platform: a.platform }));
 }
 
+/**
+ * What the run concluded, from what each platform actually did.
+ *
+ * THE RULE THIS COST US (2026-08-21): an item that has put something live is
+ * never queued again. X's media upload failed, the exception unwound past four
+ * platforms that had already published, the item went back to 'queued', and the
+ * next tick posted the whole thing again — three times over on TikTok, Facebook
+ * and LinkedIn before it was stopped by hand. Two of those TikToks could not be
+ * deleted at all, because TikTok has no delete API.
+ *
+ * So a partial failure is 'posted' with the failures recorded, never a retry.
+ * Re-queueing is a decision for a human looking at what is already up.
+ */
+function verdict(outcome) {
+  const anyLive = outcome.some((o) => o.status === 'published' || o.url);
+  const failed = outcome.filter((o) => o.status !== 'published' && !o.url);
+  if (!anyLive) {
+    return { anyLive, result: { status: 'failed', result: outcome, note: 'no platform reported a live post' } };
+  }
+  return {
+    anyLive,
+    result: {
+      status: 'posted',
+      result: outcome,
+      note: failed.length
+        ? `live, but ${failed.map((f) => f.platform).join(', ')} failed — re-queue by hand if you want them`
+        : null,
+    },
+  };
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const dryRun = argv.includes('--dry-run');
@@ -125,6 +156,10 @@ async function main() {
 
   // From here on the item is ours. Anything that goes wrong must either put it
   // back or mark it failed, or it sits 'claimed' forever with nobody looking.
+  //
+  // Outside the try on purpose: the catch has to know whether anything reached a
+  // platform before it decides between putting the item back and letting it lie.
+  let anyLive = false;
   try {
     /*
      * One video per post is a hard limit on every platform, so a vertical cut
@@ -187,35 +222,43 @@ async function main() {
       return;
     }
 
+    // One group failing must not abandon the groups behind it, and — far worse —
+    // must not unwind the ones in front of it. Each is caught where it happens
+    // so a failure is a recorded outcome rather than an exception that reaches
+    // the requeue below.
     const outcome = [];
     for (const [file, accts] of groups) {
-      const result = await publish({
-        text: item.body,
-        // So each queued post gets its own short codes rather than sharing a
-        // generic per-platform one.
-        postKey: `queue:${item.id}`,
-        accounts: accts.map((a) => a.id),
-        all: false,
-        media: file ? [file] : [],
-        title: null,
-        firstComment: item.firstComment,
-        comment: item.commentText || null,
-        topics: item.topics || [],
-        commentVariant: null,
-        tiktokPrivacy: 'PUBLIC_TO_EVERYONE',
-        draft: false, schedule: null, wait: true, dryRun: false,
-      });
-      for (const p of result.platforms || []) {
-        outcome.push({ platform: p.platform, status: p.status,
-          url: p.platformPostUrl || null, error: p.errorMessage || null });
+      try {
+        const result = await publish({
+          text: item.body,
+          // So each queued post gets its own short codes rather than sharing a
+          // generic per-platform one.
+          postKey: `queue:${item.id}`,
+          accounts: accts.map((a) => a.id),
+          all: false,
+          media: file ? [file] : [],
+          title: null,
+          firstComment: item.firstComment,
+          comment: item.commentText || null,
+          topics: item.topics || [],
+          commentVariant: null,
+          tiktokPrivacy: 'PUBLIC_TO_EVERYONE',
+          draft: false, schedule: null, wait: true, dryRun: false,
+        });
+        for (const p of result.platforms || []) {
+          outcome.push({ platform: p.platform, status: p.status,
+            url: p.platformPostUrl || null, error: p.errorMessage || null });
+        }
+      } catch (err) {
+        console.error(`${accts.map((a) => a.platform).join('+')} failed: ${err.message}`);
+        for (const a of accts) {
+          outcome.push({ platform: a.platform, status: 'failed', url: null, error: err.message });
+        }
       }
     }
-    const anyLive = outcome.some((o) => o.status === 'published' || o.url);
-
-    await call('/queue/result', {
-      id: item.id, status: anyLive ? 'posted' : 'failed', result: outcome,
-      note: anyLive ? null : 'no platform reported a live post',
-    }, api);
+    const call_ = verdict(outcome);
+    anyLive = call_.anyLive;
+    await call('/queue/result', { id: item.id, ...call_.result }, api);
 
     // The event is what makes a queued post count against the shared daily cap.
     events.emit('queue.posted', {
@@ -259,9 +302,12 @@ async function main() {
     }
     console.log(anyLive ? 'posted' : 'nothing went live — marked failed');
   } catch (err) {
-    // Put it back rather than burn it: a bad media URL or a platform having a
-    // moment should not cost the post. A genuine failure shows on the page.
-    await call('/queue/result', { id: item.id, status: 'queued', note: err.message.slice(0, 200) }, api)
+    // Put it back rather than burn it — but ONLY if nothing went live. Once a
+    // single platform has it, re-queueing means posting it twice, and on TikTok
+    // and Instagram the second copy cannot be deleted afterwards.
+    await call('/queue/result', anyLive
+      ? { id: item.id, status: 'posted', note: `stopped after publishing: ${err.message}`.slice(0, 200) }
+      : { id: item.id, status: 'queued', note: err.message.slice(0, 200) }, api)
       .catch(() => {});
     events.emit('queue.failed', { message: err.message, level: 'error',
       dedupeKey: `queue.failed|${item.id}|${Date.now()}`, data: { queueId: item.id } });
@@ -269,4 +315,8 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error(err.message); process.exit(1); });
+if (require.main === module) {
+  main().catch((err) => { console.error(err.message); process.exit(1); });
+}
+
+module.exports = { verdict };
