@@ -68,6 +68,12 @@ at once, straight from a shell — these are the actual live posts:
 - `scripts/run-queue.js` — takes one item off the dashboard queue and posts it,
   if now is a good moment. Claims before publishing, and puts an item back
   rather than burning it when something goes wrong.
+- `scripts/queue-add.js` — puts something in that queue from the box, where the
+  dashboard's own form is how he does it. His words go into a SQL literal, so
+  the escaping is the part that matters and the part that is tested.
+- `.claude/skills/` — the procedures an agent working here follows: `mwk-status`
+  for where everything stands, `mwk-post` for turning his words into a queued
+  post. They load when the work calls for them rather than every session.
 - `scripts/lib/shortlink.js` — mints the `mwkshow.com/<code>` link that every
   call to action carries, one code per platform and post, so a click says which
   channel and which clip earned it. Every link we post gets one, not just the

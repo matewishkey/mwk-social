@@ -322,6 +322,19 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   IPv6 route, so plain `curl` fails to connect in ~14 ms and `fetch` times out. Use `curl -4` when
   testing by hand; `ship-events.js` sets `net.setDefaultAutoSelectFamilyAttemptTimeout(1000)`.
 
+## Skills
+
+Procedures live in `.claude/skills/`, not in this file — a skill loads when the work calls for it,
+where everything here loads every session whether it is relevant or not.
+
+- **`mwk-status`** — where the pipeline stands: unpushed work, the five timers, the queue and the
+  pace, account health, what is waiting on mate. The sweep every restart starts with.
+- **`mwk-post`** — his words or a clip to a queued post: the voice, the hashtag rule, the media
+  checks, `scripts/queue-add.js`, and what will actually happen once it is in.
+
+**When a rule here turns out to be one a skill enforces, move it into the skill and leave this file
+pointing at it.** Two copies of a rule is how one of them drifts.
+
 ## Cross-repo
 
 This repo is PUBLIC, so only the public connections are named here:
