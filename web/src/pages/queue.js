@@ -52,14 +52,14 @@ export async function queueAction(request, env, email) {
   // An uploaded file goes to R2 and the box pulls it back through /media/<key>
   // when it claims the item. Pasting a URL is still supported and is the cheap
   // path for something already hosted.
-  let mediaKey = null; let mediaType = null;
-  const file = form.get('media');
-  if (file && typeof file === 'object' && file.size > 0) {
-    if (!env.MEDIA) return back;
-    mediaKey = `queue/${ulid()}-${file.name.replace(/[^\w.-]+/g, '_')}`.slice(0, 180);
-    mediaType = file.type || null;
-    await env.MEDIA.put(mediaKey, file.stream(), { httpMetadata: { contentType: mediaType || undefined } });
-  }
+  const put = async (f) => {
+    if (!f || typeof f !== 'object' || !f.size || !env.MEDIA) return [null, null];
+    const key = `queue/${ulid()}-${f.name.replace(/[^\w.-]+/g, '_')}`.slice(0, 180);
+    await env.MEDIA.put(key, f.stream(), { httpMetadata: { contentType: f.type || undefined } });
+    return [key, f.type || null];
+  };
+  const [mediaKey, mediaType] = await put(form.get('media'));
+  const [mediaWideKey] = await put(form.get('mediaWide'));
 
   await env.DB.prepare(
     `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
@@ -70,7 +70,7 @@ export async function queueAction(request, env, email) {
     String(form.get('reshareText') || '').trim() || null,
     String(form.get('commentText') || '').trim() || null,
     JSON.stringify(String(form.get('topics') || '').split(',')
-      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean))).run();
+      .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)), mediaWideKey).run();
   return back;
 }
 
@@ -86,6 +86,7 @@ export function queuePage({ email, tz, items, pace }) {
       <td><div class="body">${esc(i.body)}</div>
         <div class="faint meta">${platforms.length ? esc(platforms.join(' · ')) : 'wherever it fits'}
           ${i.media_key || i.media_url ? ' · has media' : ''}
+          ${i.media_wide_key || i.media_wide_url ? ' + landscape cut' : ''}
           ${i.first_comment ? ' · first comment' : ' · no first comment'}
           ${i.reshare_text ? ' · reshared from your personal account' : ''}
           ${i.comment_text ? ' · custom first comment' : ''}
@@ -127,6 +128,13 @@ ${card('Queue something', `
       <input type="file" id="qmedia" name="media" accept="video/*,image/*"></div>
     <div class="field"><label for="qurl">…or paste a media URL</label>
       <input type="url" id="qurl" name="mediaUrl" placeholder="https://…"></div>
+  </div>
+  <div class="field">
+    <label for="qmediawide">Landscape cut of the same clip (optional)</label>
+    <input type="file" id="qmediawide" name="mediaWide" accept="video/*">
+    <p class="note">Every platform allows only one video per post, so the two cuts cannot ride
+      together. Give both and the vertical one goes to Instagram, TikTok and Threads while this one
+      goes to Facebook, YouTube, LinkedIn and X — as separate posts.</p>
   </div>
   <div class="field">
     <label>Where</label>

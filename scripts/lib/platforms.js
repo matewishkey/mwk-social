@@ -10,6 +10,7 @@
 
 const PLATFORMS = {
   instagram: {
+    landscapeOk: false,           // aspectRange rejects it outright — reels are vertical
     commentsApi: true,             // inbox:* works; the watcher can reach it
     reshare: 'none',
     editable: false,
@@ -27,6 +28,7 @@ const PLATFORMS = {
     aspectRange: [0.5, 1.0],
   },
   threads: {
+    landscapeOk: false,           // an IG-shaped surface; vertical is what performs
     commentsApi: true,             // readable and repliable, same Meta auth as IG
     reshare: 'none',
     editable: false,
@@ -41,6 +43,7 @@ const PLATFORMS = {
     videoMaxSec: 300,
   },
   tiktok: {
+    landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
     editable: false,
@@ -57,6 +60,7 @@ const PLATFORMS = {
     videoMaxSec: 3600,        // creator-info's live value; read it per account rather than trusting this
   },
   twitter: {
+    landscapeOk: true,
     commentsApi: false,            // read AND reply 403 on this plan
     reshare: 'none',
     editable: false,
@@ -72,6 +76,7 @@ const PLATFORMS = {
     estCostCents: 20,              // content_create_with_url, measured
   },
   facebook: {
+    landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
     commentsApi: true,
     reshare: 'manual',             // personal timelines are impossible via any API (Meta rule)
     editable: true,
@@ -85,6 +90,7 @@ const PLATFORMS = {
     deletable: true,
   },
   youtube: {
+    landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
     editable: true,                // posts:update-metadata — title, description, tags, thumbnail
@@ -98,6 +104,7 @@ const PLATFORMS = {
     deletable: true,
   },
   linkedin: {
+    landscapeOk: true,
     commentsApi: true,
     reshare: 'api',                // platformSpecificData.reshareUrl — company post, personal quote
     editable: false,

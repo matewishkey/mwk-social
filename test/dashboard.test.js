@@ -290,3 +290,26 @@ test('the workflows page shows the caption-link platforms carrying a tracked lin
   assert.match(tiktok, /appended to the caption, with its own tracked code/);
   assert.ok(!/first-comment|watcher adds/.test(tiktok), 'nothing may suggest a comment reaches TikTok');
 });
+
+/*
+ * One video per post is a hard limit on every platform — Facebook's docs are
+ * explicit ("a single video per post", and images and videos cannot be mixed).
+ * So a vertical cut and a landscape cut can never ride together, and which
+ * platform gets which is a property of the platform, not a guess per post.
+ */
+test('the vertical surfaces are exactly the ones that reject a landscape cut', async () => {
+  const { PLATFORMS, get } = require('../scripts/lib/platforms.js');
+  const vertical = Object.keys(PLATFORMS).filter((p) => !get(p).landscapeOk);
+  assert.deepStrictEqual(vertical.sort(), ['instagram', 'threads', 'tiktok']);
+
+  // Instagram is the one the media check enforces independently, so the two
+  // statements of the same fact must agree.
+  const media = require('../scripts/lib/media.js');
+  const landscape = { durationSec: 20, aspect: 1.7778, hasAudio: true, codec: 'h264' };
+  assert.ok(media.check('instagram', landscape).length,
+    'instagram must reject a landscape clip on aspect alone');
+  for (const p of ['facebook', 'youtube', 'linkedin', 'twitter']) {
+    assert.deepStrictEqual(media.check(p, landscape), [],
+      `${p} is marked landscapeOk so it must actually accept one`);
+  }
+});

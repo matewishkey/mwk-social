@@ -143,6 +143,10 @@ async function claim(body, env) {
     ).bind(now, row.id).run();
     if (!upd.meta.changes) continue;              // someone else got it first
 
+    let mediaWideUrl = row.media_wide_url;
+    if (row.media_wide_key && env.MEDIA) {
+      mediaWideUrl = `https://${env.INGEST_HOST}/media/${encodeURIComponent(row.media_wide_key)}`;
+    }
     let mediaUrl = row.media_url;
     if (row.media_key && env.MEDIA) {
       // A short-lived readable URL is not a thing R2 bindings hand out, so the
@@ -157,6 +161,7 @@ async function claim(body, env) {
         reshareText: row.reshare_text || null,
         commentText: row.comment_text || null,
         topics: JSON.parse(row.topics || '[]'),
+        mediaWideUrl,
         createdAt: row.created_at, createdBy: row.created_by,
       },
     });

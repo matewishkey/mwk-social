@@ -146,18 +146,34 @@ function resolveMedia(items) {
 // stable for a given post, different between posts. Topic tags cannot be derived
 // here — the clip is a local file, not a published post with a media URL — so
 // they come in on --topics, named by whoever watched the video.
-function commentFor(platform, text, opts) {
+/*
+ * The first comment for ONE platform, with its own tracked links.
+ *
+ * Per platform, not per post: the codes are what say which channel a click came
+ * from, and composing this once for the whole fan-out gave Facebook, Instagram,
+ * LinkedIn, YouTube and Threads a single shared code — so a click told us which
+ * link earned it but not which channel.
+ */
+async function commentFor(platform, text, opts) {
+  const postKey = opts.postKey || `new:${voice.hash(text)}`;
+
   if (opts.comment) {
-    // The tag line is appended here rather than baked into the custom text, so
-    // each platform still gets tags under its own cap. Without this a custom
-    // comment went out with no hashtags at all.
+    // Every url in a custom comment gets its own code, on this platform.
+    const body = await shortlink.trackLinks(opts.comment, { platform, postKey });
+    // Tags are appended rather than baked into the custom text, so each platform
+    // still gets them under its own cap.
     const tags = voice.tagLine(platform, opts.topics || []);
-    return tags ? `${opts.comment}\n\n${tags}` : opts.comment;
+    return tags ? `${body}\n\n${tags}` : body;
   }
-  return voice.firstComment(`new:${voice.hash(text)}`, {
+
+  // The rotating comment used the plain sign-up url here — only the watcher
+  // minted one — so a pipeline post's CTA was the one link we could not measure.
+  const showUrl = await shortlink.mint({ platform, postKey, label: opts.title || null });
+  return voice.firstComment(postKey, {
     platform,
     topicTags: opts.topics,
     variantIndex: opts.commentVariant,
+    showUrl,
   }).text;
 }
 
@@ -195,9 +211,10 @@ async function captionFor(platform, opts) {
   // A custom comment cannot be posted here, so its links ride in the caption
   // instead — otherwise the one thing he wanted people to click is missing on
   // exactly the two platforms that cannot be commented on.
+  const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
   const body = opts.comment
-    ? await shortlink.trackLinks(opts.comment, { platform, postKey: opts.postKey || null })
-    : await shortlink.mint({ platform, postKey: opts.postKey || null, label: opts.title || null })
+    ? await shortlink.trackLinks(opts.comment, { platform, postKey })
+    : await shortlink.mint({ platform, postKey, label: opts.title || null })
       || voice.config().links.show;
   const tags = voice.tagLine(platform, opts.topics || []);
   return [opts.text, body, tags].filter(Boolean).join('\n\n');
@@ -205,11 +222,6 @@ async function captionFor(platform, opts) {
 
 async function publish(opts) {
   const accounts = resolveAccounts(opts);
-  // Every url we are about to publish gets its own code, not just the CTA.
-  if (opts.comment) {
-    opts = { ...opts, comment: await shortlink.trackLinks(opts.comment,
-      { postKey: opts.postKey || null }) };
-  }
   const wantComment = opts.firstComment;
   const media = resolveMedia(opts.media);
 
@@ -233,13 +245,14 @@ async function publish(opts) {
 
   if (commentGroup.length) {
     const b = { ...base(), content: opts.text };
-    b.platforms = commentGroup.map((a) => {
+    b.platforms = [];
+    for (const a of commentGroup) {
       const entry = { platform: a.platform, accountId: a.id };
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
-        entry.platformSpecificData = { firstComment: commentFor(a.platform, opts.text, opts) };
+        entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
-      return entry;
-    });
+      b.platforms.push(entry);
+    }
     bodies.push(b);
   }
 

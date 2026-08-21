@@ -132,8 +132,9 @@ async function stats(env, tz, snapshots, email) {
         JOIN (SELECT account_id, MAX(day) d FROM follower_point GROUP BY account_id) m
           ON m.account_id = f.account_id AND m.d = f.day`).all(),
     env.DB.prepare(
+      // bot = 0 only: a link-preview fetch is not a click.
       `SELECT l.platform, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? GROUP BY l.platform ORDER BY n DESC`).bind(from).all(),
+        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.platform ORDER BY n DESC`).bind(from).all(),
   ]);
   return statsPage({ email, tz, snapshots, days: STATS_DAYS,
     daily: daily.results || [], followers: followers.results || [], clicks: clicks.results || [] });

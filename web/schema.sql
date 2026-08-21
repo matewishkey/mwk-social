@@ -157,3 +157,20 @@ ALTER TABLE queue_item ADD COLUMN comment_text TEXT;
 -- Topic tags for one queued post, as a JSON array. Everyday words only — see
 -- the rule in CLAUDE.md. Empty means no topic tags, only the always-on pair.
 ALTER TABLE queue_item ADD COLUMN topics TEXT;
+
+-- A link preview fetch is not a click. Platforms fetch a url to build the card,
+-- and every fetch hits the redirect — the first live post showed 18 "clicks" on
+-- one link within three minutes. The User-Agent is read to DECIDE, and still
+-- never stored: the flag is all we keep.
+-- 0 = looked human, 1 = looked automated, 2 = logged before this column existed
+-- and therefore unknown. Only 0 counts as a click: calling an unclassified hit
+-- human would be a guess, and the User-Agent that would settle it was never
+-- stored — correctly.
+ALTER TABLE click ADD COLUMN bot INTEGER NOT NULL DEFAULT 0;
+
+-- An optional landscape cut of the same clip. One video per post is a hard
+-- limit on every platform, so the two versions can never ride together — the
+-- box publishes the vertical one to the vertical surfaces and this one to the
+-- rest, as separate posts.
+ALTER TABLE queue_item ADD COLUMN media_wide_key TEXT;
+ALTER TABLE queue_item ADD COLUMN media_wide_url TEXT;

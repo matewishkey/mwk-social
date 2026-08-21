@@ -66,10 +66,17 @@ async function call(path_, body, { origin, token }) {
  * resolve AAAA-first, and undici's 250 ms Happy Eyeballs window expires before
  * it falls back — which looks exactly like an expired URL.
  */
-function fetchMedia(url, token) {
+const EXT = { 'video/mp4': '.mp4', 'video/quicktime': '.mov', 'video/webm': '.webm',
+  'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp', 'image/gif': '.gif' };
+
+function fetchMedia(url, token, mediaType) {
   const { execFileSync } = require('child_process');
   fs.mkdirSync(cacheDir(), { recursive: true });
-  const name = `queue-${Buffer.from(url).toString('base64url').slice(-24)}`;
+  // The extension is load-bearing: `zernio media:upload` infers the content
+  // type from it and rejects a file without one outright. Same shape of trap as
+  // yt-dlp appending its own — the file downloads fine and the upload fails.
+  const ext = EXT[mediaType] || path.extname(new URL(url).pathname) || '.mp4';
+  const name = `queue-${Buffer.from(url).toString('base64url').slice(-24)}${ext}`;
   const out = path.join(cacheDir(), name);
   if (fs.existsSync(out) && fs.statSync(out).size > 0) return out;
   execFileSync('curl', ['-4', '-sSfL', '--max-time', '600',
@@ -119,27 +126,40 @@ async function main() {
   // From here on the item is ours. Anything that goes wrong must either put it
   // back or mark it failed, or it sits 'claimed' forever with nobody looking.
   try {
-    let media = [];
-    let clip = null;
-    if (item.mediaUrl) {
-      const file = fetchMedia(item.mediaUrl, api.token);
-      media = [file];
-      // ffprobe it once. Only videos have an aspect or a duration to check, so
-      // an image simply skips this rather than failing on a missing stream.
-      try { clip = mediaLib.probe(file); } catch { clip = null; }
-    }
+    /*
+     * One video per post is a hard limit on every platform, so a vertical cut
+     * and a landscape cut can never ride together. When both are given the run
+     * splits: vertical surfaces get the reel, the rest get the wide one, as
+     * separate posts. Given only one, everything gets that one.
+     */
+    const load = (url, type) => {
+      if (!url) return null;
+      const file = fetchMedia(url, api.token, type);
+      let probe = null;
+      try { probe = mediaLib.probe(file); } catch { probe = null; }
+      return { file, probe };
+    };
+    const tall = load(item.mediaUrl, item.mediaType);
+    const wide = load(item.mediaWideUrl, item.mediaType);
 
     const want = item.platforms || [];
-    // Instagram will not take a post without media, and a text-only item aimed
-    // at "wherever it fits" should quietly skip it rather than fail the lot.
+    // Which cut a platform should get. With only one available, everyone gets it.
+    const cutFor = (platform) => {
+      if (!wide) return tall;
+      if (!tall) return wide;
+      return platforms.get(platform).landscapeOk ? wide : tall;
+    };
+
     const usable = accountsFor(want).filter((a) => {
-      if (a.platform === 'instagram' && !media.length) return false;
-      if (clip) {
-        // Check the clip against each platform before Zernio does: a duration
-        // or aspect a platform will not take costs the post otherwise, and the
-        // item is already claimed by then. check() returns the reasons, empty
-        // when it is fine.
-        const problems = mediaLib.check(a.platform, clip);
+      const cut = cutFor(a.platform);
+      // Instagram will not take a post without media, and a text-only item aimed
+      // at "wherever it fits" should quietly skip it rather than fail the lot.
+      if (a.platform === 'instagram' && !cut) return false;
+      if (cut && cut.probe) {
+        // Check before Zernio does: a duration or aspect a platform will not
+        // take costs the post otherwise, and the item is already claimed by
+        // then. check() returns the reasons, empty when it is fine.
+        const problems = mediaLib.check(a.platform, cut.probe);
         if (problems.length) {
           console.log(`skip  ${a.platform} — ${problems.join('; ')}`);
           return false;
@@ -149,33 +169,47 @@ async function main() {
     });
     if (!usable.length) throw new Error('no account can take this post');
 
+    // Group by the cut each platform gets: one publish per distinct video.
+    const groups = new Map();
+    for (const a of usable) {
+      const cut = cutFor(a.platform);
+      const key = cut ? cut.file : '';
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(a);
+    }
+
     if (dryRun) {
-      console.log(`would post to ${usable.map((a) => a.platform).join(', ')}${media.length ? ' with media' : ''}`);
+      for (const [file, accts] of groups) {
+        console.log(`would post to ${accts.map((a) => a.platform).join(', ')}`
+          + (file ? ` with ${path.basename(file)}` : ' with no media'));
+      }
       await call('/queue/result', { id: item.id, status: 'queued', note: 'dry run' }, api);
       return;
     }
 
-    const result = await publish({
-      text: item.body,
-      // So each queued post gets its own short code rather than sharing a
-      // generic per-platform one.
-      postKey: `queue:${item.id}`,
-      accounts: usable.map((a) => a.id),
-      all: false,
-      media,
-      title: null,
-      firstComment: item.firstComment,
-      comment: item.commentText || null,
-      topics: item.topics || [],
-      commentVariant: null,
-      tiktokPrivacy: 'PUBLIC_TO_EVERYONE',
-      draft: false, schedule: null, wait: true, dryRun: false,
-    });
-
-    const outcome = (result.platforms || []).map((p) => ({
-      platform: p.platform, status: p.status, url: p.platformPostUrl || null,
-      error: p.errorMessage || null,
-    }));
+    const outcome = [];
+    for (const [file, accts] of groups) {
+      const result = await publish({
+        text: item.body,
+        // So each queued post gets its own short codes rather than sharing a
+        // generic per-platform one.
+        postKey: `queue:${item.id}`,
+        accounts: accts.map((a) => a.id),
+        all: false,
+        media: file ? [file] : [],
+        title: null,
+        firstComment: item.firstComment,
+        comment: item.commentText || null,
+        topics: item.topics || [],
+        commentVariant: null,
+        tiktokPrivacy: 'PUBLIC_TO_EVERYONE',
+        draft: false, schedule: null, wait: true, dryRun: false,
+      });
+      for (const p of result.platforms || []) {
+        outcome.push({ platform: p.platform, status: p.status,
+          url: p.platformPostUrl || null, error: p.errorMessage || null });
+      }
+    }
     const anyLive = outcome.some((o) => o.status === 'published' || o.url);
 
     await call('/queue/result', {
