@@ -63,7 +63,12 @@ const PLATFORMS = {
   },
   twitter: {
     landscapeOk: true,
-    commentsApi: false,            // read AND reply 403 on this plan
+    // Read and reply both 403'd until 2026-08-22, and we had that written down
+    // as a limit of the plan. It was not: `xCapabilities.inbox` is a per-account
+    // opt-in that defaults to OFF because it meters X API cost. Switched on, the
+    // comment endpoints answer normally. The CTA still goes out as a thread
+    // reply at publish time rather than through the watcher — see linkPlacement.
+    commentsApi: true,
     reshare: 'none',
     editable: false,
     metrics: { views:'no', reach:'no', impressions:'yes', likes:'no', comments:'no',
@@ -161,7 +166,7 @@ function flowFor(name) {
     steps.push({ step: 'first comment', how: 'the hourly watcher posts it', by: 'watcher' });
   } else {
     steps.push({ step: 'first comment', how: 'impossible — no comments API we can use',
-      by: 'none', note: name === 'twitter' ? 'read and reply both 403 on this plan' : 'no comments API at all' });
+      by: 'none', note: 'no comments API at all' });
   }
 
   if (p.linkPlacement === 'caption') {
@@ -183,4 +188,22 @@ function flowFor(name) {
 
 const flows = () => Object.keys(PLATFORMS).map(flowFor);
 
-module.exports = { PLATFORMS, get, flowFor, flows };
+/*
+ * Does the hourly first-comment watcher cover this platform?
+ *
+ * Two conditions, and BOTH matter. A comments API is necessary but not
+ * sufficient: X has one now, and the watcher still must not touch it, because
+ * X's CTA already goes out as a thread reply at publish time and a second one
+ * would be the same link twice under one post. Stated once, here, because
+ * post.js decides what to print from it and first-comment.js's own list is
+ * pinned against it in a test — the promise "the watcher adds it" has been
+ * printed wrongly twice already.
+ */
+const commentWatched = (name) => {
+  try {
+    const p = get(name);
+    return p.commentsApi === true && p.linkPlacement === 'comment';
+  } catch { return false; }
+};
+
+module.exports = { PLATFORMS, get, flowFor, flows, commentWatched };

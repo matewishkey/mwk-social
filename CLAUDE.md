@@ -177,14 +177,32 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   its own short code — they need different captions anyway, since X's tag cap is 1 against TikTok's
   none. His words stay first and untouched; link and tags are appended. X was in this group until
   2026-08-21 and now takes its link in a thread reply instead — see below.
-- **Do not claim the watcher will "pick up" TikTok or X.** It cannot — no comments API — and
-  post.js used to print exactly that. Only platforms with `commentsApi: true` are ever reached.
-  It has now been printed **twice**: the `later` filter keyed off `!linkInCaption`, so the promise
-  came back the moment X's link moved into a thread reply. It reads `commentsApi` directly now,
-  and a test pins `first-comment.js`'s hand-written `ALL_PLATFORMS` to exactly that set.
+- **`platforms.commentWatched(name)` is the ONE definition of "the hourly watcher covers this",
+  and it is two conditions, not one:** a comments API *and* `linkPlacement === 'comment'`. X has
+  a comments API now and is still not watched, because its CTA ships with the post as a thread
+  reply. post.js has printed "the watcher adds it" about a platform it cannot reach **twice** —
+  first keyed off `!linkInCaption`, then off `commentsApi` alone — so it is now derived from one
+  function, and a test pins `first-comment.js`'s hand-written `ALL_PLATFORMS` to exactly that set.
+  **Verified with a positive control both times:** adding `twitter` to that list fails the suite.
+- **X's 403s were an ACCOUNT TOGGLE, not the plan — everything we wrote off as impossible on X
+  was one PUT away** (2026-08-22, and this is the correction that matters most on this page).
+  `PUT /v1/accounts/{id}` takes `xCapabilities: { analytics, inbox }`, **both default `false`**
+  because each meters X API cost. Off, they 403 with `X_ANALYTICS_NOT_ENABLED` /
+  `X_INBOX_NOT_ENABLED` — which reads exactly like a plan limit and is not one. Both are on now.
+  What they unlock:
+  - **`GET /v1/twitter/search`** (needs `analytics`) — public tweets from the last 7 days, X's
+    own search operators passed through (`from:`, `-is:retweet`, `lang:en`, `OR`). Its own docs
+    say "e.g. to discover tweets to reply to". 300 req / 15 min per account. **Verified live.**
+  - **`GET/POST /v1/inbox/comments/{id}`** on X (needs `inbox`) — returned `success` with an
+    empty list on a real published tweet the moment the toggle flipped. **Verified live.**
+  - **`POST /v1/twitter/follow|unfollow|retweet|bookmark`** (`twitterengagement:*` in the CLI)
+    were never gated. Follow takes `targetUserId`, the NUMERIC X id, not the handle.
+    **X rate-limits follows hard**: 37 went through back to back, then a solid wall of 429s.
+    Retry with a long backoff, do not hammer it.
 - **X: the link goes in a THREAD REPLY, not the post and not a comment** (changed 2026-08-21).
-  Its comment endpoints 403 on this plan (read *and* reply, verified 2026-08-19), so the
-  first-comment mechanic is impossible there — but `platformSpecificData.threadItems` publishes a
+  A comments API exists again, but the CTA still does NOT go through the watcher: it is published
+  with the post as `platformSpecificData.threadItems`, and a watcher comment on top would be the
+  same link twice under one tweet. `platformSpecificData.threadItems` publishes a
   root tweet plus its replies in one call, which gets the link out of the tweet that has to
   travel. `linkPlacement: 'reply'` is the third value that field takes; only X uses it.
   **threadItems REPLACES the top-level `content` for that platform** — the caption is published as
@@ -199,7 +217,10 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   by hand from the app, both of which got 1 impression.
 - **A URL tweet costs 20c FLAT — the fee replaces the base charge, it does not add to it.**
   Measured off `usage:stats`, not inferred: `content_create: 2` + `content_create_with_url: 5`
-  came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly. So a clean root plus a link
+  came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly. Re-measured after 37 follows
+  and one search: `+ posts_read: 11 + user_interaction_create: 37` → `164`, and
+  2×1.5 + 11×0.5 + 5×20 + 37×1.5 = 164 exactly. **So a follow is 1.5c and a tweet READ is 0.5c** —
+  a reply-finding run that reads 30 tweets costs 15c, about $4.50 a month daily. So a clean root plus a link
   reply is **21.5c against 20c** — 1.5c to get the root tweet out of the penalised class, which
   is why the thread won. (Zernio's `usage:x-pricing` lists `content_create_with_url` with an empty
   `triggeredBy`; that metadata is wrong — the operation does fire.)

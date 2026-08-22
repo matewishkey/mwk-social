@@ -317,15 +317,13 @@ async function publish(opts) {
     bodies.push(b);
   }
 
-  // Only platforms that HAVE a comments API are ever reached by the watcher.
-  // Keyed off commentsApi and nothing else: this used to read !linkInCaption,
-  // which quietly started promising the watcher would cover X the moment X's
-  // link moved into a thread reply.
-  const canBeCommented = (p) => {
-    try { return platformTable.get(p).commentsApi === true; } catch { return false; }
-  };
+  // Only platforms the watcher actually covers. That is not "has a comments
+  // API" — X has one since 2026-08-22 and is still not covered, because its CTA
+  // goes out as a thread reply at publish time. platforms.commentWatched() is
+  // the single definition; this filter has now been wrong twice, once keyed off
+  // !linkInCaption and once off commentsApi alone.
   const later = accounts.filter((a) => wantComment
-    && !FIRST_COMMENT_PLATFORMS.has(a.platform) && canBeCommented(a.platform));
+    && !FIRST_COMMENT_PLATFORMS.has(a.platform) && platformTable.commentWatched(a.platform));
   if (later.length) {
     console.log(`note: ${later.map((a) => a.platform).join(', ')} take no native firstComment — the watcher adds it`);
   }

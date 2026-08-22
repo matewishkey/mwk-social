@@ -137,6 +137,10 @@ which is exactly why the CTA has its own short domain.
 - **YouTube** posts are video uploads — `--title` + `--media <video url>`.
 - **Comment APIs take the platform's native post ID**, not the Zernio one — read
   it from `platforms[].platformPostId`, or every `inbox:*` call 404s.
+- **X's endpoints are opt-in per account, and default to off.**
+  `xCapabilities: { analytics, inbox }` on `PUT /v1/accounts/{id}` gate tweet
+  search and the comment API respectively. While they are off, both 403 with a
+  message that reads like a plan limit. It isn't one.
 - **First comments are a native field**, `platformSpecificData.firstComment`, on
   Facebook, Instagram, LinkedIn and YouTube — but not TikTok, and not from the
   CLI, so `post.js` calls the REST API directly.

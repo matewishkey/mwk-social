@@ -77,7 +77,7 @@ in the wrong place.
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | Link goes in the caption. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
-| **X** | 403 on this plan | yes | Link goes in a **thread reply**, never the root tweet — `platformSpecificData.threadItems`. X deprioritises whichever tweet holds an external link and Premium only softens that |
+| **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. Link still goes in a **thread reply**, never the root tweet (`platformSpecificData.threadItems`): X deprioritises whichever tweet holds an external link and Premium only softens that, and a watcher comment would be the same link twice |
 
 ### The two that cost money or reach if you get them wrong
 
@@ -100,6 +100,29 @@ class. The root tweet is the one that has to travel; the reply is where the link
 `threadItems[0]` and the media has to ride there with it; a top-level `content` is kept for
 display and search only. It goes in `platformSpecificData` on the **PlatformTarget**, the same
 place as `firstComment` — not at the top level of the request body.
+
+### X: two toggles that looked like a plan limit
+
+`PUT /v1/accounts/{id}` accepts `xCapabilities: { analytics, inbox }`. **Both default to `false`**
+because each meters X API cost against the account, and while they are off the endpoints behind
+them return 403 with a message that reads like a permission problem:
+`X_ANALYTICS_NOT_ENABLED` / `X_INBOX_NOT_ENABLED`. For three days this repo recorded "X comments
+are impossible on this plan" on the strength of that. They are not.
+
+With them on:
+
+- `GET /v1/twitter/search` — public tweets from the last 7 days, X's search operators passed
+  through unchanged (`from:user`, `-is:retweet`, `lang:en`, `"exact phrase"`, `OR`). Standalone
+  operators must be combined with a keyword or a `from:`. 300 requests per 15 minutes per account.
+  Reads are billed per tweet returned, at 0.5c each.
+- `GET`/`POST /v1/inbox/comments/{id}` — reading and replying to comments on X posts.
+- `platformSpecificData.replyToTweetId` — publish a post as a reply to any existing tweet. Cannot
+  be combined with `replySettings`; on a thread only the first tweet replies to the target.
+
+`POST /v1/twitter/follow` and its siblings were never gated. It takes the **numeric** X user id,
+not the handle, and X rate-limits follows in a sliding window: 37 back-to-back succeeded and the
+38th onward returned 429 until the window rolled. Back off for a quarter of an hour, do not retry
+tight.
 
 ## Media
 

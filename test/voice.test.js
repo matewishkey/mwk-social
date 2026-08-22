@@ -167,13 +167,13 @@ test('the same post renders the identical comment twice running', () => {
  */
 const platformTable = require('../scripts/lib/platforms');
 
-test('a platform only carries its own link when it cannot be commented on', () => {
+test('exactly TikTok and X carry their own link', () => {
   const ownLink = Object.keys(platformTable.PLATFORMS)
     .filter((p) => ['caption', 'reply'].includes(platformTable.get(p).linkPlacement));
   assert.deepStrictEqual(ownLink.sort(), ['tiktok', 'twitter']);
   for (const p of ownLink) {
-    assert.equal(platformTable.get(p).commentsApi, false,
-      `${p} carries its own link, so it must be because it cannot be commented on`);
+    assert.equal(platformTable.commentWatched(p), false,
+      `${p} carries its own link, so the watcher must not add a second one`);
   }
 });
 
@@ -184,15 +184,29 @@ test('a platform only carries its own link when it cannot be commented on', () =
  * the moment X's link moved out of the caption, which is a promise nothing can
  * keep: X's comment endpoints 403 on this plan.
  */
-test('the watcher covers exactly the platforms with a comments API', () => {
+test('the watcher covers exactly the platforms commentWatched() names', () => {
   const src = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
   const m = src.match(/const ALL_PLATFORMS = \[([^\]]*)\]/);
   assert.ok(m, 'ALL_PLATFORMS must still be a literal list in first-comment.js');
   const listed = m[1].split(',').map((x) => x.trim().replace(/'/g, '')).filter(Boolean).sort();
-  const withApi = Object.keys(platformTable.PLATFORMS)
-    .filter((p) => platformTable.get(p).commentsApi).sort();
-  assert.deepStrictEqual(listed, withApi);
+  const watched = Object.keys(platformTable.PLATFORMS).filter(platformTable.commentWatched).sort();
+  assert.deepStrictEqual(listed, watched);
+});
+
+/*
+ * X has a comments API again — the 403s were an account toggle, not the plan —
+ * and it must STILL be left to the watcher's exclusion list, because its CTA
+ * goes out as a thread reply when the post publishes. A watcher comment on top
+ * of that is the same link twice under one tweet.
+ */
+test('X has a comments API and is still not watched', () => {
+  assert.equal(platformTable.get('twitter').commentsApi, true);
+  assert.equal(platformTable.commentWatched('twitter'), false);
+  assert.equal(platformTable.commentWatched('tiktok'), false, 'no comments API at all');
+  for (const p of ['instagram', 'threads', 'facebook', 'youtube', 'linkedin']) {
+    assert.equal(platformTable.commentWatched(p), true, `${p} must stay watched`);
+  }
 });
 
 /*
