@@ -157,7 +157,7 @@ function resolveMedia(items) {
 async function commentFor(platform, text, opts) {
   const postKey = opts.postKey || `new:${voice.hash(text)}`;
 
-  const live = !linkToProfile(platform);
+  const live = !linkToProfile(platform, opts);
 
   const where = { platform, postKey, clipId: opts.clipId || null,
     campaign: opts.campaign || 'clip', medium: 'comment' };
@@ -239,7 +239,11 @@ function threadWithLink(caption, link, media) {
  * point at the bio instead? Instagram and TikTok, both verified: caption, Reel
  * and comment are all plain text there.
  */
-const linkToProfile = (platform) => {
+const linkToProfile = (platform, opts = {}) => {
+  // `linkDead` is passed in by the caller for a platform whose link is dead for
+  // THIS clip rather than always — today that is YouTube given a vertical cut,
+  // which YouTube turns into a Short, where a url in the comment is plain text.
+  if ((opts.linkDead || []).includes(platform)) return true;
   try { return platformTable.get(platform).linkPlacement === 'profile'; } catch { return false; }
 };
 
@@ -249,8 +253,8 @@ const linkToProfile = (platform) => {
  * with no route to the sign-up page. Instagram gets it in its native first
  * comment instead, which keeps the caption clean for the 5-hashtag cap.
  */
-const profileCtaInCaption = (platform) => {
-  if (!linkToProfile(platform)) return false;
+const profileCtaInCaption = (platform, opts = {}) => {
+  if (!linkToProfile(platform, opts)) return false;
   const p = platformTable.get(platform);
   return !p.supportsFirstComment && !platformTable.commentWatched(platform);
 };
@@ -293,7 +297,7 @@ async function captionForPlatform(platform, opts) {
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
 
   if (linkInCaption(platform)) parts.push(await linkFor(platform, opts, 'caption'));
-  else if (profileCtaInCaption(platform)) parts.push(voice.config().firstComment.profileCta);
+  else if (profileCtaInCaption(platform, opts)) parts.push(voice.config().firstComment.profileCta);
   if (tagsInCaption(platform)) {
     const tags = voice.tagLine(platform, opts.topics || []);
     if (tags) parts.push(tags);
@@ -339,7 +343,7 @@ async function publish(opts) {
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
         entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
-      if (linkInReply(a.platform)) {
+      if (linkInReply(a.platform) && !linkToProfile(a.platform, opts)) {
         // threadItems REPLACES the top-level content for this platform — the
         // caption is published as threadItems[0], not as the post body.
         entry.platformSpecificData = Object.assign(entry.platformSpecificData || {},
@@ -366,7 +370,7 @@ async function publish(opts) {
   if (inCaption.length) {
     console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
   }
-  const toProfile = accounts.filter((a) => linkToProfile(a.platform));
+  const toProfile = accounts.filter((a) => linkToProfile(a.platform, opts));
   if (toProfile.length) {
     console.log(`note: ${toProfile.map((a) => a.platform).join(', ')} make no url clickable — the CTA points at the bio, and no code is minted`);
   }

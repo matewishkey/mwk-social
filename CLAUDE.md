@@ -152,6 +152,20 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **`commentWatched()` is not `linkPlacement === 'comment'`.** Instagram's link lives in the bio and
   its CTA still lives in a comment saying so. What excludes a platform from the watcher is carrying
   its CTA **inside the post** — X, in its thread reply.
+- **`clip_id` was declared and never written — 0 of 55 links carried one** (found 2026-08-22 when
+  mate asked whether the linking actually worked). The only route from a click back to a VIDEO was
+  a `LIKE` on the `post_key` prefix: it resolved for 14 links and for none of the 25 minted outside
+  the queue. Every mint now carries the queue item id as `clip_id`, the placement as `medium` and
+  `clip` as the default campaign, so **click → `link.clip_id` → `queue_item.media_key`** is one
+  join. `run-queue.js` is where the id comes from; a test reads `post.js` and fails if any
+  `linkFor()` call omits its medium.
+- **`shortsAreDead` is READ now, and a link can be dead for one CLIP and live for another.**
+  YouTube turns a vertical video under three minutes into a Short, and a url in a Short's
+  description or comment is plain text. `platforms.linkDeadFor(name, probe)` decides it,
+  `run-queue.js` computes the list per post and `publish({ linkDead })` makes those platforms
+  behave exactly like Instagram: the CTA names the bio and no code is minted. **This is the fourth
+  field on that table to ship declared-but-never-read** — after `linkPlacement`, `landscapeOk` and
+  `hashtagsInCaption`. Wire it or do not add it.
 - **Every link carries a campaign now, and it is part of the MINT KEY.** `link` gained `campaign`,
   `medium`, `created_by`, `note` and `utm`. Same destination from the bio and from a reply = two
   codes, or "which one earned this" has no answer — which is the state every link minted before

@@ -170,3 +170,37 @@ test('the queue passes its item id down as the clip', () => {
   assert.match(src, /clipId:\s*item\.retryOf \|\| item\.id/,
     'run-queue must hand the item id down, or nothing can join a click to a video');
 });
+
+/*
+ * YouTube is the one platform whose link is dead for SOME clips and live for
+ * others: a vertical video under three minutes becomes a Short, and YouTube
+ * deliberately makes urls in Shorts descriptions and Shorts comments plain
+ * text. `shortsAreDead` sat on the platform table unread for a day — the same
+ * declared-but-never-wired trap as linkPlacement, landscapeOk and
+ * hashtagsInCaption before it.
+ */
+test('a vertical short kills the YouTube link, a landscape one does not', () => {
+  const vertical = { aspect: 0.5625, durationSec: 22 };
+  const landscape = { aspect: 1.777, durationSec: 22 };
+  const longVertical = { aspect: 0.5625, durationSec: 600 };
+
+  assert.equal(platforms.linkDeadFor('youtube', vertical), true);
+  assert.equal(platforms.linkDeadFor('youtube', landscape), false, 'landscape is never a Short');
+  assert.equal(platforms.linkDeadFor('youtube', longVertical), false, 'over 3 min is not a Short');
+  assert.equal(platforms.linkDeadFor('youtube', null), false, 'no probe, no claim');
+});
+
+test('no other platform has a media-dependent link rule', () => {
+  const vertical = { aspect: 0.5625, durationSec: 22 };
+  for (const p of Object.keys(platforms.PLATFORMS)) {
+    if (p === 'youtube') continue;
+    assert.equal(platforms.linkDeadFor(p, vertical), false, `${p} must not claim a Shorts rule`);
+  }
+});
+
+test('the queue works out which platforms have a dead link for the clip', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+  assert.match(src, /linkDead:/, 'run-queue must pass linkDead, or the Shorts rule is unread again');
+  assert.match(src, /platforms\.linkDeadFor\(/);
+});

@@ -261,6 +261,25 @@ const linkIsLive = (name) => {
 };
 
 /*
+ * Will a link in this platform's post actually be clickable FOR THIS CLIP?
+ *
+ * Separate from linkIsLive because it depends on the media, not just the
+ * platform. YouTube is the only case today: a vertical video under three
+ * minutes is auto-classified as a Short, and YouTube deliberately makes urls in
+ * Shorts descriptions and Shorts comments plain text. `shortsAreDead` was added
+ * to the table on 2026-08-22 and read by nothing, which is the same
+ * declared-but-never-wired trap as linkPlacement, landscapeOk and
+ * hashtagsInCaption before it — so it is wired here.
+ */
+function linkDeadFor(name, probe) {
+  try {
+    const p = get(name);
+    if (!p.shortsAreDead || !probe) return false;
+    return probe.aspect <= 1 && probe.durationSec < 180;
+  } catch { return false; }
+}
+
+/*
  * Every way the table can contradict itself about links, as a list of problems.
  * Empty means consistent, and a test asserts that — so `linkClickable` cannot
  * become the fourth decorative field here after linkPlacement, landscapeOk and
@@ -283,4 +302,5 @@ function linkProblems() {
   return out;
 }
 
-module.exports = { PLATFORMS, get, flowFor, flows, commentWatched, linkIsLive, linkProblems, SLOT };
+module.exports = { PLATFORMS, get, flowFor, flows, commentWatched, linkIsLive,
+  linkDeadFor, linkProblems, SLOT };

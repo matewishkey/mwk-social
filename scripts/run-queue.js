@@ -244,6 +244,12 @@ async function main() {
           // whole chain. Before 2026-08-22 clip_id was never set and the only
           // route back was a LIKE on the post_key prefix.
           clipId: item.retryOf || item.id,
+          // Platforms where a link in this CLIP's post would be plain text.
+          // YouTube turns a vertical under three minutes into a Short, and a
+          // url in a Short's description or comment is not clickable — so the
+          // CTA names the bio there instead of spending a code nobody can follow.
+          linkDead: accts.map((a) => a.platform)
+            .filter((pl) => platforms.linkDeadFor(pl, (cutFor(pl) || {}).probe)),
           accounts: accts.map((a) => a.id),
           all: false,
           media: file ? [file] : [],
