@@ -195,9 +195,11 @@ ALTER TABLE queue_item ADD COLUMN retry_of TEXT;
 -- medium    where it was placed     ("caption", "comment", "reply", "profile")
 -- source    is the existing `platform` column — the network it was minted for.
 --
--- These three are also what gets appended to the destination as utm_campaign /
--- utm_medium / utm_source on the redirect, so the site's own analytics and
--- ours agree rather than being two numbers nobody can reconcile.
+-- The redirect passes NOTHING of this on to the destination. These three live
+-- on our side only: the code already identifies the placement, so appending
+-- utm_ parameters would count the same click twice and would make a redirect
+-- look like more tracking than it does. (A `utm` column existed for about an
+-- hour on 2026-08-22 and was dropped — mate's call, keep it slim.)
 ALTER TABLE link ADD COLUMN campaign TEXT;
 ALTER TABLE link ADD COLUMN medium TEXT;
 -- Who minted it: an Access identity for one made by hand on the dashboard, or
@@ -205,7 +207,4 @@ ALTER TABLE link ADD COLUMN medium TEXT;
 ALTER TABLE link ADD COLUMN created_by TEXT;
 -- Free text for a link made by hand — what it is, where it went, why.
 ALTER TABLE link ADD COLUMN note TEXT;
--- Off by default so an existing tracked url keeps redirecting byte for byte;
--- set when the destination is ours and should carry the campaign through.
-ALTER TABLE link ADD COLUMN utm INTEGER NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS link_campaign ON link (campaign, created_at DESC);

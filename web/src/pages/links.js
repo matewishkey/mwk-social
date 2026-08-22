@@ -51,7 +51,6 @@ export async function linksAction(request, env, email) {
         label: val('label'),
         note: val('note'),
         createdBy: email,
-        utm: form.get('utm') ? 1 : 0,
       });
       back.searchParams.set('minted', r.code);
     } catch (e) {
@@ -74,8 +73,7 @@ export function linksPage({ email, tz, host, rows, campaigns, totals, minted, er
     <td class="num ${l.human ? 'good' : ''}">${l.human || 0}</td>
     <td class="num faint">${l.crawler || 0}</td>
     <td class="tgt"><a href="${esc(l.target)}" target="_blank" rel="noopener">${esc(l.target)}</a>
-      ${l.note ? `<span class="nt">${esc(l.note)}</span>` : ''}
-      ${l.utm ? '<span class="utm" title="campaign passed through as utm_ parameters">utm</span>' : ''}</td>
+      ${l.note ? `<span class="nt">${esc(l.note)}</span>` : ''}</td>
     <td class="faint nowrap">${esc(ago(l.created_at))}</td>
   </tr>`;
 
@@ -110,7 +108,6 @@ ${card('Mint one', `
   <label>Source <select name="platform">${opts(SOURCES, '-')}</select></label>
   <label>Medium <select name="medium">${opts(MEDIUMS, '-')}</select></label>
   <label class="wide">Note to self <input name="note" placeholder="X bio, from 22 Aug"></label>
-  <label class="check"><input type="checkbox" name="utm" checked> add utm_source / utm_medium / utm_campaign to the destination</label>
   <div><button class="primary">Mint it</button></div>
 </form>`)}
 
@@ -152,8 +149,6 @@ td.num.good { color:var(--ok); font-weight:600; }
 td.tgt { max-width:32rem; }
 td.tgt a { word-break:break-all; font-size:.82rem; }
 .nt { display:block; font-size:.74rem; color:var(--faint); }
-.utm { font-size:.66rem; border:1px solid var(--line); border-radius:4px; padding:0 .25rem;
-  color:var(--faint); margin-left:.3rem; }
 code.big { font-size:1rem; font-weight:600; }
 button.copy { font:inherit; font-size:.8rem; margin-left:.5rem; padding:.2rem .7rem;
   border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--fg); cursor:pointer; }

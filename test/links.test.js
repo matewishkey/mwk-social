@@ -92,17 +92,30 @@ test('a live-link platform still gets the url', () => {
 
 /* ----------------------------------------------------------- campaign plumbing */
 
-test('the campaign is passed to the destination, and never overwrites one already there', async () => {
-  const { withCampaign } = await import('../web/src/links.js');
-  assert.equal(
-    withCampaign({ target: 'https://matewishkey.com/show', platform: 'tiktok', medium: 'profile', campaign: 'bio', utm: 1 }),
-    'https://matewishkey.com/show?utm_source=tiktok&utm_medium=profile&utm_campaign=bio');
-  // A url he wrote himself keeps what he wrote.
-  assert.equal(
-    withCampaign({ target: 'https://matewishkey.com/show?utm_source=mine', platform: 'tiktok', medium: 'profile', campaign: 'bio', utm: 1 }),
-    'https://matewishkey.com/show?utm_source=mine&utm_medium=profile&utm_campaign=bio');
-  // Somebody else's url is left exactly alone.
-  assert.equal(
-    withCampaign({ target: 'https://github.com/matewishkey/x', platform: 'facebook', medium: 'comment', campaign: 'og', utm: 0 }),
-    'https://github.com/matewishkey/x');
+/*
+ * The redirect hands NOTHING to the destination. The code already carries the
+ * platform, the placement and the campaign, so appending utm_ parameters would
+ * count the same click twice — once here and once in somebody else's analytics
+ * — and would make the redirect look like more tracking than it does. Mate's
+ * call, 2026-08-22: keep it slim, and do not appear to over-track.
+ */
+test('the redirect passes the target through untouched', async () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'links.js'), 'utf8');
+  assert.ok(!/utm_source|utm_medium|utm_campaign/.test(src.replace(/\/\/.*|\/\*[\s\S]*?\*\//g, '')),
+    'no utm parameter may be added to a destination');
+  assert.ok(!/withCampaign/.test(src), 'the utm builder should be gone, not just unused');
+});
+
+/*
+ * Campaign and medium stay in the KEY, though — that is ours, on our side, and
+ * it is what makes "which placement earned this" answerable at all.
+ */
+test('campaign and medium are part of what makes a code unique', async () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'api.js'), 'utf8');
+  const sel = src.slice(src.indexOf('SELECT code FROM link'), src.indexOf('if (existing)'));
+  for (const col of ['target', 'platform', 'clip_id', 'post_key', 'campaign', 'medium']) {
+    assert.ok(sel.includes(col), `${col} must be part of the mint key`);
+  }
 });

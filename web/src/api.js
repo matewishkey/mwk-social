@@ -198,7 +198,7 @@ async function result(body, env) {
  */
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
-  campaign = null, medium = null, createdBy = null, note = null, utm = null,
+  campaign = null, medium = null, createdBy = null, note = null,
 }) {
   // Campaign and medium are part of the KEY, not decoration. The same sign-up
   // page linked from the bio and from a reply has to be two codes or the
@@ -211,25 +211,15 @@ export async function mint(env, {
   ).bind(target, platform, clipId, postKey, campaign, medium).first();
   if (existing) return { code: existing.code, url: linkUrl(env, existing.code), reused: true };
 
-  // Default the UTM pass-through on for destinations that are ours, where the
-  // site's own analytics can read it, and off for anyone else's — appending
-  // query parameters to a third party's url is at best noise and at worst
-  // breaks it.
-  const ours = /(^|\.)matewishkey\.com$|(^|\.)mwkshow\.com$/i;
-  let withUtm = utm;
-  if (withUtm === null || withUtm === undefined) {
-    try { withUtm = ours.test(new URL(target).hostname) ? 1 : 0; } catch { withUtm = 0; }
-  }
-
   for (let attempt = 0; attempt < 5; attempt++) {
     const code = shortCode(5);
     try {
       await env.DB.prepare(
         `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,
-           campaign, medium, created_by, note, utm)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+           campaign, medium, created_by, note)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       ).bind(code, target, platform, clipId, postKey, label, new Date().toISOString(),
-        campaign, medium, createdBy, note, withUtm ? 1 : 0).run();
+        campaign, medium, createdBy, note).run();
       return { code, url: linkUrl(env, code), reused: false };
     } catch { /* collision on the primary key — try another */ }
   }
