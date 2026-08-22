@@ -185,3 +185,27 @@ ALTER TABLE queue_item ADD COLUMN reshare INTEGER NOT NULL DEFAULT 1;
 -- tracked links from `queue:<id>`, so a retry under a fresh id would mint a
 -- different code for the same post and split its clicks in two.
 ALTER TABLE queue_item ADD COLUMN retry_of TEXT;
+
+-- ---------------------------------------------------------------------------
+-- Campaigns (2026-08-22). Every link ever minted pointed at the same sign-up
+-- page with no way to tell one placement from another, so "which post earned
+-- this click" was answerable and "which campaign earned it" was not.
+--
+-- campaign  what this link is FOR   ("bio", "og-generator", "x-replies")
+-- medium    where it was placed     ("caption", "comment", "reply", "profile")
+-- source    is the existing `platform` column — the network it was minted for.
+--
+-- These three are also what gets appended to the destination as utm_campaign /
+-- utm_medium / utm_source on the redirect, so the site's own analytics and
+-- ours agree rather than being two numbers nobody can reconcile.
+ALTER TABLE link ADD COLUMN campaign TEXT;
+ALTER TABLE link ADD COLUMN medium TEXT;
+-- Who minted it: an Access identity for one made by hand on the dashboard, or
+-- the job name for one the pipeline minted. Blank for everything before this.
+ALTER TABLE link ADD COLUMN created_by TEXT;
+-- Free text for a link made by hand — what it is, where it went, why.
+ALTER TABLE link ADD COLUMN note TEXT;
+-- Off by default so an existing tracked url keeps redirecting byte for byte;
+-- set when the destination is ours and should carry the campaign through.
+ALTER TABLE link ADD COLUMN utm INTEGER NOT NULL DEFAULT 0;
+CREATE INDEX IF NOT EXISTS link_campaign ON link (campaign, created_at DESC);

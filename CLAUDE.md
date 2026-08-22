@@ -131,6 +131,40 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
   (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
   **Alerting must key on `needsReconnect: true` or `status: error`**, never on `warning`.
+- **A URL IS NOT CLICKABLE EVERYWHERE, and for three weeks this pipeline acted as though it was**
+  (found 2026-08-22, on mate's instinct, and he was right). Instagram makes NOTHING clickable — not
+  a caption, not a comment, not a Reel; the link-in-bio industry exists because of it. TikTok is
+  the same. **YouTube deliberately makes urls in SHORTS descriptions and SHORTS comments plain
+  text** (its own help page says so) while long-form is fine — this pipeline only sends YouTube the
+  wide cut, and a landscape video is never a Short, so ours are live. The damage was measurable:
+  five TikTok codes and five Instagram codes took **0 and 1** human clicks between them, which
+  reads as "posted, nobody cared" rather than "nobody could".
+- **`linkClickable: { caption, comment, profile }` is the fact; `linkPlacement` is the decision, and
+  `platforms.linkProblems()` refuses to let them disagree.** A test asserts it returns empty, so
+  `linkClickable` cannot become the fourth decorative field on that table after `linkPlacement`,
+  `landscapeOk` and `hashtagsInCaption` each shipped declared-but-never-read.
+- **`linkPlacement: 'profile'` means: say where the link is, mint nothing.** Instagram and TikTok
+  only. `{show}` renders as `firstComment.profileCta` ("link in my bio") instead of a tracked code,
+  and any variant carrying `{episodeUrl}` is dropped from the pool — that url is exactly as dead.
+  **The phrasing MUST be in `markers[]`**, and it is: the guard finds the CTA by matching the text,
+  so a comment with no url in it would otherwise be unrecognisable and the watcher would re-comment
+  on every Instagram post for ever.
+- **`commentWatched()` is not `linkPlacement === 'comment'`.** Instagram's link lives in the bio and
+  its CTA still lives in a comment saying so. What excludes a platform from the watcher is carrying
+  its CTA **inside the post** — X, in its thread reply.
+- **Every link carries a campaign now, and it is part of the MINT KEY.** `link` gained `campaign`,
+  `medium`, `created_by`, `note` and `utm`. Same destination from the bio and from a reply = two
+  codes, or "which one earned this" has no answer — which is the state every link minted before
+  2026-08-22 was in: 40 codes, all pointing at `matewishkey.com/show`, no campaign dimension at all.
+  `medium` is the *placement* (`profile`/`caption`/`comment`/`reply`), `platform` is the source.
+  The redirect appends them as `utm_source`/`utm_medium`/`utm_campaign` **only when `utm = 1`**
+  (defaulted on for our own hostnames, off for anyone else's) and **never overwrites a parameter
+  already on the target** — one he typed is a decision.
+- **`/links` on the dashboard is the database, and it can mint by hand.** That was the actual gap:
+  a link could only be created as a side effect of publishing, so anything he pastes somewhere
+  himself — a bio, a newsletter, a talk — had to be a raw url and was invisible. The seven
+  `campaign = bio` codes are the ones Instagram and TikTok now point at, so they are the whole
+  conversion path on both.
 - **A CAPTION IS COMPOSED PER PLATFORM, and `publish()` groups by the caption a platform gets** —
   not by any fixed split. Three things vary and each is a platform rule, not a choice: the link
   (caption where there is no comments API), the hashtags (`hashtagsInCaption`), and nothing else.

@@ -28,6 +28,7 @@ import { statsPage } from './pages/stats.js';
 import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
 import { youtubePage, youtubeAction } from './pages/youtube.js';
+import { linksPage, linksAction } from './pages/links.js';
 
 const EVENT_PAGE = 100;
 const HISTORY_PAGE = 25;
@@ -93,6 +94,7 @@ async function dashboard(request, env, url) {
   if (request.method === 'POST') {
     if (url.pathname === '/queue')   return queueAction(request, env, email);
     if (url.pathname === '/youtube') return youtubeAction(request, env, email);
+    if (url.pathname === '/links')   return linksAction(request, env, email);
     if (url.pathname === '/')        return overviewAction(request, env, email);
     return new Response('not found', { status: 404 });
   }
@@ -104,6 +106,7 @@ async function dashboard(request, env, url) {
     case '/config':  return html(configPage({ email, tz, snapshots }));
     case '/queue':   return html(await queue(env, tz, snapshots, email, url));
     case '/youtube': return html(await youtube(env, tz, snapshots, email, url));
+    case '/links':   return html(await links(env, tz, email, url));
     case '/':        return html(await overview(request, env, tz, snapshots, email, url));
     default:         return new Response('not found', { status: 404 });
   }
@@ -214,6 +217,51 @@ async function queue(env, tz, snapshots, email, url) {
   const pace = ((snapshots.pace || {}).body) || { perDay: '—', today: '—', minGapMinutes: null, tz, nextAt: null, why: '' };
   return queuePage({ email, tz, waiting: waiting.results || [], done: done.results || [],
     pace, page, size: HISTORY_PAGE, total: rows, params: url.searchParams });
+}
+
+/*
+ * The link database. Clicks are counted with bot = 0 only — a preview fetcher
+ * hits the redirect exactly like a person, so counting both would make every
+ * link look like a success.
+ */
+const LINK_PAGE = 50;
+
+async function links(env, tz, email, url) {
+  const campaign = url.searchParams.get('campaign') || '';
+  const where = campaign ? 'WHERE l.campaign = ?1' : '';
+  const bind = campaign ? [campaign] : [];
+
+  const clicks = `LEFT JOIN click c ON c.code = l.code`;
+  const counts = `SUM(CASE WHEN c.bot = 0 THEN 1 ELSE 0 END) AS human,
+                  SUM(CASE WHEN c.bot = 1 THEN 1 ELSE 0 END) AS crawler`;
+
+  const totalRow = await env.DB.prepare(
+    `SELECT COUNT(*) n FROM link l ${where}`).bind(...bind).first();
+  const total = (totalRow && totalRow.n) || 0;
+  const page = pageOf(url, LINK_PAGE, total);
+
+  const [rows, campaigns, totals] = await Promise.all([
+    env.DB.prepare(
+      `SELECT l.*, ${counts} FROM link l ${clicks} ${where}
+        GROUP BY l.code ORDER BY l.created_at DESC LIMIT ?${bind.length + 1} OFFSET ?${bind.length + 2}`,
+    ).bind(...bind, LINK_PAGE, (page - 1) * LINK_PAGE).all(),
+    env.DB.prepare(
+      `SELECT l.campaign, COUNT(DISTINCT l.code) AS links, ${counts}
+         FROM link l ${clicks} WHERE l.campaign IS NOT NULL AND l.campaign != ''
+        GROUP BY l.campaign ORDER BY human DESC, links DESC`).all(),
+    env.DB.prepare(
+      `SELECT COUNT(DISTINCT l.code) AS links, ${counts} FROM link l ${clicks}`).first(),
+  ]);
+
+  return linksPage({
+    email, tz, host: env.LINK_HOST,
+    rows: rows.results || [],
+    campaigns: campaigns.results || [],
+    totals: totals || { links: 0, human: 0, crawler: 0 },
+    minted: url.searchParams.get('minted'),
+    err: url.searchParams.get('err'),
+    campaign, page, size: LINK_PAGE, total, params: url.searchParams,
+  });
 }
 
 async function youtube(env, tz, snapshots, email, url) {

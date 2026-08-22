@@ -451,15 +451,24 @@ test('the workflows page states the hashtag rule, with both sides of it', async 
 
 // TikTok and X were publishing into a dead end; the page must not imply
 // otherwise now that it is fixed.
-test('the workflows page shows the caption-link platforms carrying a tracked link', async () => {
+test('the workflows page says where each platform\'s link actually goes', async () => {
   const { configPage } = await src('pages/config.js');
   const { flows } = require('../scripts/lib/platforms.js');
   const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
     platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() } } });
 
+  // TikTok has no clickable link anywhere, so the page must say the bio — not
+  // a tracked code, which is what it said while the codes were being wasted.
   const tiktok = html.split('<h2>tiktok</h2>')[1].split('</section>')[0];
-  assert.match(tiktok, /appended to the caption, with its own tracked code/);
+  assert.match(tiktok, /the bio — the post says so, and no code is minted/);
+  // Match the CLAIM, not the explanation: the note legitimately uses the words
+  // "a tracked code" while saying why one is not spent here.
+  assert.ok(!/with its own tracked code/.test(tiktok), 'no code is minted for TikTok any more');
   assert.ok(!/first-comment|watcher adds/.test(tiktok), 'nothing may suggest a comment reaches TikTok');
+
+  // X is the one that does append its own tracked link to a post it publishes.
+  const x = html.split('<h2>twitter</h2>')[1].split('</section>')[0];
+  assert.match(x, /a second tweet in the same call, with its own tracked code/);
 });
 
 /*

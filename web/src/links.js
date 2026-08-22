@@ -57,12 +57,30 @@ export function platformFromReferer(host) {
   return null;
 }
 
+/*
+ * Hand the campaign through to the destination as UTM parameters.
+ *
+ * Only for links flagged `utm` — ours, by default — because appending query
+ * parameters to somebody else's url is noise at best. Anything already present
+ * on the target WINS: a hand-written utm_source on a link he pasted in is a
+ * decision, not something to overwrite.
+ */
+export function withCampaign(row) {
+  if (!row.utm) return row.target;
+  let u;
+  try { u = new URL(row.target); } catch { return row.target; }
+  const pairs = [['utm_source', row.platform], ['utm_medium', row.medium], ['utm_campaign', row.campaign]];
+  for (const [k, v] of pairs) if (v && !u.searchParams.has(k)) u.searchParams.set(k, v);
+  return u.toString();
+}
+
 export async function redirect(request, env, url, ctx) {
   const code = url.pathname.replace(/^\/+/, '').toLowerCase();
   if (!code || code === 'favicon.ico') return Response.redirect(env.LINK_FALLBACK, 302);
 
-  const row = await env.DB.prepare('SELECT target FROM link WHERE code = ?').bind(code).first();
-  const target = (row && row.target) || env.LINK_FALLBACK;
+  const row = await env.DB.prepare(
+    'SELECT target, platform, medium, campaign, utm FROM link WHERE code = ?').bind(code).first();
+  const target = row ? withCampaign(row) : env.LINK_FALLBACK;
 
   if (row) {
     let refererHost = null;

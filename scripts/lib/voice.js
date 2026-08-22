@@ -127,9 +127,18 @@ const unescapeXml = (s) => s
  * @returns {{text: string, variant: string, index: number}}
  */
 function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
-  variantIndex = null, showUrl = null, noTags = false } = {}) {
+  variantIndex = null, showUrl = null, noTags = false, linkLive = true } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
+
+  /*
+   * On Instagram and TikTok a url in a post or a comment is plain text — the
+   * whole link-in-bio industry exists because of it. `linkLive: false` says so,
+   * and two things follow: {show} becomes the bio phrasing instead of a tracked
+   * code, and any variant carrying an episode URL is dropped from the pool,
+   * because that url is just as dead as the CTA one would have been.
+   */
+  const usable = (pool) => (linkLive ? pool : pool.filter((v) => !/\{episodeUrl\}/.test(v)));
 
   // Pinning names a line out of the plain list, so it also rules out an episode
   // variant: a human picked that exact wording and must get it, not a quote.
@@ -138,7 +147,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   const wantEpisode = episodes.length > 0 &&
     (hash(key, 'mix') % 1000) / 1000 < (fc.episodeMixRatio ?? 0);
 
-  const pool = wantEpisode ? fc.episode : fc.plain;
+  const pool = usable(wantEpisode ? fc.episode : fc.plain);
   let index;
   if (pinned) {
     if (variantIndex < 0 || variantIndex >= pool.length) {
@@ -152,7 +161,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
 
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
   let text = pool[index]
-    .replace(/\{show\}/g, showUrl || cfg.links.show)
+    .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : fc.profileCta)
     .replace(/\{wish\}/g, episode ? episode.wish : '')
     .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
     .replace(/\{episodeUrl\}/g, episode ? episode.url : '');

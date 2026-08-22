@@ -19,7 +19,11 @@ const PLATFORMS = {
     captionMax: 2200,
     foldAt: 125,
     hashtagsInCaption: 0,          // the cap counts caption AND comments together
-    linkPlacement: 'comment',
+    // NOTHING is clickable on Instagram — not the caption, not a comment, not a
+    // Reel. The link-in-bio industry exists because of this. Caption links are
+    // in a Meta Verified test as of 2026; a Reel has no link surface at all.
+    linkClickable: { caption: false, comment: false, profile: true },
+    linkPlacement: 'profile',      // say where the link is; do not print a dead one
     markerInCaption: false,
     supportsFirstComment: true,    // native platformSpecificData.firstComment
     deletable: false,              // nothing can be removed via the API — ever
@@ -36,6 +40,10 @@ const PLATFORMS = {
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 500,               // the #1 cross-posting failure
     hashtagsInCaption: 0,
+    // Threads is an Instagram-shaped surface that does NOT share Instagram's
+    // link rule: a url in a post or a reply is a live link. It is the only Meta
+    // property here where the comment mechanic actually reaches anybody.
+    linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',
     markerInCaption: false,
     supportsFirstComment: false,   // no native field; the watcher does it
@@ -51,8 +59,12 @@ const PLATFORMS = {
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 2200,
     hashtagsInCaption: 'all',
-    linkPlacement: 'caption',      // no comment API of any kind
-    markerInCaption: true,
+    // Nothing is clickable on TikTok either — caption or comment, it is plain
+    // text. Five short codes were minted for TikTok captions and took ZERO
+    // human clicks, which is what a dead url looks like in the data.
+    linkClickable: { caption: false, comment: false, profile: true },
+    linkPlacement: 'profile',      // the bio is the only live link TikTok has
+    markerInCaption: false,
     supportsFirstComment: false,
     deletable: false,              // posts:unpublish → "TikTok does not support post deletion
                                    // via API" (2026-08-21, against two real duplicates). Same as
@@ -76,6 +88,7 @@ const PLATFORMS = {
     captionMax: 280,               // Premium raises this, but 280 keeps it portable
     urlLength: 23,                 // every URL counts as a t.co link
     hashtagsInCaption: 1,
+    linkClickable: { caption: true, comment: true, profile: true },
     // X deprioritises a post carrying an external link to keep people on
     // platform, and Premium REDUCES that rather than removing it. Every X post
     // this pipeline made before 2026-08-21 put the link in the caption and was
@@ -107,6 +120,9 @@ const PLATFORMS = {
                shares:'yes', saves:'no', clicks:'yes', watchTime:'no' },
     captionMax: 63206,
     hashtagsInCaption: 'all',
+    // A url in a Facebook post or comment is a live link. Reach is the
+    // constraint here, not clickability — hence the comment rather than the body.
+    linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',
     markerInCaption: false,
     supportsFirstComment: true,
@@ -121,6 +137,13 @@ const PLATFORMS = {
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 5000,
     hashtagsInCaption: 'all',
+    // TRUE FOR LONG-FORM ONLY. YouTube makes urls in SHORTS descriptions and
+    // SHORTS comments non-clickable, deliberately, to cut spam — its own help
+    // page says so outright. This pipeline only ever sends YouTube the wide
+    // cut (landscapeOk), and a landscape video is never classified as a Short,
+    // so the comment link is live. Send a vertical here and it silently is not.
+    linkClickable: { caption: true, comment: true, profile: true },
+    shortsAreDead: true,
     linkPlacement: 'comment',
     markerInCaption: false,
     supportsFirstComment: true,
@@ -135,6 +158,7 @@ const PLATFORMS = {
                shares:'partial', saves:'no', clicks:'rare', watchTime:'no' },
     captionMax: 3000,
     hashtagsInCaption: 'all',
+    linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',      // links in the body cut reach 40-50%
     markerInCaption: false,
     supportsFirstComment: true,
@@ -169,7 +193,11 @@ function flowFor(name) {
       by: 'none', note: 'no comments API at all' });
   }
 
-  if (p.linkPlacement === 'caption') {
+  if (p.linkPlacement === 'profile') {
+    steps.push({ step: 'the link', how: 'the bio — the post says so, and no code is minted',
+      note: 'a url is plain text here, in the caption and in a comment alike. A tracked code '
+        + 'spent on a click that cannot happen reads as indifference rather than as unreachable' });
+  } else if (p.linkPlacement === 'caption') {
     steps.push({ step: 'the link', how: 'appended to the caption, with its own tracked code',
       note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' });
   } else if (p.linkPlacement === 'reply') {
@@ -202,8 +230,57 @@ const flows = () => Object.keys(PLATFORMS).map(flowFor);
 const commentWatched = (name) => {
   try {
     const p = get(name);
-    return p.commentsApi === true && p.linkPlacement === 'comment';
+    // Not `linkPlacement === 'comment'`: Instagram's CTA is still a comment, it
+    // just names the bio instead of carrying a url, because no url on Instagram
+    // is clickable. What excludes a platform is carrying its CTA in the POST —
+    // TikTok used to, in its caption; X still does, in its thread reply.
+    return p.commentsApi === true && !['caption', 'reply'].includes(p.linkPlacement);
   } catch { return false; }
 };
 
-module.exports = { PLATFORMS, get, flowFor, flows, commentWatched };
+/*
+ * Which surface a platform's link actually lands on. `reply` is a post of its
+ * own on X, so it is governed by the caption rule, not the comment one.
+ */
+const SLOT = { caption: 'caption', reply: 'caption', comment: 'comment', profile: 'profile' };
+
+/*
+ * Is the link we place on this platform a LIVE link, or plain text?
+ *
+ * This exists because for three weeks the pipeline minted tracked short codes
+ * for Instagram comments and TikTok captions, where a url is not clickable on
+ * either — five TikTok codes took zero human clicks between them. A code spent
+ * somewhere nobody can click it is worse than no code: it reads in the numbers
+ * as "posted, no interest" rather than "never reachable".
+ */
+const linkIsLive = (name) => {
+  try {
+    const p = get(name);
+    return !!(p.linkClickable || {})[SLOT[p.linkPlacement]];
+  } catch { return false; }
+};
+
+/*
+ * Every way the table can contradict itself about links, as a list of problems.
+ * Empty means consistent, and a test asserts that — so `linkClickable` cannot
+ * become the fourth decorative field here after linkPlacement, landscapeOk and
+ * hashtagsInCaption each shipped declared-but-never-read.
+ */
+function linkProblems() {
+  const out = [];
+  for (const name of Object.keys(PLATFORMS)) {
+    const p = PLATFORMS[name];
+    if (!p.linkClickable) { out.push(`${name}: no linkClickable — say where a url is live`); continue; }
+    const slot = SLOT[p.linkPlacement];
+    if (!slot) { out.push(`${name}: linkPlacement '${p.linkPlacement}' is not a slot`); continue; }
+    if (!p.linkClickable[slot]) {
+      out.push(`${name}: places its link in the ${slot}, where it is not clickable`);
+    }
+    if (p.linkPlacement === 'profile' && (p.linkClickable.caption || p.linkClickable.comment)) {
+      out.push(`${name}: points at the profile although a post link would be live`);
+    }
+  }
+  return out;
+}
+
+module.exports = { PLATFORMS, get, flowFor, flows, commentWatched, linkIsLive, linkProblems, SLOT };

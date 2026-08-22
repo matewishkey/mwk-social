@@ -167,11 +167,13 @@ test('the same post renders the identical comment twice running', () => {
  */
 const platformTable = require('../scripts/lib/platforms');
 
-test('exactly TikTok and X carry their own link', () => {
-  const ownLink = Object.keys(platformTable.PLATFORMS)
+test('X is the only platform that carries its CTA inside the post', () => {
+  // TikTok used to be here too. It is not any more: a url in a TikTok caption is
+  // plain text, so its caption names the bio and mints nothing.
+  const inPost = Object.keys(platformTable.PLATFORMS)
     .filter((p) => ['caption', 'reply'].includes(platformTable.get(p).linkPlacement));
-  assert.deepStrictEqual(ownLink.sort(), ['tiktok', 'twitter']);
-  for (const p of ownLink) {
+  assert.deepStrictEqual(inPost, ['twitter']);
+  for (const p of inPost) {
     assert.equal(platformTable.commentWatched(p), false,
       `${p} carries its own link, so the watcher must not add a second one`);
   }
@@ -202,11 +204,15 @@ test('the watcher covers exactly the platforms commentWatched() names', () => {
  */
 test('X has a comments API and is still not watched', () => {
   assert.equal(platformTable.get('twitter').commentsApi, true);
-  assert.equal(platformTable.commentWatched('twitter'), false);
+  assert.equal(platformTable.commentWatched('twitter'), false, 'its CTA rides in the thread reply');
   assert.equal(platformTable.commentWatched('tiktok'), false, 'no comments API at all');
   for (const p of ['instagram', 'threads', 'facebook', 'youtube', 'linkedin']) {
     assert.equal(platformTable.commentWatched(p), true, `${p} must stay watched`);
   }
+  // Instagram is the case that makes commentWatched subtle: its link lives in
+  // the bio, and its CTA still lives in a comment saying so.
+  assert.equal(platformTable.get('instagram').linkPlacement, 'profile');
+  assert.equal(platformTable.commentWatched('instagram'), true);
 });
 
 /*
@@ -253,8 +259,9 @@ test('a platform carrying its own link gets tags under its own cap', () => {
 
 test('a platform that can be commented on keeps its caption clean', () => {
   for (const p of ['linkedin', 'instagram', 'facebook', 'youtube', 'threads']) {
-    assert.equal(platformTable.get(p).linkPlacement, 'comment',
+    assert.notEqual(platformTable.get(p).linkPlacement, 'caption',
       `${p} must keep the link out of the body`);
+    assert.equal(platformTable.commentWatched(p), true);
   }
 });
 

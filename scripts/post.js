@@ -157,9 +157,16 @@ function resolveMedia(items) {
 async function commentFor(platform, text, opts) {
   const postKey = opts.postKey || `new:${voice.hash(text)}`;
 
+  const live = !linkToProfile(platform);
+
   if (opts.comment) {
-    // Every url in a custom comment gets its own code, on this platform.
-    const body = await shortlink.trackLinks(opts.comment, { platform, postKey });
+    // Every url in a custom comment gets its own code, on this platform — but
+    // only where a url is clickable at all. On Instagram and TikTok a code
+    // spent in a comment can never be followed, so his words go through as
+    // written and the tracking happens on the bio link instead.
+    const body = live
+      ? await shortlink.trackLinks(opts.comment, { platform, postKey })
+      : opts.comment;
     // Tags only if the caption is not already carrying them, or the post would
     // show the same list twice.
     const tags = tagsInCaption(platform) ? '' : voice.tagLine(platform, opts.topics || []);
@@ -168,13 +175,16 @@ async function commentFor(platform, text, opts) {
 
   // The rotating comment used the plain sign-up url here — only the watcher
   // minted one — so a pipeline post's CTA was the one link we could not measure.
-  const showUrl = await shortlink.mint({ platform, postKey, label: opts.title || null });
+  // No mint at all where the url would be plain text: that is a code spent on a
+  // click that cannot happen, and it reads in the numbers as indifference.
+  const showUrl = live ? await shortlink.mint({ platform, postKey, label: opts.title || null }) : null;
   return voice.firstComment(postKey, {
     platform,
     topicTags: opts.topics,
     noTags: tagsInCaption(platform),
     variantIndex: opts.commentVariant,
     showUrl,
+    linkLive: live,
   }).text;
 }
 
@@ -223,6 +233,27 @@ function threadWithLink(caption, link, media) {
   return [root, { content: link }];
 }
 
+/*
+ * Is this a platform where no url in a POST is clickable, so the CTA has to
+ * point at the bio instead? Instagram and TikTok, both verified: caption, Reel
+ * and comment are all plain text there.
+ */
+const linkToProfile = (platform) => {
+  try { return platformTable.get(platform).linkPlacement === 'profile'; } catch { return false; }
+};
+
+/*
+ * ...and is there no comment path to say that in? Then it goes in the caption.
+ * TikTok has no comments API at all, so a caption with nothing in it is a post
+ * with no route to the sign-up page. Instagram gets it in its native first
+ * comment instead, which keeps the caption clean for the 5-hashtag cap.
+ */
+const profileCtaInCaption = (platform) => {
+  if (!linkToProfile(platform)) return false;
+  const p = platformTable.get(platform);
+  return !p.supportsFirstComment && !platformTable.commentWatched(platform);
+};
+
 /** Does this platform take hashtags in the caption, or must they stay out of it? */
 const tagsInCaption = (platform) => {
   try { return platformTable.get(platform).hashtagsInCaption !== 0; } catch { return false; }
@@ -259,6 +290,7 @@ async function captionForPlatform(platform, opts) {
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
 
   if (linkInCaption(platform)) parts.push(await linkFor(platform, opts));
+  else if (profileCtaInCaption(platform)) parts.push(voice.config().firstComment.profileCta);
   if (tagsInCaption(platform)) {
     const tags = voice.tagLine(platform, opts.topics || []);
     if (tags) parts.push(tags);
@@ -330,6 +362,10 @@ async function publish(opts) {
   const inCaption = accounts.filter((a) => linkInCaption(a.platform));
   if (inCaption.length) {
     console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
+  }
+  const toProfile = accounts.filter((a) => linkToProfile(a.platform));
+  if (toProfile.length) {
+    console.log(`note: ${toProfile.map((a) => a.platform).join(', ')} make no url clickable — the CTA points at the bio, and no code is minted`);
   }
   const inReply = accounts.filter((a) => linkInReply(a.platform));
   if (inReply.length) {
