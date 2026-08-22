@@ -243,3 +243,20 @@ CREATE TABLE IF NOT EXISTS reply_target (
 );
 CREATE INDEX IF NOT EXISTS reply_state  ON reply_target (state, found_at DESC);
 CREATE INDEX IF NOT EXISTS reply_author ON reply_target (author, sent_at DESC);
+
+-- Replies he asked for by hand (2026-08-22). He is scrolling anyway, and on
+-- Threads he finds the genuine questions X does not have — so he pastes what he
+-- found and the box drafts a reply for it.
+--
+-- platform matters because what happens next differs completely:
+--   twitter — resolvable from a url for free, and postable through Zernio
+--             (platformSpecificData.replyToTweetId). Send works.
+--   threads — NEITHER. Zernio has no reply-to-a-foreign-post field for Threads
+--             (only topic_tag and its own threadItems), and a Threads url
+--             cannot be resolved to a post id at all: the shortcode is not the
+--             Instagram encoding (checked against a post whose id we knew) and
+--             the page is a JS shell with no id and no og:description in it.
+--             So Threads drafts are COPIED OUT and posted by hand.
+ALTER TABLE reply_target ADD COLUMN platform TEXT NOT NULL DEFAULT 'twitter';
+ALTER TABLE reply_target ADD COLUMN source_url TEXT;
+ALTER TABLE reply_target ADD COLUMN asked_by TEXT;
