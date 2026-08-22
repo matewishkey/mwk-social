@@ -280,16 +280,31 @@ async function main() {
     // reshare === false means "do not"; anything else reposts, with his words
     // on top only if he wrote some.
     if (li && item.reshare !== false) {
-      try {
-        const shared = await reshare.quoteReshare(li.url, item.reshareText);
-        console.log(`reposted from the personal account${item.reshareText ? ' with your words' : ' (plain repost)'}`
-          + ` — ${shared ? shared._id : 'skipped'}`);
-        events.emit('linkedin.reshared', { message: 'quote-reshared from the personal account',
-          platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}` });
-      } catch (err) {
-        console.error(`reshare failed (the post itself is fine): ${err.message}`);
+      // Every personal account, not just the first. There are two now, and the
+      // second was invisible to this until the list became a list.
+      //
+      // reshareAll() catches each account for itself, so this try only covers
+      // the account LOOKUP failing — but it still has to be here: the post is
+      // already live, and a repost that cannot happen must never turn a
+      // published item into a failed one.
+      let shared = [];
+      try { shared = await reshare.reshareAll(li.url, item.reshareText); }
+      catch (err) {
+        shared = [];
+        console.error(`could not read the LinkedIn accounts, so nothing was reposted: ${err.message}`);
         events.emit('linkedin.reshare-failed', { message: err.message, level: 'warn',
-          platform: 'linkedin', dedupeKey: `linkedin.reshare-failed|${item.id}` });
+          platform: 'linkedin', dedupeKey: `linkedin.reshare-failed|${item.id}|lookup` });
+      }
+      for (const r of shared) {
+        if (r.ok) {
+          console.log(`reposted from ${r.account}${item.reshareText ? ' with your words' : ' (plain repost)'}`);
+          events.emit('linkedin.reshared', { message: `quote-reshared from ${r.account}`,
+            platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}|${r.account}` });
+        } else {
+          console.error(`reshare from ${r.account} failed (the post itself is fine): ${r.error}`);
+          events.emit('linkedin.reshare-failed', { message: `${r.account}: ${r.error}`, level: 'warn',
+            platform: 'linkedin', dedupeKey: `linkedin.reshare-failed|${item.id}|${r.account}` });
+        }
       }
     }
 

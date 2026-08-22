@@ -21,13 +21,22 @@
 
 const { api, cli } = require('./api');
 
-/** The two LinkedIn accounts, told apart by which profile owns them. */
+/*
+ * The LinkedIn accounts: one company page, and EVERY personal profile behind it.
+ *
+ * `personal` is a LIST, and that is not future-proofing — it is a bug fix. It
+ * used to be `all.find(a => a !== company)`, which returns the first one and
+ * silently ignores the rest. A second personal account was connected on
+ * 2026-08-22 and was invisible to the whole pipeline from the moment it was
+ * added: no error, no warning, just one fewer repost than anybody expected.
+ *
+ * The company page is matched on the display name we post under rather than a
+ * hard-coded id, so reconnecting it does not break this.
+ */
 function linkedinAccounts() {
   const all = (cli(['accounts:list']).accounts || []).filter((a) => a.platform === 'linkedin' && a.isActive !== false);
-  // The company page and the personal profile sit on different Zernio profiles.
-  // Rather than hard-code either id, match on the display name we post under.
   const company = all.find((a) => /wish\s*key/i.test(a.displayName || a.username || ''));
-  const personal = all.find((a) => a !== company);
+  const personal = all.filter((a) => a !== company);
   return { company, personal, all };
 }
 
@@ -39,7 +48,7 @@ function linkedinAccounts() {
 async function quoteReshare(postUrl, comment, account = null) {
   if (!postUrl) throw new Error('nothing to reshare — no post url');
 
-  const who = account || linkedinAccounts().personal;
+  const who = account || linkedinAccounts().personal[0];
   if (!who) throw new Error('no personal LinkedIn account in accounts:list');
 
   // reshareUrl is not exposed as a posts:create flag, so this goes to REST.
@@ -58,4 +67,27 @@ async function quoteReshare(postUrl, comment, account = null) {
   return post;
 }
 
-module.exports = { quoteReshare, linkedinAccounts };
+/*
+ * Repost one company post from every personal account there is.
+ *
+ * Each is caught where it happens: one account failing — a token that needs
+ * reconnecting, LinkedIn's duplicate-content 422 — must not cost the reposts
+ * from the others, and must never cost the post itself, which is already live.
+ * Same rule as the publish groups in run-queue.js, learned the same way.
+ */
+async function reshareAll(postUrl, comment) {
+  const { personal } = linkedinAccounts();
+  const results = [];
+  for (const who of personal) {
+    const name = who.displayName || who.username || who._id || who.id;
+    try {
+      const post = await quoteReshare(postUrl, comment, who);
+      results.push({ account: name, ok: true, id: post && post._id });
+    } catch (err) {
+      results.push({ account: name, ok: false, error: err.message });
+    }
+  }
+  return results;
+}
+
+module.exports = { quoteReshare, reshareAll, linkedinAccounts };

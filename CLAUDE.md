@@ -181,8 +181,20 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   be mixed either). So a vertical and a landscape cut are two posts, never one. `landscapeOk` on the
   platform table routes them: instagram/threads/tiktok are vertical-only, the rest take the wide
   cut. `queue_item.media_wide_key` carries the second one.
-- **`reshare.quoteReshare()` takes an account argument** — it is not hardwired to the one personal
-  profile, so adding LinkedIn accounts is a connection job, never a code change.
+- **`reshare.quoteReshare()` takes an account argument, but "adding an account is a connection job,
+  never a code change" WAS WRONG** — an earlier note here said exactly that, and a third LinkedIn
+  account connected on 2026-08-22 proved it. `linkedinAccounts().personal` was
+  `all.find(a => a !== company)`: **`find` where it needed `filter`**, so the new account was
+  invisible to the whole pipeline the moment it arrived. No error, no warning, one fewer repost
+  than anybody expected. `personal` is a LIST now, `reshare.reshareAll()` reposts from every one of
+  them, and a test fails if it ever goes back to `find` (verified with a positive control — the
+  revert fails six tests).
+- **Each reshare is caught for itself, and the lookup is caught too.** One account's 422 or expired
+  token must not cost the reposts from the others, and none of it may turn an already-published
+  post into a failed one. Same rule as the publish groups, learned the same expensive way.
+- **A LinkedIn account other than the company page is NEVER posted to natively** — `run-queue.js`
+  filters them out before publishing. They only ever repost what the company page published. That
+  filter keys off the company account, so it keeps working as personals are added.
 - **A LinkedIn repost with no commentary needs `content` OMITTED, not empty.** The docs are explicit
   that commentary is optional and leaving it out gives a one-click repost. `queue_item.reshare` is a
   separate flag from `reshare_text` for exactly this: an empty comment used to mean "do not repost".
