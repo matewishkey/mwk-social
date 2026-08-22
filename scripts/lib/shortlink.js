@@ -25,6 +25,14 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 const voice = require('./voice');
 
 /**
+ * @param {string} [opts.clipId] the QUEUE ITEM id. It is what makes a click
+ *   answerable back to a video: queue_item carries the media_key, so
+ *   click -> link.clip_id -> queue_item.media_key is the whole chain. It was
+ *   never set until 2026-08-22 and the only way back was a LIKE on the
+ *   post_key prefix, which worked for 14 links out of 55.
+ * @param {string} [opts.medium] where the link was placed — caption, comment,
+ *   reply or profile. Part of the mint key, so the same clip linked from a
+ *   caption and from a comment are two codes and two numbers.
  * @param {string} [opts.target] where the link should go. Defaults to the
  *   sign-up page, but ANY url we post can be tracked — a repo, an episode —
  *   and the far end keys on (target, platform, clip, post) so each gets its own
@@ -32,7 +40,7 @@ const voice = require('./voice');
  * @returns {Promise<string|null>} the short URL, or null to use the plain one.
  */
 async function mint({ platform = null, clipId = null, postKey = null, label = null,
-  target: wanted = null } = {}) {
+  campaign = null, medium = null, target: wanted = null } = {}) {
   const cfg = voice.shortLink();
   if (!cfg.enabled) return null;
 
@@ -45,7 +53,8 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
     const res = await fetch(`${new URL(base).origin}/links`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target, platform, clipId, postKey, label }),
+      body: JSON.stringify({ target, platform, clipId, postKey, label, campaign, medium,
+        createdBy: 'pipeline' }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
@@ -71,7 +80,8 @@ const URL_RE = /https?:\/\/[^\s<>"')\]]+[^\s<>"')\].,;:!?]/g;
  * open per url: one that cannot be minted is left exactly as written rather
  * than costing the post.
  */
-async function trackLinks(text, { platform = null, postKey = null, clipId = null } = {}) {
+async function trackLinks(text, { platform = null, postKey = null, clipId = null,
+  campaign = null, medium = null } = {}) {
   const body = String(text || '');
   const urls = [...new Set(body.match(URL_RE) || [])];
   if (!urls.length) return body;
@@ -82,7 +92,8 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
     // Not carriesCta(): that matches the sign-up destination as well, which is
     // precisely the link we most want to measure.
     if (host(url) === (voice.shortLink().host || '').toLowerCase()) continue;
-    const short = await mint({ platform, postKey, clipId, target: url, label: url.slice(0, 120) });
+    const short = await mint({ platform, postKey, clipId, campaign, medium,
+      target: url, label: url.slice(0, 120) });
     if (short) out = out.split(url).join(short);
   }
   return out;

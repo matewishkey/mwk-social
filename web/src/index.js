@@ -275,8 +275,17 @@ async function links(env, tz, email, url) {
   const page = pageOf(url, LINK_PAGE, total);
 
   const [rows, campaigns, totals] = await Promise.all([
+    // The join back to the video. clip_id is the queue item id, and queue_item
+    // carries the media_key — so click -> link -> item -> file is one hop, not
+    // a LIKE on a string prefix. The COALESCE keeps the 14 older links working:
+    // they predate clip_id and only carry `queue:<id>` in post_key.
     env.DB.prepare(
-      `SELECT l.*, ${counts} FROM link l ${clicks} ${where}
+      `SELECT l.*, ${counts},
+              q.id AS q_id, q.media_key AS q_media, q.body AS q_body
+         FROM link l ${clicks}
+         LEFT JOIN queue_item q
+           ON q.id = COALESCE(NULLIF(l.clip_id, ''), REPLACE(l.post_key, 'queue:', ''))
+        ${where}
         GROUP BY l.code ORDER BY l.created_at DESC LIMIT ?${bind.length + 1} OFFSET ?${bind.length + 2}`,
     ).bind(...bind, LINK_PAGE, (page - 1) * LINK_PAGE).all(),
     env.DB.prepare(

@@ -238,6 +238,12 @@ async function main() {
           // generic per-platform one. A retry keys off the item it is retrying,
           // not itself, or the same post's clicks land under two codes.
           postKey: `queue:${item.retryOf || item.id}`,
+          // The queue item id, stored on every code this post mints. It is what
+          // makes a click answerable back to a VIDEO: queue_item carries the
+          // media_key, so click -> link.clip_id -> queue_item.media_key is the
+          // whole chain. Before 2026-08-22 clip_id was never set and the only
+          // route back was a LIKE on the post_key prefix.
+          clipId: item.retryOf || item.id,
           accounts: accts.map((a) => a.id),
           all: false,
           media: file ? [file] : [],

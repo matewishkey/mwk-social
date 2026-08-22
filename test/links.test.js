@@ -119,3 +119,54 @@ test('campaign and medium are part of what makes a code unique', async () => {
     assert.ok(sel.includes(col), `${col} must be part of the mint key`);
   }
 });
+
+/* ------------------------------------------------ which clip earned the click */
+
+/*
+ * `clip_id` was declared on the link table from the beginning and never
+ * written — 0 of 55 links carried one. The only way back from a click to a
+ * video was a LIKE on the `post_key` prefix, which worked for 14 of them and
+ * for none of the 25 minted outside the queue. Two of these tests exist because
+ * of that; the third is the one that keeps it fixed.
+ */
+test('a mint carries the clip, the campaign and the placement', async () => {
+  const shortlink = require('../scripts/lib/shortlink');
+  const realFetch = global.fetch;
+  const sent = [];
+  process.env.MWK_LOG_URL = 'https://example.test/events';
+  process.env.MWK_LOG_TOKEN = 'x';
+  global.fetch = async (_u, o) => {
+    sent.push(JSON.parse(o.body));
+    return { ok: true, json: async () => ({ ok: true, url: 'https://mwkshow.com/aaaaa' }) };
+  };
+  try {
+    await shortlink.mint({ platform: 'facebook', postKey: 'queue:01ABC', clipId: '01ABC',
+      campaign: 'clip', medium: 'comment' });
+    assert.equal(sent.length, 1);
+    for (const k of ['platform', 'clipId', 'postKey', 'campaign', 'medium']) {
+      assert.ok(sent[0][k], `${k} must reach the mint, or the click cannot be attributed`);
+    }
+    assert.equal(sent[0].clipId, '01ABC');
+    assert.equal(sent[0].medium, 'comment');
+  } finally { global.fetch = realFetch; }
+});
+
+test('every place post.js mints a link names where the link is going', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
+  // linkFor's third argument IS the medium. A call without one stores null and
+  // the link becomes unattributable to a placement, which is half the question.
+  const calls = src.match(/linkFor\([^)]*\)/g) || [];
+  const invocations = calls.filter((c) => !c.startsWith('linkFor(platform, opts, medium'));
+  assert.ok(invocations.length >= 2, 'expected linkFor to be called at least twice');
+  for (const c of invocations) {
+    assert.match(c, /,\s*'(caption|comment|reply|profile)'\)$/, `${c} does not name a medium`);
+  }
+});
+
+test('the queue passes its item id down as the clip', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+  assert.match(src, /clipId:\s*item\.retryOf \|\| item\.id/,
+    'run-queue must hand the item id down, or nothing can join a click to a video');
+});

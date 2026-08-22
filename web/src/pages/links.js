@@ -63,6 +63,9 @@ export async function linksAction(request, env, email) {
 export function linksPage({ email, tz, host, rows, campaigns, totals, minted, err,
   campaign = '', page = 1, size = 50, total = 0, params = '' }) {
   const short = (code) => `https://${host}/${code}`;
+  // queue/2026-08-21-dont-call-your-brother.mp4 -> dont-call-your-brother
+  const clipName = (key) => (key || '').replace(/^.*\//, '').replace(/\.[a-z0-9]+$/i, '')
+    .replace(/^\d{4}-\d{2}-\d{2}-/, '') || null;
 
   const row = (l) => `<tr>
     <td class="code"><a href="${esc(short(l.code))}" target="_blank" rel="noopener">${esc(l.code)}</a></td>
@@ -70,6 +73,9 @@ export function linksPage({ email, tz, host, rows, campaigns, totals, minted, er
       : '<span class="faint">—</span>'}</td>
     <td class="faint">${esc(l.platform || '—')}</td>
     <td class="faint">${esc(l.medium || '—')}</td>
+    <td class="clip">${l.q_id
+      ? `<span title="${esc(l.q_body || '')}">${esc(clipName(l.q_media) || l.q_id)}</span>`
+      : '<span class="faint">—</span>'}</td>
     <td class="num ${l.human ? 'good' : ''}">${l.human || 0}</td>
     <td class="num faint">${l.crawler || 0}</td>
     <td class="tgt"><a href="${esc(l.target)}" target="_blank" rel="noopener">${esc(l.target)}</a>
@@ -127,9 +133,10 @@ ${card(campaign ? `Links in "${esc(campaign)}" (${total})` : `All links (${total
 </div>
 <div class="wrap"><table>
   <thead><tr><th>code</th><th>campaign</th><th>source</th><th>medium</th>
-    <th class="num">clicks</th><th class="num">bots</th><th>goes to</th><th>minted</th></tr></thead>
+    <th>which clip</th><th class="num">clicks</th><th class="num">bots</th>
+    <th>goes to</th><th>minted</th></tr></thead>
   <tbody>${rows.length ? rows.map(row).join('')
-    : '<tr><td colspan="8" class="empty">Nothing here.</td></tr>'}</tbody>
+    : '<tr><td colspan="9" class="empty">Nothing here.</td></tr>'}</tbody>
 </table></div>
 ${pager({ path: '/links', params, page, size, total, noun: 'links' })}`)}
 
@@ -146,7 +153,8 @@ ${pager({ path: '/links', params, page, size, total, noun: 'links' })}`)}
 td.code a { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-weight:600; }
 td.num { text-align:right; font-variant-numeric:tabular-nums; }
 td.num.good { color:var(--ok); font-weight:600; }
-td.tgt { max-width:32rem; }
+td.tgt { max-width:26rem; }
+td.clip { font-size:.8rem; max-width:12rem; }
 td.tgt a { word-break:break-all; font-size:.82rem; }
 .nt { display:block; font-size:.74rem; color:var(--faint); }
 code.big { font-size:1rem; font-weight:600; }

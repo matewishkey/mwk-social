@@ -159,14 +159,15 @@ async function commentFor(platform, text, opts) {
 
   const live = !linkToProfile(platform);
 
+  const where = { platform, postKey, clipId: opts.clipId || null,
+    campaign: opts.campaign || 'clip', medium: 'comment' };
+
   if (opts.comment) {
     // Every url in a custom comment gets its own code, on this platform — but
     // only where a url is clickable at all. On Instagram and TikTok a code
     // spent in a comment can never be followed, so his words go through as
     // written and the tracking happens on the bio link instead.
-    const body = live
-      ? await shortlink.trackLinks(opts.comment, { platform, postKey })
-      : opts.comment;
+    const body = live ? await shortlink.trackLinks(opts.comment, where) : opts.comment;
     // Tags only if the caption is not already carrying them, or the post would
     // show the same list twice.
     const tags = tagsInCaption(platform) ? '' : voice.tagLine(platform, opts.topics || []);
@@ -177,7 +178,7 @@ async function commentFor(platform, text, opts) {
   // minted one — so a pipeline post's CTA was the one link we could not measure.
   // No mint at all where the url would be plain text: that is a code spent on a
   // click that cannot happen, and it reads in the numbers as indifference.
-  const showUrl = live ? await shortlink.mint({ platform, postKey, label: opts.title || null }) : null;
+  const showUrl = live ? await shortlink.mint({ ...where, label: opts.title || null }) : null;
   return voice.firstComment(postKey, {
     platform,
     topicTags: opts.topics,
@@ -278,10 +279,12 @@ const tagsInCaption = (platform) => {
  * default is the CTA short link. Never fatal — with no dashboard to mint
  * against, the plain sign-up url goes out instead.
  */
-async function linkFor(platform, opts) {
+async function linkFor(platform, opts, medium) {
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
-  if (opts.comment) return shortlink.trackLinks(opts.comment, { platform, postKey });
-  return (await shortlink.mint({ platform, postKey, label: opts.title || null }))
+  const where = { platform, postKey, clipId: opts.clipId || null,
+    campaign: opts.campaign || 'clip', medium };
+  if (opts.comment) return shortlink.trackLinks(opts.comment, where);
+  return (await shortlink.mint({ ...where, label: opts.title || null }))
     || voice.config().links.show;
 }
 
@@ -289,7 +292,7 @@ async function captionForPlatform(platform, opts) {
   const parts = [opts.text];
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
 
-  if (linkInCaption(platform)) parts.push(await linkFor(platform, opts));
+  if (linkInCaption(platform)) parts.push(await linkFor(platform, opts, 'caption'));
   else if (profileCtaInCaption(platform)) parts.push(voice.config().firstComment.profileCta);
   if (tagsInCaption(platform)) {
     const tags = voice.tagLine(platform, opts.topics || []);
@@ -340,7 +343,7 @@ async function publish(opts) {
         // threadItems REPLACES the top-level content for this platform — the
         // caption is published as threadItems[0], not as the post body.
         entry.platformSpecificData = Object.assign(entry.platformSpecificData || {},
-          { threadItems: threadWithLink(caption, await linkFor(a.platform, opts), media) });
+          { threadItems: threadWithLink(caption, await linkFor(a.platform, opts, 'reply'), media) });
       }
       b.platforms.push(entry);
     }
