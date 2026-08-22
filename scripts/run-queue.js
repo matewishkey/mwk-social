@@ -309,7 +309,9 @@ async function main() {
       }
       for (const r of shared) {
         if (r.ok) {
-          console.log(`reposted from ${r.account}${item.reshareText ? ' with your words' : ' (plain repost)'}`);
+          const when = r.delayMinutes
+            ? `in ${Math.round(r.delayMinutes / 60)}h` : 'now';
+          console.log(`repost from ${r.account} — ${when}${item.reshareText ? ', with your words' : ' (plain repost)'}`);
           events.emit('linkedin.reshared', { message: `quote-reshared from ${r.account}`,
             platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}|${r.account}` });
         } else {

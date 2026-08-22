@@ -40,12 +40,28 @@ function linkedinAccounts() {
   return { company, personal, all };
 }
 
+/*
+ * How far apart two personal accounts repost the same company post.
+ *
+ * Mate's call, 2026-08-22: "keep them out of sync, so can we make lag between
+ * them... we do not have to repost news, just let's have some wait time." Two
+ * reposts of the same thing landing in the same minute reads as one person
+ * running two accounts, which is what it is — spaced out, each one is somebody
+ * sharing something they saw, and each gets its own pass at the feed.
+ *
+ * Four hours: far enough apart that nobody sees them together, close enough
+ * that both land the same day. Zernio holds the later one (`scheduledFor`), so
+ * nothing has to stay running on this box to make it happen.
+ */
+const RESHARE_LAG_MINUTES = Number(process.env.MWK_RESHARE_LAG_MINUTES || 240);
+
 /**
  * @param {string} postUrl  the company post to repost
  * @param {string} [comment] his words. Omitted or blank gives a plain repost.
  * @param {object} [account] which account reposts; defaults to the personal one.
+ * @param {number} [delayMinutes] 0 posts now; anything else schedules it.
  */
-async function quoteReshare(postUrl, comment, account = null) {
+async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0) {
   if (!postUrl) throw new Error('nothing to reshare — no post url');
 
   const who = account || linkedinAccounts().personal[0];
@@ -58,8 +74,12 @@ async function quoteReshare(postUrl, comment, account = null) {
       accountId: who._id || who.id,
       platformSpecificData: { reshareUrl: postUrl },
     }],
-    publishNow: true,
   };
+  if (delayMinutes > 0) {
+    body.scheduledFor = new Date(Date.now() + delayMinutes * 60000).toISOString();
+  } else {
+    body.publishNow = true;
+  }
   // Omitted, not empty: the docs say leave content out for a plain repost.
   if (comment && comment.trim()) body.content = comment.trim();
 
@@ -75,19 +95,24 @@ async function quoteReshare(postUrl, comment, account = null) {
  * from the others, and must never cost the post itself, which is already live.
  * Same rule as the publish groups in run-queue.js, learned the same way.
  */
-async function reshareAll(postUrl, comment) {
+async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES } = {}) {
   const { personal } = linkedinAccounts();
   const results = [];
-  for (const who of personal) {
+  for (let i = 0; i < personal.length; i++) {
+    const who = personal[i];
     const name = who.displayName || who.username || who._id || who.id;
+    // The first goes now; each one after it is staggered so two accounts never
+    // repost the same post in the same minute.
+    const delay = i * lagMinutes;
     try {
-      const post = await quoteReshare(postUrl, comment, who);
-      results.push({ account: name, ok: true, id: post && post._id });
+      const post = await quoteReshare(postUrl, comment, who, delay);
+      results.push({ account: name, ok: true, id: post && post._id, delayMinutes: delay,
+        at: delay ? new Date(Date.now() + delay * 60000).toISOString() : null });
     } catch (err) {
-      results.push({ account: name, ok: false, error: err.message });
+      results.push({ account: name, ok: false, error: err.message, delayMinutes: delay });
     }
   }
   return results;
 }
 
-module.exports = { quoteReshare, reshareAll, linkedinAccounts };
+module.exports = { quoteReshare, reshareAll, linkedinAccounts, RESHARE_LAG_MINUTES };

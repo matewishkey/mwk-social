@@ -203,6 +203,11 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   than anybody expected. `personal` is a LIST now, `reshare.reshareAll()` reposts from every one of
   them, and a test fails if it ever goes back to `find` (verified with a positive control — the
   revert fails six tests).
+- **The two personal reshares are STAGGERED, four hours apart** (mate's call, 2026-08-22: "keep them
+  out of sync... let's have some wait time"). Two accounts reposting the same thing in the same
+  minute reads as one person running two accounts, which is what it is. The first goes now, each
+  one after it gets `scheduledFor` — **Zernio holds it**, so nothing has to stay running on this
+  box. `MWK_RESHARE_LAG_MINUTES` overrides the 240.
 - **Each reshare is caught for itself, and the lookup is caught too.** One account's 422 or expired
   token must not cost the reposts from the others, and none of it may turn an already-published
   post into a failed one. Same rule as the publish groups, learned the same expensive way.

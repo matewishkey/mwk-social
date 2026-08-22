@@ -130,3 +130,67 @@ test('a plain repost omits content entirely, rather than sending an empty one', 
     delete require.cache[require.resolve('../scripts/lib/reshare.js')];
   }
 });
+
+/*
+ * Two accounts reposting the same thing in the same minute reads as one person
+ * running two accounts — which it is. Spaced out, each is somebody sharing
+ * something they saw, and each gets its own pass at the feed. Mate's call,
+ * 2026-08-22: "keep them out of sync... let's have some wait time."
+ *
+ * Zernio holds the later one via scheduledFor, so nothing has to stay running
+ * on this box for the second repost to happen.
+ */
+test('the first account reposts now and the rest are staggered', async () => {
+  const path = require.resolve('../scripts/lib/api.js');
+  const real = require.cache[path];
+  delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  const bodies = [];
+  require.cache[path] = new Module(path, null);
+  require.cache[path].loaded = true;
+  require.cache[path].exports = {
+    cli: () => ({ accounts: [LI('Mate Wish Key', 'co'), LI('Mate Visky', 'a'), LI('Suzy Fay', 'b')] }),
+    api: async (_m, _e, { body }) => { bodies.push(body); return { post: { _id: 'ok' } }; },
+  };
+  try {
+    const reshare = require('../scripts/lib/reshare.js');
+    const before = Date.now();
+    const out = await reshare.reshareAll('https://linkedin.com/x', null, { lagMinutes: 240 });
+
+    assert.equal(bodies.length, 2);
+    assert.equal(bodies[0].publishNow, true, 'the first goes out immediately');
+    assert.ok(!bodies[0].scheduledFor);
+
+    assert.ok(!bodies[1].publishNow, 'the second must not also publish now');
+    const at = new Date(bodies[1].scheduledFor).getTime();
+    const gapMin = (at - before) / 60000;
+    assert.ok(gapMin > 239 && gapMin < 242, `second repost is ${gapMin} minutes out, expected ~240`);
+
+    assert.equal(out[0].delayMinutes, 0);
+    assert.equal(out[1].delayMinutes, 240);
+  } finally {
+    if (real) require.cache[path] = real; else delete require.cache[path];
+    delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  }
+});
+
+test('with one personal account there is nothing to stagger', async () => {
+  const path = require.resolve('../scripts/lib/api.js');
+  const real = require.cache[path];
+  delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  const bodies = [];
+  require.cache[path] = new Module(path, null);
+  require.cache[path].loaded = true;
+  require.cache[path].exports = {
+    cli: () => ({ accounts: [LI('Mate Wish Key', 'co'), LI('Mate Visky', 'a')] }),
+    api: async (_m, _e, { body }) => { bodies.push(body); return { post: { _id: 'ok' } }; },
+  };
+  try {
+    const reshare = require('../scripts/lib/reshare.js');
+    await reshare.reshareAll('https://linkedin.com/x');
+    assert.equal(bodies.length, 1);
+    assert.equal(bodies[0].publishNow, true, 'a lone account must not be delayed for no reason');
+  } finally {
+    if (real) require.cache[path] = real; else delete require.cache[path];
+    delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  }
+});
