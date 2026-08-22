@@ -6,12 +6,15 @@
  * he has already approved goes out FIRST, because making him wait a cycle for a
  * decision he already made is rude. Same shape as yt-description.js.
  *
- *   1. send      what he approved on the dashboard, as a real reply on X
- *   2. find      new posts worth answering, drafted and filed for approval
- *   3. outcomes  how the sent ones did, days later
+ *   1. send      DEAD — X blocked programmatic replies on 23 Feb 2026. Kept
+ *                only so the reason is written down where somebody would look
+ *                before rebuilding it. See sendOne().
+ *   2. find      new posts worth answering, drafted and filed for him to copy
+ *   3. outcomes  how the posted ones did — only for replies with a recorded id,
+ *                which a hand-posted one does not have
  *
- * Nothing here posts anything he has not released. That is the whole design:
- * a reply goes out under his name, to a real person, in his voice.
+ * Nothing here posts anything. A reply goes out under his name, to a real
+ * person, in his voice — and now, by his own hand.
  *
  * Usage:
  *   scripts/replies.js --sync                run all three phases
@@ -67,10 +70,23 @@ function dashboard() {
 /* ------------------------------------------------------------------- send -- */
 
 /*
- * Post one approved reply. `platformSpecificData.replyToTweetId` publishes it
- * into that tweet's thread — it is not a comment API call, it is an ordinary
- * post that happens to be a reply, which is why it works on a plan whose
- * comment endpoints we only just switched on.
+ * DEAD, and kept only so nobody rebuilds it.
+ *
+ * On 23 February 2026 X restricted programmatic replies on every plan below
+ * Enterprise: POST /2/tweets will only reply if the original author has
+ * @mentioned or quoted you first. Confirmed by @XDevelopers, and by trying it —
+ * Zernio returns 207 with
+ *
+ *   "X (Twitter) cannot reply to this post. Since February 2026, X only allows
+ *    API replies when the original author has @mentioned or quoted you.
+ *    Self-replies (threads) are not affected."
+ *
+ * The self-reply carve-out is why our own thread CTA still publishes. Answering
+ * a stranger does not, at any price, on any plan we would ever buy.
+ *
+ * So the drafts are copied off the dashboard and posted by hand. This function
+ * stays because the day X reverses it, or somebody @mentions us and a reply
+ * becomes legal again, this is the code — not because anything calls it.
  */
 async function sendOne(item) {
   const body = {
@@ -103,7 +119,14 @@ async function sendOne(item) {
 
 async function send(call, { dryRun }) {
   const { items = [] } = await call('/replies/pending', {});
-  if (!items.length) { console.log('nothing approved'); return 0; }
+  if (!items.length) return 0;
+  // Anything sitting in `approved` predates the X restriction. Say so rather
+  // than throwing it at an endpoint that cannot accept it.
+  console.log(`${items.length} approved reply/replies cannot be sent by API — `
+    + 'X blocks programmatic replies to anyone who has not mentioned you. '
+    + 'Copy them off https://social.matewishkey.com/replies and post them yourself.');
+  return 0;
+  /* eslint-disable no-unreachable */
 
   const sent = [];
   for (const item of items) {
@@ -123,6 +146,7 @@ async function send(call, { dryRun }) {
   }
   if (sent.length) await call('/replies/sent', { sent });
   return sent.filter((s) => !s.error).length;
+  /* eslint-enable no-unreachable */
 }
 
 /* ------------------------------------------------------------------- find -- */

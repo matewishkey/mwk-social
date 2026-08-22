@@ -117,7 +117,7 @@ if [[ "$want" == all || "$want" == replies ]]; then
   # calls and the box is 15 GB with earlyoom watching.
   unit mwk-replies \
     'Find X posts worth replying to, send what he approved' \
-    "$repo/scripts/replies.js --sync" \
+    "$repo/scripts/replies.js --find" \
     '*:07/20' \
     'Draft and send MWK X replies'
 fi

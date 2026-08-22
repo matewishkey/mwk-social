@@ -1,11 +1,21 @@
 /*
  * X replies waiting on him.
  *
- * The whole reason this is a page and not a bot: a reply goes out under his
- * name, in his voice, to a real person. He reviews on a phone in under a
- * minute — the tweet, the draft, Send or Skip — and nothing leaves the box
- * until he presses one of them. Same shape as the YouTube proposals, which is
- * what he asked for by name.
+ * He posts these HIMSELF, and that is not a preference — it is the only way
+ * left. On 23 February 2026 X restricted programmatic replies on every plan
+ * below Enterprise: POST /2/tweets will only reply if the original author has
+ * @mentioned or quoted you first. Zernio surfaced it as
+ *
+ *   "X (Twitter) cannot reply to this post. Since February 2026, X only allows
+ *    API replies when the original author has @mentioned or quoted you.
+ *    Self-replies (threads) are not affected."
+ *
+ * confirmed by @XDevelopers. Our own thread CTA still works, because that is a
+ * self-reply. Answering a stranger is not.
+ *
+ * So the page drafts and he copies. Which is arguably where this should have
+ * landed anyway: a reply under his name, in his voice, to a real person, sent
+ * by the person whose name is on it.
  *
  * Two things on this page are deliberate and easy to get wrong:
  *
@@ -37,15 +47,19 @@ export async function repliesAction(request, env, email) {
   const id = String(form.get('tweetId') || '');
   const now = new Date().toISOString();
 
-  if (id && ['approve', 'skip'].includes(doing)) {
+  if (id && ['posted', 'skip'].includes(doing)) {
     // The edit box is always posted with the form, so a change he made and then
-    // approved in one press is not lost. Blank means "use the draft".
+    // marked done in one press is not lost. Blank means "use the draft".
+    //
+    // 'posted' goes straight to sent, with no sent_id: he pasted it into X
+    // himself, so there is no id to record and nothing for the box to do.
     const edited = String(form.get('text') || '').trim();
     await env.DB.prepare(
       `UPDATE reply_target SET state = ?, decided_at = ?, decided_by = ?,
+         sent_at = CASE WHEN ?1 = 'sent' THEN ?2 ELSE NULL END,
          edited = CASE WHEN ?4 = '' THEN edited ELSE ?4 END
        WHERE tweet_id = ?5 AND state = 'proposed'`,
-    ).bind(doing === 'approve' ? 'approved' : 'skipped', now, email, edited, id).run();
+    ).bind(doing === 'posted' ? 'sent' : 'skipped', now, email, edited, id).run();
   }
   return Response.redirect(new URL('/replies', request.url).toString(), 303);
 }
@@ -73,12 +87,13 @@ export function repliesPage({ email, tz, waiting, settled, byState = {}, stats =
       ${r.state === 'proposed' ? `
       <form method="post" class="rf">
         <input type="hidden" name="tweetId" value="${esc(r.tweet_id)}">
-        <textarea name="text" rows="3" maxlength="270">${esc(text)}</textarea>
+        <textarea name="text" id="t-${esc(r.tweet_id)}" rows="3" maxlength="270">${esc(text)}</textarea>
         <div class="rfoot">
           <span class="faint">${text.length} chars${r.invite ? ' · mentions the show' : ''}</span>
           <span class="acts">
-            <a class="btn" href="${esc(tweetUrl(r))}" target="_blank" rel="noopener">See it on X</a>
-            <button class="primary" name="do" value="approve">Send</button>
+            <button type="button" class="primary copy" data-t="t-${esc(r.tweet_id)}">Copy</button>
+            <a class="btn" href="${esc(tweetUrl(r))}" target="_blank" rel="noopener">Open on X</a>
+            <button name="do" value="posted">Posted it</button>
             <button name="do" value="skip">Skip</button>
           </span>
         </div>
@@ -97,14 +112,21 @@ export function repliesPage({ email, tz, waiting, settled, byState = {}, stats =
   const body = `
 <h1>Replies</h1>
 <p class="lede">Posts from people you follow that are worth adding something specific to, with a
-draft underneath. Nothing goes out until you press Send. No links, ever — X buries a post that
-carries one, and the route to the show is your bio.</p>
+draft underneath. <b>Copy</b>, <b>Open on X</b>, paste, then <b>Posted it</b>. No links, ever —
+X buries a post that carries one, and the route to the show is your bio.</p>
+
+<div class="card whybox"><div class="card-body">
+<b>Why you paste it rather than the box sending it.</b> On 23 February 2026 X restricted
+programmatic replies on every plan below Enterprise — the API will only reply to someone who has
+already @mentioned or quoted you. Our own thread CTA still works because that is a self-reply;
+answering a stranger is not. So this page writes and you post.
+</div></div>
 
 <div class="tiles">
   ${tile(waiting.length, 'waiting on you', waiting.length ? 'warn' : 'ok')}
-  ${tile(byState.sent || 0, 'sent')}
+  ${tile(byState.sent || 0, 'posted by you')}
   ${tile(stats.authorReplied || 0, 'they replied back', stats.authorReplied ? 'ok' : 'plain',
-    'the one that counts')}
+    'read it in the X app')}
   ${tile(byState.skipped || 0, 'skipped', 'plain')}
 </div>
 
@@ -117,6 +139,7 @@ ${total ? card(`Settled (${total})`, settled.map(item).join('')
   + pager({ path: '/replies', params, page, size, total, noun: 'replies' })) : ''}
 
 <style>
+.whybox { border-color:var(--warn); background:var(--warn-soft); }
 .rep { border-bottom:1px solid var(--line2); padding:0 0 1.1rem; margin:0 0 1.1rem; }
 .rep:last-child { border-bottom:0; margin-bottom:0; padding-bottom:0; }
 .rep > header { display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; margin:0 0 .5rem; }
@@ -136,7 +159,18 @@ blockquote { margin:0 0 .6rem; padding:.6rem .8rem; background:var(--bg); border
 .said { padding:.55rem .8rem; background:var(--bg); border:1px solid var(--line2); border-radius:8px;
   font-size:.88rem; white-space:pre-wrap; }
 .good { color:var(--ok); } .bad { color:var(--bad); }
-</style>`;
+</style>
+<script>
+document.querySelectorAll('button.copy').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var el = document.getElementById(b.dataset.t);
+    var t = el.value;
+    function ok() { b.textContent = 'Copied'; setTimeout(function () { b.textContent = 'Copy'; }, 1600); }
+    if (navigator.clipboard) { navigator.clipboard.writeText(t).then(ok, fb); } else { fb(); }
+    function fb() { el.select(); try { document.execCommand('copy'); ok(); } catch (e) { b.textContent = 'select and copy'; } }
+  });
+});
+</script>`;
 
   return layout({ title: 'Replies', path: '/replies', email, tz, body, wide: true });
 }

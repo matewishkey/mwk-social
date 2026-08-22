@@ -132,3 +132,31 @@ test('the daily cap is small on purpose', () => {
   assert.ok(p.perDay <= 15, `perDay is ${p.perDay} — X deboosts a reply guy`);
   assert.ok(p.perRun <= p.perDay);
 });
+
+/* ------------------------------------------------------- what X will not allow */
+
+/*
+ * On 23 February 2026 X restricted programmatic replies on every plan below
+ * Enterprise: POST /2/tweets only replies if the original author @mentioned or
+ * quoted you first. Confirmed by @XDevelopers and by trying it — the whole send
+ * half of this feature was built and then died on its first live attempt.
+ *
+ * These pin the two things that must not drift back: the timer must not try to
+ * send, and the reason must stay written down next to the dead code.
+ */
+test('the timer only finds — it does not try to send', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'install-timers.sh'), 'utf8');
+  const unit = src.slice(src.indexOf('unit mwk-replies'), src.indexOf('unit mwk-replies') + 400);
+  assert.match(unit, /replies\.js --find/, 'the replies timer must run --find');
+  assert.ok(!/replies\.js --sync/.test(unit),
+    '--sync includes the send phase, which X refuses');
+});
+
+test('the reason X replies are impossible is written where someone would look', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'replies.js'), 'utf8');
+  assert.match(src, /February 2026/, 'the date of the restriction must be recorded');
+  assert.match(src, /@mentioned or quoted/, 'the exact condition must be recorded');
+  assert.match(src, /[Ss]elf-repl/, 'the carve-out that keeps our thread CTA working must be noted');
+});
