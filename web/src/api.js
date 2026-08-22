@@ -9,6 +9,9 @@
  *   POST /youtube/propose   file drafted descriptions for approval
  *   POST /youtube/pending   "which ones did he say yes to?"
  *   POST /youtube/applied   mark them written
+ *   POST /replies/propose   file drafted X replies for approval
+ *   POST /replies/pending   "which ones did he say yes to?"
+ *   POST /replies/sent      record what happened, and later how it did
  *   POST /actions       file a your-turn item
  *
  * The queue is a to-do list, not a scheduler. The box decides WHEN — it already
@@ -35,6 +38,9 @@ export async function api(request, env, url) {
     case '/youtube/propose': return propose(body, env);
     case '/youtube/pending': return pending(body, env);
     case '/youtube/applied': return applied(body, env);
+    case '/replies/propose': return replyPropose(body, env);
+    case '/replies/pending': return replyPending(body, env);
+    case '/replies/sent':    return replySent(body, env);
     case '/actions':      return fileAction(body, env);
     default:              return new Response('not found', { status: 404 });
   }
@@ -294,4 +300,93 @@ async function applied(body, env) {
     `UPDATE yt_proposal SET state = 'applied', applied_at = ? WHERE video_id = ?`,
   ).bind(now, id)));
   return json({ ok: true, applied: ids.length });
+}
+
+
+/* ---------------------------------------------------------------- replies -- */
+
+/*
+ * File drafted replies. Exactly like the YouTube proposals: a row he has
+ * already decided on is never touched, so a re-run cannot un-approve something
+ * or push a skipped one back into the queue.
+ *
+ * The reply he will see is stored whole. Nothing is regenerated at send time —
+ * the draft carries deliberate typos from a seeded generator, and a second
+ * render that differed would mean he approved one thing and we posted another.
+ */
+async function replyPropose(body, env) {
+  const items = Array.isArray(body.items) ? body.items : [];
+  if (!items.length) return json({ ok: true, filed: 0 });
+  const now = new Date().toISOString();
+  await env.DB.batch(items.map((i) => env.DB.prepare(
+    `INSERT INTO reply_target
+       (tweet_id, author, author_name, tweet_text, tweet_at, reply_count,
+        found_at, draft, invite, why, state)
+     VALUES (?,?,?,?,?,?,?,?,?,?,'proposed')
+     ON CONFLICT(tweet_id) DO UPDATE SET
+       draft = excluded.draft, why = excluded.why, invite = excluded.invite,
+       reply_count = excluded.reply_count
+     WHERE reply_target.state = 'proposed'`,
+  ).bind(String(i.tweetId), i.author, i.authorName || null, i.tweetText || '',
+    i.tweetAt || null, i.replyCount ?? null, now, i.draft || '',
+    i.invite ? 1 : 0, i.why || null)));
+  return json({ ok: true, filed: items.length });
+}
+
+/*
+ * What he approved, plus who we have replied to lately. The second half is the
+ * cooldown: turning up under the same person repeatedly is what reads as a bot,
+ * whatever the words say — so the box needs to know who is off limits before it
+ * spends a search on them.
+ */
+const replyPending = async (_body, env) => json({
+  ok: true,
+  items: (await env.DB.prepare(
+    `SELECT tweet_id, author, COALESCE(NULLIF(edited, ''), draft) AS text
+       FROM reply_target WHERE state = 'approved' ORDER BY decided_at`).all()).results || [],
+  recentAuthors: ((await env.DB.prepare(
+    `SELECT DISTINCT author FROM reply_target
+      WHERE sent_at IS NOT NULL AND sent_at > datetime('now', '-14 days')`).all()).results || [])
+    .map((r) => r.author),
+  // Everything already on the board, so the box does not re-draft what is
+  // sitting in front of him or re-file one he has skipped.
+  known: ((await env.DB.prepare(
+    `SELECT tweet_id FROM reply_target`).all()).results || []).map((r) => r.tweet_id),
+  sentToday: ((await env.DB.prepare(
+    `SELECT COUNT(*) n FROM reply_target WHERE sent_at > datetime('now', '-1 day')`).first()) || {}).n || 0,
+  // Sent, landed, and old enough to have been noticed — but not yet scored.
+  // Two days is the wait: X conversations move for a while, and re-reading one
+  // an hour after it went out costs half a cent to learn nothing.
+  sentAwaiting: (await env.DB.prepare(
+    `SELECT tweet_id, author, sent_id FROM reply_target
+      WHERE state = 'sent' AND sent_id IS NOT NULL AND outcome_at IS NULL
+        AND sent_at < datetime('now', '-2 days')
+      ORDER BY sent_at LIMIT 20`).all()).results || [],
+});
+
+/*
+ * What happened. Two shapes on one endpoint: `sent` records the post going out
+ * (or failing), `outcomes` records how it did days later — which is the entire
+ * point of running this for a month.
+ */
+async function replySent(body, env) {
+  const now = new Date().toISOString();
+  const stmts = [];
+  for (const s of (Array.isArray(body.sent) ? body.sent : [])) {
+    if (!s || !s.tweetId) continue;
+    stmts.push(env.DB.prepare(
+      `UPDATE reply_target SET state = ?, sent_at = ?, sent_id = ?, sent_url = ?, error = ?
+        WHERE tweet_id = ?`,
+    ).bind(s.error ? 'failed' : 'sent', s.error ? null : now,
+      s.sentId || null, s.sentUrl || null, s.error || null, String(s.tweetId)));
+  }
+  for (const o of (Array.isArray(body.outcomes) ? body.outcomes : [])) {
+    if (!o || !o.tweetId) continue;
+    stmts.push(env.DB.prepare(
+      `UPDATE reply_target SET outcome_at = ?, got_likes = ?, got_replies = ?, author_replied = ?
+        WHERE tweet_id = ?`,
+    ).bind(now, o.likes ?? 0, o.replies ?? 0, o.authorReplied ? 1 : 0, String(o.tweetId)));
+  }
+  if (stmts.length) await env.DB.batch(stmts);
+  return json({ ok: true, sent: (body.sent || []).length, outcomes: (body.outcomes || []).length });
 }

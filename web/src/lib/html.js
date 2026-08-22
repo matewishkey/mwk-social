@@ -102,6 +102,7 @@ const NAV = [
   ['/stats', 'Stats'],
   ['/queue', 'Queue'],
   ['/youtube', 'YouTube'],
+  ['/replies', 'Replies'],
   ['/links', 'Links'],
   ['/config', 'Workflows'],
 ];

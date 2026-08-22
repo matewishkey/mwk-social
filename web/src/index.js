@@ -29,6 +29,7 @@ import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
 import { youtubePage, youtubeAction } from './pages/youtube.js';
 import { linksPage, linksAction } from './pages/links.js';
+import { repliesPage, repliesAction } from './pages/replies.js';
 
 const EVENT_PAGE = 100;
 const HISTORY_PAGE = 25;
@@ -95,6 +96,7 @@ async function dashboard(request, env, url) {
     if (url.pathname === '/queue')   return queueAction(request, env, email);
     if (url.pathname === '/youtube') return youtubeAction(request, env, email);
     if (url.pathname === '/links')   return linksAction(request, env, email);
+    if (url.pathname === '/replies') return repliesAction(request, env, email);
     if (url.pathname === '/')        return overviewAction(request, env, email);
     return new Response('not found', { status: 404 });
   }
@@ -107,6 +109,7 @@ async function dashboard(request, env, url) {
     case '/queue':   return html(await queue(env, tz, snapshots, email, url));
     case '/youtube': return html(await youtube(env, tz, snapshots, email, url));
     case '/links':   return html(await links(env, tz, email, url));
+    case '/replies': return html(await replies(env, tz, email, url));
     case '/':        return html(await overview(request, env, tz, snapshots, email, url));
     default:         return new Response('not found', { status: 404 });
   }
@@ -225,6 +228,37 @@ async function queue(env, tz, snapshots, email, url) {
  * link look like a success.
  */
 const LINK_PAGE = 50;
+const REPLY_PAGE = 25;
+
+/*
+ * X replies. The tiles count the whole table rather than the page in front of
+ * him — "sent" meaning "sent on this page" would shrink every time he paged.
+ */
+async function replies(env, tz, email, url) {
+  const [waiting, totalRow, states, stats] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM reply_target WHERE state = 'proposed'
+                     ORDER BY tweet_at DESC, found_at DESC`).all(),
+    env.DB.prepare(`SELECT COUNT(*) n FROM reply_target WHERE state != 'proposed'`).first(),
+    env.DB.prepare('SELECT state, COUNT(*) n FROM reply_target GROUP BY state').all(),
+    env.DB.prepare(`SELECT SUM(author_replied) AS authorReplied, SUM(got_replies) AS gotReplies
+                      FROM reply_target WHERE outcome_at IS NOT NULL`).first(),
+  ]);
+  const rows = (totalRow && totalRow.n) || 0;
+  const page = pageOf(url, REPLY_PAGE, rows);
+  const settled = await env.DB.prepare(
+    `SELECT * FROM reply_target WHERE state != 'proposed'
+      ORDER BY COALESCE(sent_at, decided_at, found_at) DESC LIMIT ?1 OFFSET ?2`,
+  ).bind(REPLY_PAGE, (page - 1) * REPLY_PAGE).all();
+
+  return repliesPage({
+    email, tz,
+    waiting: waiting.results || [],
+    settled: settled.results || [],
+    byState: Object.fromEntries((states.results || []).map((r) => [r.state, r.n])),
+    stats: stats || {},
+    page, size: REPLY_PAGE, total: rows, params: url.searchParams,
+  });
+}
 
 async function links(env, tz, email, url) {
   const campaign = url.searchParams.get('campaign') || '';

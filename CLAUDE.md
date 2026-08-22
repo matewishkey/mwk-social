@@ -428,6 +428,49 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   IPv6 route, so plain `curl` fails to connect in ~14 ms and `fetch` times out. Use `curl -4` when
   testing by hand; `ship-events.js` sets `net.setDefaultAutoSelectFamilyAttemptTimeout(1000)`.
 
+## X replies (`scripts/replies.js`, `/replies` on the dashboard)
+
+- **The strategy was WRONG the first time, and the correction is the useful part.** Searching all of
+  X for strangers asking answerable questions returned **0 usable posts out of 168** across three
+  live runs — the people this show is for are not on X phrasing problems in searchable ways, and
+  half of what matches is marketers using the same words. The reply sections of large accounts were
+  worse: 100 replies, 96 noise, 4 promo, 0 usable. **What works is what X itself rewards** — reply
+  early to accounts already in your niche. Measured on the follow list: 22 people produced 6 posts
+  worth answering in 24h, against a cap of five a day.
+- **`config/replies.json` is the whole policy** — the watch list, the queries, the block list, the
+  triage rules, the drafting rules and the caps. `lib/replies.js` is the only reader.
+- **Mate's rule, absolute (2026-08-22): never reply under somebody who is promoting their stuff.**
+  His words: "that is not nice". The triage classifies `promo` and drops it. The watch list is
+  **people, never brands** for the same reason — a brand account posts marketing by definition.
+- **NO LINK IN A REPLY, ever.** X deprioritises a post carrying an external url and a reply is the
+  worst place to spend that. The route to the show is the **bio**, which is why the bio link is the
+  tracked one. `problems()` refuses any draft containing one.
+- **NEVER let the model invent his history.** The very first live draft claimed he had hosted and
+  sold his own digital assets — he never said any such thing, and a made-up anecdote under his name
+  cannot be walked back. The prompt forbids it and `problems()` is the hard backstop under it,
+  matching `i built` / `i ended up` / `my client` / `when i was`. Same shape as the blocked-tag list
+  under `topic-tags.js`.
+- **The draft carries deliberate typos and they are SEEDED off the tweet id** (`lib/typos.js`).
+  Keyboard-adjacent substitutions weighted highest; never a url, handle, hashtag or number; at most
+  two; nothing under 60 characters. Seeded because what he approves on the dashboard has to be
+  byte-for-byte what gets posted — regenerating at send time would mean he approved one thing and we
+  posted another. **Premium users can downvote a reply flagged as AI-generated**, which is what this
+  is actually defending against.
+- **`sinceId` is what makes the cadence affordable, and its absence is a $70/day bug.** X bills
+  **half a cent per post RETURNED**: five chunk queries at forty posts is $1.00 a run, and the timer
+  fires every twenty minutes. The high-water mark per query lives at
+  `~/.local/state/mwk-social/reply-cursor.json` and is **keyed by the query text, not its index** —
+  adding one handle reshuffles every chunk, and a cursor applied to the wrong group hides posts
+  silently. **The cursor advances only after the drafts are filed**, same rule as `ship-events.js`.
+- **X's own limits: 20+ replies in an hour trips spam detection, 50/day is the ceiling, 15–20 is
+  optimal.** `perDay` is 5 — his "less is more" — and a test pins it at ≤15.
+- **A reply the author answers back is worth ~150x a like**, which is why `author_replied` is the
+  column that matters on `/replies` and the point of running this for a month before deciding.
+- **`platformSpecificData.replyToTweetId` is how a reply is published** — an ordinary post that
+  happens to be a reply, not a comment-API call. Cannot be combined with `replySettings`.
+- **The X account id is resolved from `accounts:list` at runtime**, not kept in the env: a second
+  copy is one more thing that goes stale the day an account is reconnected.
+
 ## Skills
 
 Procedures live in `.claude/skills/`, not in this file — a skill loads when the work calls for it,

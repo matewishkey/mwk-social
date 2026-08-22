@@ -4,7 +4,8 @@
 #   scripts/install-timers.sh                 # all of them
 #   scripts/install-timers.sh first-comment   # just one
 #
-# Logs:  journalctl --user -u mwk-first-comment -f
+# Logs:  journalctl --user -u mwk-replies -f
+#        journalctl --user -u mwk-first-comment -f
 #        journalctl --user -u mwk-ship-events -f
 set -euo pipefail
 
@@ -104,8 +105,25 @@ if [[ "$want" == all || "$want" == yt-notes ]]; then
     'Draft MWK YouTube show notes'
 fi
 
+if [[ "$want" == all || "$want" == replies ]]; then
+  # Every twenty minutes, all day. Two reasons it can be this often and still be
+  # cheap: the search carries a per-query high-water mark, so a run that finds
+  # nothing new reads nothing and costs nothing, and the daily cap lives in
+  # config/replies.json rather than in the schedule. Frequency is the point —
+  # X rewards a reply posted while the post is still gaining, and an hourly
+  # timer would miss that window on most posts.
+  #
+  # :07 past, deliberately off every other unit's slot: this one makes model
+  # calls and the box is 15 GB with earlyoom watching.
+  unit mwk-replies \
+    'Find X posts worth replying to, send what he approved' \
+    "$repo/scripts/replies.js --sync" \
+    '*:07/20' \
+    'Draft and send MWK X replies'
+fi
+
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes; do
+for name in mwk-first-comment mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes mwk-replies; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done

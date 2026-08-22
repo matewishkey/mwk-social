@@ -208,3 +208,38 @@ ALTER TABLE link ADD COLUMN created_by TEXT;
 -- Free text for a link made by hand — what it is, where it went, why.
 ALTER TABLE link ADD COLUMN note TEXT;
 CREATE INDEX IF NOT EXISTS link_campaign ON link (campaign, created_at DESC);
+
+-- ---------------------------------------------------------------------------
+-- Reply targets (2026-08-22). A post from somebody we follow, worth adding a
+-- specific thought to, plus the draft of that thought. Nothing here goes out
+-- until he releases it — same shape as yt_proposal, for the same reason.
+--
+-- state: proposed -> approved -> sent      (he pressed Send, the box posted it)
+--                -> skipped               (he pressed Skip)
+--                -> failed                (the box tried and X refused)
+--
+-- The tweet's own text is stored rather than fetched at render time: X charges
+-- half a cent per post read, and re-reading a tweet to draw a page he refreshes
+-- would meter every time he looked at it.
+CREATE TABLE IF NOT EXISTS reply_target (
+  tweet_id     TEXT PRIMARY KEY,      -- the post we would be replying to
+  author       TEXT NOT NULL,         -- their handle, for the cooldown rule
+  author_name  TEXT,
+  tweet_text   TEXT NOT NULL,
+  tweet_at     TEXT,                  -- when THEY posted; freshness is the whole game
+  reply_count  INTEGER,
+  found_at     TEXT NOT NULL,
+  draft        TEXT NOT NULL,         -- exactly what will be posted, typos and all
+  edited       TEXT,                  -- his version, when he changed it
+  invite       INTEGER NOT NULL DEFAULT 0,  -- does this one mention the show?
+  why          TEXT,                  -- the model's one line on why it is worth it
+  state        TEXT NOT NULL DEFAULT 'proposed',
+  decided_at   TEXT, decided_by TEXT,
+  sent_at      TEXT, sent_id TEXT, sent_url TEXT, error TEXT,
+  -- Filled in by the outcome sweep, which is the point of the month-long trial:
+  -- a reply the author answers is worth ~150x a like, and is the only signal
+  -- that any of this reached a person.
+  outcome_at   TEXT, got_likes INTEGER, got_replies INTEGER, author_replied INTEGER
+);
+CREATE INDEX IF NOT EXISTS reply_state  ON reply_target (state, found_at DESC);
+CREATE INDEX IF NOT EXISTS reply_author ON reply_target (author, sent_at DESC);

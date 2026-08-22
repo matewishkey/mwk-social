@@ -87,11 +87,19 @@ at once, straight from a shell — these are the actual live posts:
   transcript. `--sync` fills in videos that have none and files a *proposal* for
   anything that already has a description, which does nothing until it is
   approved on the dashboard.
-- `scripts/install-timers.sh` — installs the five systemd `--user` timers: the
+- `scripts/replies.js` — finds posts worth replying to on X, drafts a reply for
+  each, and posts the ones approved on the dashboard. The drafts carry
+  deliberate typos made with the neighbouring keys, seeded off the tweet id so
+  what is approved is byte for byte what goes out. Never a link — X buries a
+  post carrying one — and never under somebody promoting their own thing.
+- `scripts/lib/typos.js` — the typos. Keyboard neighbours, doubled and dropped
+  keys, missing apostrophes. Never touches a url, a handle, a hashtag or a
+  number, never more than two, and nothing under sixty characters.
+- `scripts/install-timers.sh` — installs the six systemd `--user` timers: the
   comment check hourly, the queue every five minutes (stopping at `:45`, to
   leave the comment watcher a clear run at `:00`), the event uploader every two
-  minutes, analytics hourly, and the show-notes draft daily. The posting *pace* lives in
-  `lib/pace.js`, not the timers.
+  minutes, analytics hourly, the show-notes draft daily, and the X replies every
+  twenty minutes. The posting *pace* lives in `lib/pace.js`, not the timers.
 
 ## Reproduce it
 
