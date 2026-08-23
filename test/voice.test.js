@@ -336,3 +336,37 @@ test('a comment does carry tags when its caption does not', () => {
   // Exactly five: Instagram's cap counts the caption too, and the caption is clean.
   assert.strictEqual((ig.text.match(/#\w+/g) || []).length, 5);
 });
+
+/*
+ * The YouTube description tail carries a per-VIDEO link (2026-08-23), because
+ * which episode is pulling is the one thing YouTube exposes nowhere in an API.
+ * Three things have to hold: the placeholder is substituted, no argument still
+ * renders something valid, and the config cannot lose {show} — the last one is
+ * what would silently put one shared untracked url on every video again.
+ */
+test('the show blurb substitutes a per-video link', () => {
+  const link = 'https://mwkshow.com/ab12c';
+  const out = voice.showBlurb(link);
+  assert.ok(out.includes(link), 'the minted link did not make it into the blurb');
+  assert.ok(!out.includes('{show}'), 'the placeholder was left unsubstituted');
+  assert.ok(!out.includes(voice.config().links.show),
+    'the plain sign-up url is still there — the click would be untraceable');
+});
+
+test('the show blurb with no link falls back to the plain url', () => {
+  const out = voice.showBlurb();
+  assert.ok(out.includes(voice.config().links.show));
+  assert.ok(!out.includes('{show}'));
+});
+
+test('the blurb still carries a marker the duplicate guard recognises', () => {
+  assert.ok(voice.carriesCta(voice.showBlurb('https://mwkshow.com/ab12c')),
+    'a tracked blurb must still register as carrying the CTA');
+  assert.ok(voice.carriesCta(voice.showBlurb()));
+});
+
+test('config/voice.json keeps {show} in the blurb', () => {
+  const raw = require('../config/voice.json').youtubeDescription.showBlurb;
+  assert.ok(raw.includes('{show}'),
+    'without {show} every video shares one untracked link and no episode can be told apart');
+});

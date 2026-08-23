@@ -38,6 +38,7 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 const { api, cli } = require('./lib/api');
 const { topicsFor } = require('./lib/topic-tags');
 const voice = require('./lib/voice');
+const shortlink = require('./lib/shortlink');
 
 /*
  * The YouTube account id, resolved from the connection list rather than baked in
@@ -106,9 +107,34 @@ async function build(id) {
   const title = currentTitle(id);
   const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
   if (!topics) throw new Error('no transcript available (YouTube has not captioned it yet)');
+
+  /*
+   * One tracked link per VIDEO, which is the only way to learn which episode is
+   * actually pulling — YouTube reports impressions and CTR in Studio's UI and
+   * exposes neither through any API, so a click on our own link is the whole
+   * scoreboard.
+   *
+   * Idempotent by construction: the mint key is (target, platform, clipId,
+   * campaign, medium), so a re-run returns the SAME code and the description
+   * stays byte-identical. That matters more than it looks — the show-notes loop
+   * compares against what was last written, and a link that changed every run
+   * would re-propose every video for ever.
+   *
+   * A failed mint is FATAL here, and that is a deliberate departure from the
+   * first-comment rule (mint, but never let it block the comment). A comment
+   * gets one shot and is better untracked than missing. A description can be
+   * written any day, so falling back to the plain url would buy nothing and
+   * cost two rewrites of every video — one to the untracked url and one back.
+   */
+  const link = await shortlink.mint({
+    platform: 'youtube', medium: 'description', campaign: 'episode',
+    clipId: id, label: title,
+  });
+  if (!link) throw new Error('could not mint the episode link (dashboard unreachable) — retrying next run');
+
   const opening = await summarise(topics.transcript, title);
   const tags = voice.tagLine('youtube', topics.tags);
-  return { title, description: `${opening}\n\n${voice.showBlurb()}\n\n${tags}` };
+  return { title, description: `${opening}\n\n${voice.showBlurb(link)}\n\n${tags}` };
 }
 
 /** Has the show blurb been chosen, or is it still my paraphrase? */

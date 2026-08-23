@@ -46,6 +46,10 @@ function config() {
     for (const v of [...cached.firstComment.plain, ...cached.firstComment.episode]) {
       if (!v.includes('{show}')) throw new Error(`${CONFIG_PATH}: every variant must contain {show} — offender: ${v.slice(0, 40)}`);
     }
+    const blurb = (cached.youtubeDescription || {}).showBlurb;
+    if (blurb && !blurb.includes('{show}')) {
+      throw new Error(`${CONFIG_PATH}: youtubeDescription.showBlurb must contain {show} — without it every video would share one untracked link`);
+    }
   }
   return cached;
 }
@@ -203,7 +207,17 @@ function tagLine(platform, topicTags = []) {
   return [...always, ...topics].join(' ');
 }
 
-const showBlurb = () => config().youtubeDescription.showBlurb;
+/*
+ * The constant tail of every YouTube description. `{show}` is substituted with
+ * whatever link the caller has minted for that video, so a click can be traced
+ * back to the episode it came from — which episode is pulling is the one thing
+ * YouTube's own analytics will not tell us. With no argument it renders the
+ * plain sign-up url, which is what every description carried before 2026-08-23.
+ */
+const showBlurb = (link = null) => {
+  const raw = config().youtubeDescription.showBlurb;
+  return raw.split('{show}').join(link || config().links.show);
+};
 
 module.exports = {
   config, marker, markers, carriesCta, shortLink, alwaysTags, blockedTags, maxTopicTags, capFor,
