@@ -39,7 +39,23 @@ const { api, cli } = require('./lib/api');
 const { topicsFor } = require('./lib/topic-tags');
 const voice = require('./lib/voice');
 
-const ACCOUNT = process.env.MWK_YT_ACCOUNT || '6a7f2a4677555aae01be88d4';
+/*
+ * The YouTube account id, resolved from the connection list rather than baked in
+ * here. Two reasons, and the second is why it changed on 2026-08-23: a literal
+ * goes stale the day the account is reconnected, and THIS REPO IS PUBLIC — an
+ * account id is exactly what CLAUDE.md says must not be committed to it. Same
+ * rule the X account id already followed. MWK_YT_ACCOUNT still overrides.
+ */
+let accountId = null;
+async function account() {
+  if (accountId) return accountId;
+  if (process.env.MWK_YT_ACCOUNT) { accountId = process.env.MWK_YT_ACCOUNT; return accountId; }
+  const { accounts = [] } = await api('GET', '/accounts');
+  const yt = accounts.find((a) => a.platform === 'youtube' && a.isActive !== false);
+  if (!yt) throw new Error('no YouTube account is connected — check `zernio accounts:list`');
+  accountId = yt._id || yt.id;
+  return accountId;
+}
 const BACKUP = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
   'mwk-social', 'yt-descriptions');
 
@@ -116,9 +132,9 @@ function dashboard() {
   };
 }
 
-const setDescription = (id, description) =>
+const setDescription = async (id, description) =>
   api('POST', '/posts/_/update-metadata',
-    { body: { platform: 'youtube', videoId: id, accountId: ACCOUNT, description } });
+    { body: { platform: 'youtube', videoId: id, accountId: await account(), description } });
 
 async function sync({ dryRun = false, limit = 50 } = {}) {
   const call = dashboard();
@@ -192,7 +208,7 @@ async function main() {
     for (const id of ids) {
       const f = path.join(BACKUP, `${id}.txt`);
       const description = fs.readFileSync(f, 'utf8');
-      await api('POST', '/posts/_/update-metadata', { body: { platform: 'youtube', videoId: id, accountId: ACCOUNT, description } });
+      await api('POST', '/posts/_/update-metadata', { body: { platform: 'youtube', videoId: id, accountId: await account(), description } });
       console.log(`restored ${id} from ${f}`);
     }
     return;
@@ -212,7 +228,7 @@ async function main() {
       console.log(description);
       if (!apply) continue;
       backup(id, existing, title);
-      await api('POST', '/posts/_/update-metadata', { body: { platform: 'youtube', videoId: id, accountId: ACCOUNT, description } });
+      await api('POST', '/posts/_/update-metadata', { body: { platform: 'youtube', videoId: id, accountId: await account(), description } });
       console.log(`--- applied (previous description backed up)`);
     } catch (err) {
       console.error(`FAIL  ${id} — ${err.message}`);

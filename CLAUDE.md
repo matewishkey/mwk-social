@@ -417,7 +417,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   satisfied, so empty descriptions now get filled.
 - **The dashboard is `web/`, deployed with `web/deploy.sh` (locally, never on push).** One Worker
   `mwk-social-log`, **three** custom domains — `social.matewishkey.com` (Cloudflare Access, email
-  OTP, allowing mate@ and suzy@matewishkey.com), `ingest.matewishkey.com` (bearer token) and
+  OTP, allow-list of two addresses — named in the internal state note, not here), `ingest.matewishkey.com` (bearer token) and
   `mwkshow.com` (public short links, **no Access application, ever**). D1 database `mwk-social`,
   R2 bucket `mwk-social-media` for queued uploads. **`workers_dev = false` is the load-bearing
   line**: Access binds to a *hostname*, not to a script, so leaving it on would serve the whole
