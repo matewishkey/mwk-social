@@ -210,53 +210,12 @@ ALTER TABLE link ADD COLUMN note TEXT;
 CREATE INDEX IF NOT EXISTS link_campaign ON link (campaign, created_at DESC);
 
 -- ---------------------------------------------------------------------------
--- Reply targets (2026-08-22). A post from somebody we follow, worth adding a
--- specific thought to, plus the draft of that thought. Nothing here goes out
--- until he releases it — same shape as yt_proposal, for the same reason.
+-- Reply targets: GONE (2026-08-23). The X reply pipeline is retired — X blocked
+-- programmatic replies on 23 February 2026 on every plan below Enterprise, so
+-- the only version left was a page he copied off by hand, and that was more of
+-- his attention than the idea had earned. X strategy is now follows only; the
+-- list of who lives in config/follow.json.
 --
--- state: proposed -> approved -> sent      (he pressed Send, the box posted it)
---                -> skipped               (he pressed Skip)
---                -> failed                (the box tried and X refused)
---
--- The tweet's own text is stored rather than fetched at render time: X charges
--- half a cent per post read, and re-reading a tweet to draw a page he refreshes
--- would meter every time he looked at it.
-CREATE TABLE IF NOT EXISTS reply_target (
-  tweet_id     TEXT PRIMARY KEY,      -- the post we would be replying to
-  author       TEXT NOT NULL,         -- their handle, for the cooldown rule
-  author_name  TEXT,
-  tweet_text   TEXT NOT NULL,
-  tweet_at     TEXT,                  -- when THEY posted; freshness is the whole game
-  reply_count  INTEGER,
-  found_at     TEXT NOT NULL,
-  draft        TEXT NOT NULL,         -- exactly what will be posted, typos and all
-  edited       TEXT,                  -- his version, when he changed it
-  invite       INTEGER NOT NULL DEFAULT 0,  -- does this one mention the show?
-  why          TEXT,                  -- the model's one line on why it is worth it
-  state        TEXT NOT NULL DEFAULT 'proposed',
-  decided_at   TEXT, decided_by TEXT,
-  sent_at      TEXT, sent_id TEXT, sent_url TEXT, error TEXT,
-  -- Filled in by the outcome sweep, which is the point of the month-long trial:
-  -- a reply the author answers is worth ~150x a like, and is the only signal
-  -- that any of this reached a person.
-  outcome_at   TEXT, got_likes INTEGER, got_replies INTEGER, author_replied INTEGER
-);
-CREATE INDEX IF NOT EXISTS reply_state  ON reply_target (state, found_at DESC);
-CREATE INDEX IF NOT EXISTS reply_author ON reply_target (author, sent_at DESC);
-
--- Replies he asked for by hand (2026-08-22). He is scrolling anyway, and on
--- Threads he finds the genuine questions X does not have — so he pastes what he
--- found and the box drafts a reply for it.
---
--- platform matters because what happens next differs completely:
---   twitter — resolvable from a url for free, and postable through Zernio
---             (platformSpecificData.replyToTweetId). Send works.
---   threads — NEITHER. Zernio has no reply-to-a-foreign-post field for Threads
---             (only topic_tag and its own threadItems), and a Threads url
---             cannot be resolved to a post id at all: the shortcode is not the
---             Instagram encoding (checked against a post whose id we knew) and
---             the page is a JS shell with no id and no og:description in it.
---             So Threads drafts are COPIED OUT and posted by hand.
-ALTER TABLE reply_target ADD COLUMN platform TEXT NOT NULL DEFAULT 'twitter';
-ALTER TABLE reply_target ADD COLUMN source_url TEXT;
-ALTER TABLE reply_target ADD COLUMN asked_by TEXT;
+-- Dropped rather than left standing: a table nothing writes is a table somebody
+-- reads in six months and believes.
+DROP TABLE IF EXISTS reply_target;

@@ -116,8 +116,13 @@ With them on:
   operators must be combined with a keyword or a `from:`. 300 requests per 15 minutes per account.
   Reads are billed per tweet returned, at 0.5c each.
 - `GET`/`POST /v1/inbox/comments/{id}` — reading and replying to comments on X posts.
-- `platformSpecificData.replyToTweetId` — publish a post as a reply to any existing tweet. Cannot
+- `platformSpecificData.replyToTweetId` — publish a post as a reply to an existing tweet. Cannot
   be combined with `replySettings`; on a thread only the first tweet replies to the target.
+  **Only works on a tweet whose author has @mentioned or quoted you first.** X restricted
+  programmatic replies on 23 February 2026 across every plan below Enterprise, and Zernio returns
+  207 with that reason for anything else. **Self-replies are exempt**, which is why our own
+  `threadItems` link reply publishes. It is also why the X reply pipeline was retired on
+  2026-08-23 — CLAUDE.md, *X: follows only*, has the rest.
 
 `POST /v1/twitter/follow` and its siblings were never gated. It takes the **numeric** X user id,
 not the handle, and X rate-limits follows in a sliding window: 37 back-to-back succeeded and the
