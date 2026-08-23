@@ -487,6 +487,29 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **`xCapabilities: { analytics, inbox }` on `PUT /v1/accounts/{id}` stay ON.** They are what
   `GET /v1/twitter/search` and the X comment endpoints need, both default `false`, and both 403 in a
   way that reads exactly like a plan limit and is not one.
+- **MORE FOLLOWS IS NOT THE LEVER — settled 2026-08-23, do not re-research this.** Mate: *"lock in,
+  right now we are good with x."* The whole X question was taken to the source code and closed. What
+  we hold: 8 followers, 118 following, 11 tweets, account opened 11 August. 118 follows produced at
+  most 8 followers — **6.8%, a ceiling not a measurement**, since attributing them needs a paid
+  follower-list read. Industry average is ~13.7%.
+- **The 500-following / 0.6-ratio cliff everyone warns about is DEAD, and believing it is the common
+  mistake.** It was real — `UserMass.scala` in the 2023 repo divided reputation by
+  `exp(5 × (ratio − 0.6))` once you passed 500 follows. **X open-sourced a new algorithm in January
+  2026 (`xai-org/x-algorithm`) and `tweepcred` returns 0 hits in it.** Verified with a positive
+  control on the same search: `phoenix` 102, `follower` 96. There is no mechanical penalty left.
+- **What replaced it is a language model reading your profile as prose**, so there is no threshold to
+  game and nowhere to hide. `grox/core/lm/user.py` renders `Account Created`, `Followers`,
+  `Following` and `Subscription` as literal text for Grok. A 118/8 line reads as what it is. Roughly
+  half the For You feed is out-of-network, so followers were never the distribution mechanism.
+- **The real gap is CADENCE, and it is the one free lever: we post to X ~1.5×/day against the 3–5
+  every guide converges on.** That needs no new code — it is the queue's pacing.
+- **If we ever do want more people, the follower lists of the 72 we already follow beat X's own
+  search, on cost and on aim.** Apify's `data-slayer/twitter-followers` is **$1.50/1,000 profiles,
+  no login, no API key** — 0.15c a person against X's 0.5c per *tweet* returned — and everyone
+  following a designer is a designer, where a keyword search returns whoever typed the word.
+  Followerwonk/Circleboom/Fedica do bio search free in a browser. **Not started, deliberately.**
+- **Keep the room in mind before spending anything more here**: 0 usable posts out of 168 measured,
+  Facebook has 91 followers to X's 8, and LinkedIn 7,190 across the two accounts.
 
 ## Skills
 
