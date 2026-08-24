@@ -94,7 +94,10 @@ function zernio(args) {
 function resolveAccounts(opts) {
   const all = zernio(['accounts:list']).accounts || [];
   if (opts.all) {
-    const active = all.filter((a) => a.isActive !== false);
+    // Same rule as run-queue's accountsFor: a connected account on a platform
+    // the table does not describe is skipped, never fatal. "Everywhere" means
+    // everywhere we know how to post, not everywhere Zernio happens to list.
+    const active = all.filter((a) => a.isActive !== false && platformTable.known(a.platform));
     if (!active.length) throw new Error('accounts:list returned no active accounts');
     return active.map((a) => ({ id: a._id || a.id, platform: a.platform }));
   }

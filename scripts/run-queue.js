@@ -102,6 +102,14 @@ function accountsFor(want) {
   const chosen = want.length ? all.filter((a) => want.includes(a.platform)) : all;
   const { company } = reshare.linkedinAccounts();
   return chosen
+    // An account on a platform this pipeline has never described is skipped, not
+    // fatal — connecting one in Zernio must not stop the posts to everywhere
+    // else. See platforms.known(); a Reddit connection did exactly that.
+    .filter((a) => {
+      if (platforms.known(a.platform)) return true;
+      console.log(`skip  ${a.platform} — not in the platform table, nothing describes how to post there`);
+      return false;
+    })
     .filter((a) => a.platform !== 'linkedin' || !company || (a._id || a.id) === (company._id || company.id))
     .map((a) => ({ id: a._id || a.id, platform: a.platform }));
 }

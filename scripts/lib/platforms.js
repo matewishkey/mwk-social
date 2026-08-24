@@ -173,6 +173,22 @@ const get = (name) => {
   return p;
 };
 
+/*
+ * Whether this table knows a platform at all.
+ *
+ * THE RULE THIS COST US (2026-08-24): a Reddit account was connected to Zernio
+ * on 2026-08-22 and `accounts:list` started returning it. Nothing in this table
+ * describes Reddit, so `get('reddit')` threw and took the WHOLE queue run with
+ * it — every five minutes, on the only item in the queue, for an hour before
+ * anyone looked. Exactly the shape of the LinkedIn `find`-vs-`filter` bug: a new
+ * account arrives, no error anybody reads, and the pipeline quietly stops.
+ *
+ * Connecting an account must never be able to break posting to the others. An
+ * unknown platform is skipped and said out loud; whether it BECOMES a target is
+ * a content decision, made by adding it to this table deliberately.
+ */
+const known = (name) => Object.prototype.hasOwnProperty.call(PLATFORMS, name);
+
 
 /*
  * The posting shape for one platform, DERIVED from the capability fields above
@@ -302,5 +318,5 @@ function linkProblems() {
   return out;
 }
 
-module.exports = { PLATFORMS, get, flowFor, flows, commentWatched, linkIsLive,
+module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
   linkDeadFor, linkProblems, SLOT };

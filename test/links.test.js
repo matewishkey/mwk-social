@@ -418,3 +418,34 @@ test('the propose endpoint reports what landed, not what was sent', () => {
   assert.match(fn, /meta\.changes/, '"filed: 22" when nineteen were dropped is a number somebody believes');
   assert.ok(!/filed: items\.length/.test(fn));
 });
+
+/*
+ * A connected account on a platform this pipeline has never described must be
+ * skipped, never fatal.
+ *
+ * 2026-08-24: a Reddit account was connected in Zernio on 2026-08-22 and
+ * `accounts:list` started returning it. Nothing in the platform table describes
+ * Reddit, so `get('reddit')` threw and took the whole queue run with it — every
+ * five minutes, on the only item in the queue, until someone read the journal.
+ * Same shape as the LinkedIn find-vs-filter bug: an account arrives, no error
+ * anybody reads, and posting quietly stops everywhere.
+ */
+test('the table knows what it describes and admits what it does not', () => {
+  // The positive control comes first: a predicate that answers false to
+  // everything would pass the real assertion below without meaning anything.
+  for (const name of Object.keys(platforms.PLATFORMS)) {
+    assert.equal(platforms.known(name), true, `${name} is in the table and known() denies it`);
+  }
+  assert.equal(platforms.known('reddit'), false);
+  assert.equal(platforms.known('mastodon'), false);
+  assert.equal(platforms.known('__proto__'), false, 'known() must not inherit from Object.prototype');
+});
+
+test('every platform known() admits can actually be described', () => {
+  // known() is the gate accountsFor uses before anything calls get(), so the two
+  // must never disagree — a name that passes the gate and then throws would be
+  // the same outage wearing a different hat.
+  for (const name of Object.keys(platforms.PLATFORMS)) {
+    assert.doesNotThrow(() => platforms.get(name), `get(${name}) throws behind a true known()`);
+  }
+});
