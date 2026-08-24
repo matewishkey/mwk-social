@@ -123,10 +123,14 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   expire, so a reel that isn't fetched soon after the sync sees it can never be transcribed.
   Results are cached per post in `~/.local/state/mwk-social/topics/` — transcription costs money
   and a post must only ever be processed once.
-- **Instagram's 5-hashtag cap counts caption AND comments together** (enforced since
-  2025-12-18; over the cap = no Explore, no hashtag pages, no Reels recommendations). Tags in the
-  first comment buy no extra slots. So a reel posted from the app with tags already in its caption
-  must not also get tags in its comment — and captions cannot be edited after publishing on IG.
+- **Instagram's 5-hashtag cap: the CAP is Instagram's, the "caption AND comments together" part is
+  not** (corrected 2026-08-24). Instagram's own statement is caption-scoped; the combined-counting
+  claim and the penalties listed beside it (no Explore, no hashtag pages, no Reels recommendations)
+  trace to marketing blogs, not to Instagram. **We keep the behaviour and drop the certainty**:
+  never spending the budget twice is free and costs nothing if the stricter reading is wrong.
+  A related and better-sourced point cuts the other way — IG's own search guidance says keywords
+  have to be in the CAPTION to be searchable, so tags in a first comment may buy nothing at all
+  there. Worth a test, not a rewrite. Captions still cannot be edited after publishing on IG.
 - **`accounts:health` reporting `warning` is routine, not a fault** — Zernio refreshes tokens
   lazily, so an account passes through `warning` with the issue "Token expired or expiring soon
   (auto-refresh pending)" and returns to `healthy` on its own (watched it happen 2026-08-19).
@@ -639,10 +643,27 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `exp(5 × (ratio − 0.6))` once you passed 500 follows. **X open-sourced a new algorithm in January
   2026 (`xai-org/x-algorithm`) and `tweepcred` returns 0 hits in it.** Verified with a positive
   control on the same search: `phoenix` 102, `follower` 96. There is no mechanical penalty left.
-- **What replaced it is a language model reading your profile as prose**, so there is no threshold to
-  game and nowhere to hide. `grox/core/lm/user.py` renders `Account Created`, `Followers`,
-  `Following` and `Subscription` as literal text for Grok. A 118/8 line reads as what it is. Roughly
-  half the For You feed is out-of-network, so followers were never the distribution mechanism.
+- **`grox` is a SAFETY classifier, not the ranker — an earlier note here had that wrong** (corrected
+  2026-08-24 by a second read of the source). It renders `Account Created`, `Followers`, `Following`
+  and `Subscription` as prose for a model, but that model feeds spam/visibility filtering at publish
+  time; it is not what orders the For You feed. The conclusion it was used to support still holds
+  for its own reason: roughly half the For You feed is out-of-network, so followers were never the
+  distribution mechanism.
+- **THE X THREAD CTA IS ONLY SURFACED TO PEOPLE WHO ALREADY FOLLOW US, and I read this in the
+  source** (2026-08-24, `xai-org/x-algorithm`, `home-mixer/filters/oon_retweet_reply_filter.rs`).
+  The filter partitions out `c.in_network == Some(false) && (is_retweet || is_reply)` — an
+  out-of-network REPLY never enters the For You candidate set, and the file's own test asserts it.
+  **Read it precisely: the reply is still there for anyone who opens the root tweet.** What it
+  cannot do is reach a non-follower as a feed item of its own. At 8 followers that is the whole
+  audience for the CTA.
+  **And the penalty the thread was built to dodge is not in the ranker.** Grepped
+  `has_url|url_penalty|link_penalty|contains_link|external_link` across the repo: the only hits are
+  USER features measuring how long someone dwelt on a link (`external_link_duration`,
+  `CLIENT_TWEET_EXTERNAL_LINK_LONG_DWELLED`) and an ads threshold — engagement signals, not a
+  demotion. Positive control on the same search: `favorite` returns 68 files. `open_link_score` is
+  one of the predicted-engagement terms the ranker consumes; **its numeric weight is NOT in the
+  repo**, so do not quote one. **Not yet acted on — moving the link into the root tweet is a
+  reversal of a documented decision and is his call.**
 - **The real gap is CADENCE, and it is the one free lever: we post to X ~1.5×/day against the 3–5
   every guide converges on.** That needs no new code — it is the queue's pacing.
 - **If we ever do want more people, the follower lists of the 72 we already follow beat X's own

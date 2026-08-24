@@ -53,7 +53,10 @@ const PLATFORMS = {
     videoMaxSec: 300,
   },
   tiktok: {
-    imageOk: false,          // photo posts need contentType photo and have never been exercised here
+    // TikTok's API DID gain photo posts (4 Aug 2026). This stays false because
+    // nothing here has ever sent one — contentType photo is a different request
+    // shape with its own consent flags. False is "not built", not "impossible".
+    imageOk: false,
     landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
