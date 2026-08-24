@@ -613,3 +613,49 @@ test('the links page still refuses to build a utm', async () => {
       `a utm parameter appeared on a rendered link: ${u}`);
   }
 });
+
+/* -------------------------------------------------------------- youtube -- */
+
+/*
+ * The bulk approve. What makes it safe is the split: a proposal that changes one
+ * line of boilerplate is not the same decision as one that replaces words he
+ * wrote, and the button says which it is doing. If tailOnly ever loosened to
+ * "mostly the same", "approve the boilerplate swaps" would start approving
+ * rewrites — silently, in a batch, over words already published.
+ */
+const PROP = (over = {}) => ({ video_id: 'abc', title: 'A video', state: 'proposed',
+  proposed_at: new Date().toISOString(), current_text: 'one\ntwo\nthree',
+  proposed: 'one\nTWO\nthree', ...over });
+
+test('one changed line is a boilerplate swap; anything else is a rewrite', async () => {
+  const { tailOnly } = await src('pages/youtube.js');
+  assert.equal(tailOnly(PROP()), true, 'a single changed line should count as a swap');
+  assert.equal(tailOnly(PROP({ proposed: 'one\nTWO\nTHREE' })), false, 'two changed lines is a rewrite');
+  assert.equal(tailOnly(PROP({ proposed: 'one\ntwo\nthree\nfour' })), false, 'an added line is a rewrite');
+  assert.equal(tailOnly(PROP({ proposed: 'one\nthree' })), false, 'a removed line is a rewrite');
+  assert.equal(tailOnly(PROP({ proposed: 'one\ntwo\nthree' })), false, 'no change is not a swap');
+  assert.equal(tailOnly(PROP({ current_text: '', proposed: 'anything' })), false,
+    'filling an empty description is not a one-line swap');
+});
+
+test('the bulk buttons count the swaps and the rewrites separately', async () => {
+  const { youtubePage } = await src('pages/youtube.js');
+  const waiting = [PROP({ video_id: 'a' }), PROP({ video_id: 'b' }),
+    PROP({ video_id: 'c', proposed: 'wholly\ndifferent\nwords\nhere' })];
+  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting, settled: [],
+    snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
+  assert.match(html, /Approve the 2 boilerplate swaps/);
+  assert.match(html, /Approve all 3, rewrites included/);
+  assert.match(html, /value="approve-tails"/);
+  assert.match(html, /value="approve-all"/);
+  // The pill is what tells him WHICH is which before he clicks either.
+  assert.equal((html.match(/>one line</g) || []).length, 2);
+  assert.equal((html.match(/>rewritten</g) || []).length, 1);
+});
+
+test('a single proposal gets no bulk bar at all', async () => {
+  const { youtubePage } = await src('pages/youtube.js');
+  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting: [PROP()], settled: [],
+    snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
+  assert.ok(!html.includes('approve-tails'), 'one proposal does not need approving in bulk');
+});

@@ -17,6 +17,28 @@ const STATE = {
   rejected: ['p-plain', 'left alone'],
 };
 
+/*
+ * Does this proposal change exactly one line of what is live?
+ *
+ * That is the difference between "the sign-up line moved" and "your words were
+ * rewritten", and it is the only distinction that matters when deciding a stack
+ * of these at once. Same line count, exactly one index differing — anything
+ * else, including a line added or removed, counts as a rewrite and is shown as
+ * one. Erring toward "rewritten" is the safe direction: the cost of the mistake
+ * is one extra click, against quietly replacing something he wrote.
+ */
+export function tailOnly(p) {
+  const current = String(p.current_text || '');
+  // Nothing there to preserve is not a swap — it is the whole description being
+  // written. `''.split('\n')` is `['']`, one line, so without this an empty
+  // description against a full one reads as a single changed line.
+  if (!current.trim()) return false;
+  const a = current.split('\n');
+  const b = String(p.proposed || '').split('\n');
+  if (a.length !== b.length) return false;
+  return a.reduce((n, line, i) => n + (line === b[i] ? 0 : 1), 0) === 1;
+}
+
 export async function youtubeAction(request, env, email) {
   const form = await request.formData();
   const doing = String(form.get('do') || '');
@@ -25,6 +47,33 @@ export async function youtubeAction(request, env, email) {
     await env.DB.prepare(
       `UPDATE yt_proposal SET state = ?, decided_at = ?, decided_by = ? WHERE video_id = ? AND state = 'proposed'`,
     ).bind(doing === 'approve' ? 'approved' : 'rejected', new Date().toISOString(), email, id).run();
+  }
+  /*
+   * Approve the lot in one go. It exists because the honest shape of this page
+   * is lopsided: on 2026-08-24 twenty-three proposals were waiting and twenty
+   * of them changed a SINGLE line — the CTA the Shorts fix had just corrected.
+   * Clicking twenty identical one-line diffs is not review, it is typing, and a
+   * page that makes it tedious to say yes to the obvious gets a blanket yes
+   * anyway, just later and with less attention.
+   *
+   * Two buttons, not one, and the split is the whole point. `approve-tails`
+   * takes only the proposals that differ from what is live on exactly one line
+   * — a boilerplate swap, nothing he wrote is touched. `approve-all` includes
+   * the rewrites too and says so on the button. Both are still a decision he
+   * makes; neither is a default.
+   */
+  if (['approve-tails', 'approve-all'].includes(doing)) {
+    const rows = (await env.DB.prepare(
+      `SELECT video_id, current_text, proposed FROM yt_proposal WHERE state = 'proposed'`,
+    ).all()).results || [];
+    const ids = rows.filter((r) => doing === 'approve-all' || tailOnly(r)).map((r) => r.video_id);
+    if (ids.length) {
+      const now = new Date().toISOString();
+      await env.DB.batch(ids.map((v) => env.DB.prepare(
+        `UPDATE yt_proposal SET state = 'approved', decided_at = ?, decided_by = ?
+          WHERE video_id = ? AND state = 'proposed'`,
+      ).bind(now, email, v)));
+    }
   }
   return Response.redirect(new URL('/youtube', request.url).toString(), 303);
 }
@@ -39,7 +88,9 @@ export function youtubePage({ email, tz, waiting, settled, snapshots, byState = 
       <header>
         <div><b>${esc(p.title || p.video_id)}</b>
           <span class="faint">${esc(p.video_id)} · drafted ${esc(ago(p.proposed_at))}</span></div>
-        <span class="pill ${cls}">${esc(label)}</span>
+        <span class="pills">${p.state === 'proposed' ? `<span class="pill ${
+          tailOnly(p) ? 'p-plain' : 'p-warn'}">${tailOnly(p) ? 'one line' : 'rewritten'}</span>` : ''
+        }<span class="pill ${cls}">${esc(label)}</span></span>
       </header>
       <div class="cols">
         <div><label>Now</label><pre>${esc(p.current_text || '(empty)')}</pre></div>
@@ -56,6 +107,28 @@ export function youtubePage({ email, tz, waiting, settled, snapshots, byState = 
       </div>` : `<p class="note">${esc(p.decided_by || '')} ${p.decided_at ? esc(when(p.decided_at, tz)) : ''}${
         p.applied_at ? ` · applied ${esc(ago(p.applied_at))}` : ''}</p>`}
     </article>`;
+  };
+
+  /*
+   * Say yes to the obvious in one click. The tail-only count is named on the
+   * button rather than hidden behind it — "approve 20" and "approve 20 boilerplate
+   * swaps" ask for different amounts of trust, and only one of them is honest.
+   */
+  const bulk = (rows) => {
+    const tails = rows.filter(tailOnly).length;
+    if (rows.length < 2) return '';
+    return `<div class="acts bulk">
+      ${tails ? `<form method="post" class="inline-form">
+        <input type="hidden" name="do" value="approve-tails">
+        <button class="primary">Approve the ${tails} boilerplate ${tails === 1 ? 'swap' : 'swaps'}</button>
+      </form>` : ''}
+      ${tails < rows.length ? `<form method="post" class="inline-form">
+        <input type="hidden" name="do" value="approve-all">
+        <button>Approve all ${rows.length}, rewrites included</button>
+      </form>` : ''}
+      <span class="faint">A boilerplate swap changes one line — the sign-up link or the tags.
+        A rewrite replaces words that are already up there.</span>
+    </div>`;
   };
 
   const body = `
@@ -76,7 +149,7 @@ ${blurbReady === false ? `<div class="card warnbox"><div class="card-body">
 </div>
 
 ${card(`Waiting on you (${waiting.length})`, waiting.length
-  ? waiting.map(item).join('') : '<p class="empty">Nothing to review.</p>')}
+  ? bulk(waiting) + waiting.map(item).join('') : '<p class="empty">Nothing to review.</p>')}
 
 ${total ? card(`Settled (${total})`, settled.map(item).join('')
   + pager({ path: '/youtube', params, page, size, total, noun: 'proposals' })) : ''}
@@ -92,6 +165,9 @@ ${total ? card(`Settled (${total})`, settled.map(item).join('')
 .cols pre { margin:.2rem 0 0; padding:.6rem .7rem; background:var(--bg); border:1px solid var(--line);
   border-radius:8px; font:inherit; font-size:.8rem; white-space:pre-wrap; max-height:16rem; overflow:auto; }
 .acts { display:flex; gap:.4rem; margin-top:.7rem; flex-wrap:wrap; }
+.acts.bulk { margin:0 0 1rem; align-items:center; border-bottom:1px solid var(--line2); padding-bottom:1rem; }
+.acts.bulk .faint { font-size:.75rem; }
+.pills { display:flex; gap:.35rem; flex-shrink:0; }
 code { font-size:.85rem; background:var(--line2); padding:.1rem .35rem; border-radius:4px; }
 </style>`;
 
