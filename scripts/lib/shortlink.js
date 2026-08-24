@@ -87,7 +87,15 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
   if (!urls.length) return body;
 
   let out = body;
-  for (const url of urls) {
+  /*
+   * Longest first. `out.split(url).join(short)` is a plain substring swap, so
+   * with both matewishkey.com/show and matewishkey.com/show/faq in one comment,
+   * replacing the shorter one first turns the longer into mwkshow.com/abcde/faq
+   * — a code with a path glued on, pointing nowhere. Only the queue form's
+   * custom-comment field can put two such urls in one body, which is why this
+   * had never been seen; it is one sort to make it unreachable.
+   */
+  for (const url of [...urls].sort((a, b) => b.length - a.length)) {
     // Skip only a link that is ALREADY shortened — a code pointing at a code.
     // Not carriesCta(): that matches the sign-up destination as well, which is
     // precisely the link we most want to measure.

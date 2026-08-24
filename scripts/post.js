@@ -204,14 +204,28 @@ async function commentFor(platform, text, opts) {
 }
 
 async function waitForResults(postId) {
+  let platforms = [];
   for (let attempt = 0; attempt < 20; attempt++) {
     await new Promise((r) => setTimeout(r, 5000));
     const { post } = await api('GET', `/posts/${postId}`);
-    const platforms = post.platforms || [];
-    const settled = platforms.every((p) => p.status === 'published' || p.status === 'failed');
-    if (settled || attempt === 19) return platforms;
+    platforms = post.platforms || [];
+    /*
+     * An EMPTY platforms[] is "not hydrated yet", never "everything settled".
+     *
+     * `[].every(...)` is true, so an empty array on the first poll returned
+     * immediately with no outcomes at all — run-queue then records nothing for
+     * the group and verdict() can mark a post that is on its way out as failed,
+     * which is the state that offers a Re-queue button over live content.
+     * Waiting costs at most a hundred seconds; being wrong costs a duplicate
+     * post on platforms that cannot delete.
+     */
+    const settled = platforms.length
+      && platforms.every((p) => p.status === 'published' || p.status === 'failed');
+    if (settled) return platforms;
   }
-  return [];
+  // Out of patience. Hand back whatever the last poll saw rather than [] — a
+  // half-hydrated list is still the truth about the platforms it does name.
+  return platforms;
 }
 
 /*

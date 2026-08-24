@@ -19,7 +19,7 @@
  * reason it always was: Access binds to a hostname, not to a script.
  */
 
-import { accessIdentity } from './lib/access.js';
+import { accessIdentity, tokenOk } from './lib/access.js';
 import { pageOf } from './lib/html.js';
 import { api } from './api.js';
 import { redirect, platformFromReferer } from './links.js';
@@ -51,8 +51,10 @@ async function ingestHost(request, env, url) {
   // The box fetches back media it queued, with the same bearer token the rest
   // of the API uses. Kept here rather than in api.js because it is a GET.
   if (request.method === 'GET' && url.pathname.startsWith('/media/')) {
+    // tokenOk(), not !==. Same door as every other ingest route, and this was
+    // the one spelling of the check that compared in variable time.
     const bearer = (request.headers.get('Authorization') || '').replace(/^Bearer\s+/i, '');
-    if (bearer !== env.INGEST_TOKEN) return new Response('unauthorized', { status: 401 });
+    if (!tokenOk(bearer, env.INGEST_TOKEN)) return new Response('unauthorized', { status: 401 });
     if (!env.MEDIA) return new Response('no media store', { status: 404 });
     const object = await env.MEDIA.get(decodeURIComponent(url.pathname.slice('/media/'.length)));
     if (!object) return new Response('not found', { status: 404 });

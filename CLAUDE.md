@@ -45,7 +45,10 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   rule, and refuses to return a composed comment that has lost the marker.
 - **The first comment rotates.** A variant is picked deterministically from the post's key, so a
   re-run renders the identical comment while consecutive posts differ; the last index used per
-  platform is kept in the state file so the same one never lands twice running. Roughly
+  platform is kept in the state file so the same one never lands twice running — **on the WATCHER's
+  path only.** `avoidIndex` is passed by `first-comment.js` and by nothing else, so a queued post
+  does not consult it. Deterministic rotation off the post key means consecutive posts differ anyway;
+  this is the belt-and-braces that is missing, not the rotation. Roughly
   `episodeMixRatio` of comments quote a real guest wish pulled from the show's RSS feed and link
   that episode. If the feed is unreachable every comment falls back to a plain variant —
   freshness must never block a comment.
@@ -380,7 +383,12 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `/youtube/pending` returns what was last WRITTEN as well as what is approved, and a video already
   carrying exactly that is skipped. The upsert's `WHERE state = 'proposed'` was hiding the churn at
   the database level while the work still happened every run.
-- **TikTok takes the CTA in the CAPTION, and `post.js` now actually does it.** The platform table
+- **TikTok's CTA moved to the PROFILE, so NO platform uses `linkPlacement: 'caption'` any more**
+  (noted 2026-08-24; the paragraph below is the history of how it got wired, kept because the lesson
+  is). `linkInCaption()` therefore always returns false today and its branch in `flowFor()` is
+  unreachable. The code stays — it handles a legitimate value of a config field, which is not the
+  same thing as a field nothing reads — but do not believe a claim that it runs. Original note:
+  the platform table
   declared `linkPlacement: 'caption'` from the start but nothing ever acted on it, so posts there
   went out with his words alone — no route to the sign-up page and nothing measurable. **A platform
   carrying its own link cannot share a request with the comment platforms** (one body, one
@@ -604,6 +612,16 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **The IPv6 trap bites the dashboard hostnames too**: they resolve AAAA-first and this box has no
   IPv6 route, so plain `curl` fails to connect in ~14 ms and `fetch` times out. Use `curl -4` when
   testing by hand; `ship-events.js` sets `net.setDefaultAutoSelectFamilyAttemptTimeout(1000)`.
+
+- **COMMENT-TO-DM EXISTS AND WE DO NOT USE IT — verified live 2026-08-24, and it is the only
+  clickable route out of Instagram.** `zernio automations:list|create`, and `GET
+  /v1/comment-automations` answered `{"success":true,"automations":[]}` on this account. A DM link
+  IS clickable on Instagram, where a caption, a comment and a Reel are all dead — which is the gap
+  `linkPlacement: 'profile'` works around rather than solves. **It is PER POST**:
+  `automations:create` requires `--platformPostId`, `--accountId`, `--profileId`, `--name` and
+  `--dmMessage`, with optional `--keywords` (empty = every comment), `--matchMode` and
+  `--commentReply`. So wiring it means creating one after each Instagram publish, not setting it
+  once. **Not built — it sends messages to real people, so it needs his say-so first.**
 
 ## X: follows only (2026-08-23)
 
