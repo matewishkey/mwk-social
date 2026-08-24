@@ -179,6 +179,26 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   so `firstComment.profileCtaBy.youtube` says so instead. **Every value there must also be in
   `markers[]`** and `voice.js` refuses to load a config where it is not — same rule, same reason, as
   `profileCta` itself.
+- **"NO TERMINAL NEEDED" WAS FALSE AND WAS LIVE ON ALL 23 VIDEOS** (mate, 2026-08-24: *"B is
+  incorrect they do need terminal lol"*). It had been in the blurb from the beginning and nothing
+  caught it, because it reads exactly like the reassurance a show for beginners ought to give. The
+  brand page describes the AUDIENCE as someone who *"has never opened a terminal"* — that is who
+  turns up, not a promise about what the session needs, and collapsing the two is how the claim got
+  written. Gone with the short blurb; a test fails if the word returns to anything we say out loud
+  (`showBlurbPast` is exempt — it is the record of what WAS written, and the `blocked` tag list is a
+  different thing). **Reassurance is where a false claim hides: check it against what actually
+  happens on the show, not against how kind it sounds.**
+- **SHORT IS THE HOUSE STYLE NOW** (mate's call, 2026-08-24: *"Keep the text simple short and
+  concise, so we will not do AI issues"*). The description went 819 characters to **347** — the
+  three-line brand headline, the ask, and where it is live, and nothing else. Every comment variant
+  roughly halved. His reasoning is that length is what reads as machine-written, so a long correct
+  paragraph loses to a short one.
+- **A VARIANT CARRYING A SECOND URL IS DROPPED WHERE URLS ARE DEAD, and the test is ANY url now.**
+  It keyed on `{episodeUrl}` by name, which held for exactly as long as that was the only variant
+  with a link in it. The archive line (*"Every episode is online, start to finish: {episodes}"*,
+  his idea) would have printed a dead `matewishkey.com/episodes/` under every Instagram post — the
+  2026-08-22 mistake again, from a new direction. `CARRIES_URL` matches `{episodeUrl}`, `{episodes}`
+  and a literal `http`, and a positive control (narrowing it back) fails two tests.
 - **`matewishkey.com/brand` IS the voice, it MOVES, and it renders `VOICE.md` at that repo's root —
   read it, never restate it.** Checked 2026-08-24 and it had moved: the headline is now **three
   lines in that order** — *"Why let others solve your problems with AI? / Prompt it yourself! /

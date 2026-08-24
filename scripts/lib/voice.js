@@ -45,6 +45,9 @@ function config() {
     }
     for (const v of [...cached.firstComment.plain, ...cached.firstComment.episode]) {
       if (!v.includes('{show}')) throw new Error(`${CONFIG_PATH}: every variant must contain {show} — offender: ${v.slice(0, 40)}`);
+      if (v.includes('{episodes}') && !cached.links.episodes) {
+        throw new Error(`${CONFIG_PATH}: a variant asks for {episodes} but links.episodes is not set`);
+      }
     }
     const blurb = (cached.youtubeDescription || {}).showBlurb;
     if (blurb && !blurb.includes('{show}')) {
@@ -61,6 +64,12 @@ function config() {
   }
   return cached;
 }
+
+/*
+ * A variant that carries a url of its own, whichever form it takes. Used to drop
+ * one from the pool where urls are not clickable — see usable() below.
+ */
+const CARRIES_URL = /\{episodeUrl\}|\{episodes\}|https?:\/\//;
 
 const marker = () => config().marker;
 const markers = () => config().markers.slice();
@@ -160,10 +169,16 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
    * On Instagram and TikTok a url in a post or a comment is plain text — the
    * whole link-in-bio industry exists because of it. `linkLive: false` says so,
    * and two things follow: {show} becomes the bio phrasing instead of a tracked
-   * code, and any variant carrying an episode URL is dropped from the pool,
+   * code, and any variant carrying a SECOND url is dropped from the pool,
    * because that url is just as dead as the CTA one would have been.
+   *
+   * The test is any url, not one named placeholder. It was `{episodeUrl}` alone,
+   * which was right for exactly as long as that was the only variant carrying a
+   * link — the archive line added on 2026-08-24 would have printed a dead
+   * matewishkey.com/episodes/ under every Instagram post. A literal http:// in a
+   * hand-written variant is caught by the same expression.
    */
-  const usable = (pool) => (linkLive ? pool : pool.filter((v) => !/\{episodeUrl\}/.test(v)));
+  const usable = (pool) => (linkLive ? pool : pool.filter((v) => !CARRIES_URL.test(v)));
 
   // Pinning names a line out of the plain list, so it also rules out an episode
   // variant: a human picked that exact wording and must get it, not a quote.
@@ -189,7 +204,8 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
     .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : profileCta(platform))
     .replace(/\{wish\}/g, episode ? episode.wish : '')
     .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
-    .replace(/\{episodeUrl\}/g, episode ? episode.url : '');
+    .replace(/\{episodeUrl\}/g, episode ? episode.url : '')
+    .replace(/\{episodes\}/g, cfg.links.episodes || '');
 
   // noTags is for a platform whose CAPTION already carries them — repeating the
   // list under the post shows it twice, and on Instagram would spend the cap

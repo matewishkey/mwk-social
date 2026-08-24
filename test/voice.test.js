@@ -451,3 +451,57 @@ test('a retired blurb swaps out without touching the video\'s own words', () => 
     assert.ok(swapped.endsWith('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
   }
 });
+
+/*
+ * The archive line, and the rule it forced.
+ *
+ * A variant carrying a second url is dead weight on Instagram and TikTok, where
+ * nothing in a comment is clickable. That drop used to test for `{episodeUrl}`
+ * by name, which was right for exactly as long as that was the only variant
+ * with a link in it — this one would have printed a dead matewishkey.com URL
+ * under every Instagram post, the same mistake the pipeline was fixed for on
+ * 2026-08-22. The test is now any url in any form.
+ */
+test('the archive line renders its address, and only where a link works', () => {
+  const cfg = voice.config();
+  const idx = cfg.firstComment.plain.findIndex((v) => v.includes('{episodes}'));
+  assert.ok(idx >= 0, 'no variant asks for {episodes} — this would pass vacuously');
+
+  const live = voice.firstComment('k', { platform: 'facebook', variantIndex: idx }).text;
+  assert.ok(live.includes(cfg.links.episodes), 'the archive address did not render');
+
+  // Where urls are dead the whole variant leaves the pool, so no key can draw it.
+  for (const platform of ['instagram', 'tiktok']) {
+    for (const key of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) {
+      const t = voice.firstComment(key, { platform, linkLive: false }).text;
+      assert.ok(!t.includes(cfg.links.episodes),
+        `${platform} drew a comment carrying a url nobody can click: ${t}`);
+      assert.ok(!/https?:\/\//.test(t.replace(voice.tagLine(platform, []), '')),
+        `${platform} drew a comment with a url in it: ${t}`);
+    }
+  }
+});
+
+test('a variant asking for {episodes} with no address configured is refused', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const cfg = JSON.parse(JSON.stringify(voice.config()));
+  delete cfg.links.episodes;
+  const bad = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'voice-')), 'voice.json');
+  fs.writeFileSync(bad, JSON.stringify(cfg));
+  const { execFileSync } = require('child_process');
+  assert.throws(() => execFileSync(process.execPath, ['-e', 'require(process.env.V).config()'],
+    { env: { ...process.env, MWK_VOICE_CONFIG: bad, V: require.resolve('../scripts/lib/voice') },
+      stdio: 'pipe' }));
+});
+
+test('nothing claims a terminal is not needed — it is', () => {
+  // Mate, 2026-08-24: "B is incorrect they do need terminal lol". The claim was
+  // live on all 23 videos when he said it. History in showBlurbPast is exempt:
+  // that is the record of what WAS written, not something we would write now.
+  const cfg = voice.config();
+  const live = JSON.stringify({ ...cfg, youtubeDescription: { showBlurb: cfg.youtubeDescription.showBlurb } });
+  assert.ok(!/terminal/i.test(live.replace(/"blocked":\[[^\]]*\]/, '')),
+    'something we say out loud mentions a terminal again');
+});
