@@ -237,3 +237,19 @@ DROP TABLE IF EXISTS reply_target;
 -- NULL is every row filed before this column existed; the dashboard falls back
 -- to the diff for those.
 ALTER TABLE yt_proposal ADD COLUMN kind TEXT;
+
+-- ---------------------------------------------------------------------------
+-- How many times the box has claimed this item and handed it straight back.
+--
+-- The release path is deliberate — "put it back rather than burn it" — but it
+-- had no floor, and nothing else stopped a repeat: a failure that throws emits
+-- queue.failed rather than queue.posted, so the pace never counts it either.
+-- A deterministic failure (a media url that has expired, a silent clip no
+-- platform will take, lapsed Zernio auth) therefore re-claimed itself every
+-- five minutes for ever: 288 cycles a day, 288 error events, and an item that
+-- never surfaced as needing a person.
+--
+-- Counted on the Worker, which owns the row, so both release paths are covered.
+-- Reset to 0 by a re-queue from the dashboard: a human looking at it is exactly
+-- the condition the counter was waiting for.
+ALTER TABLE queue_item ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;

@@ -37,8 +37,6 @@ const DOWNLOAD_TIMEOUT_SEC = 300;
 const sh = (cmd, args, timeoutMs = 360000) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26, timeout: timeoutMs });
 
-const safe = (s) => String(s).replace(/[^\w.-]/g, '_');
-const cachePath = (clipId) => path.join(CACHE, `${safe(clipId)}.mp4`);
 
 /**
  * Pull the file down from the signed URL Zernio handed us.
@@ -65,35 +63,6 @@ function downloadDirect(url, dest) {
   if (!/^2/.test(code)) { fs.rmSync(tmp, { force: true }); throw new Error(`download returned HTTP ${code}`); }
   fs.renameSync(tmp, dest);
   return true;
-}
-
-/*
- * The fallback. Free, and it never expires.
- *
- * It downloads into a scratch directory and moves whatever lands there, because
- * yt-dlp appends its own extension to -o: asking for "x" and getting "x.mp4"
- * looked exactly like "produced nothing usable".
- */
-function downloadYouTube(videoId, dest) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-yt-'));
-  try {
-    sh('yt-dlp', ['-q', '--no-warnings', '--no-playlist', '--force-ipv4',
-      // H.264 first: YouTube serves AV1 for these clips by default and both
-      // Instagram and TikTok want avc1 for a reel. Falling back through the
-      // plain mp4 selectors keeps a video we can still post if avc1 is absent.
-      '-f', 'bv*[ext=mp4][vcodec^=avc1]+ba[ext=m4a]/b[ext=mp4][vcodec^=avc1]/bv*[ext=mp4]+ba[ext=m4a]/b[ext=mp4]/b',
-      '--merge-output-format', 'mp4', '-o', path.join(tmp, 'v.%(ext)s'),
-      '--', `https://www.youtube.com/watch?v=${videoId}`]);
-    const got = fs.readdirSync(tmp).map((f) => path.join(tmp, f))
-      .filter((f) => fs.statSync(f).size >= MIN_BYTES)
-      .sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0];
-    if (!got) throw new Error('produced nothing usable');
-    fs.copyFileSync(got, dest);                  // copy, not rename: /tmp is its own filesystem
-  } catch (err) {
-    throw new Error(`yt-dlp ${videoId}: ${(err.stderr || err.message).toString().trim().slice(0, 160)}`);
-  } finally {
-    fs.rmSync(tmp, { recursive: true, force: true });
-  }
 }
 
 /*
@@ -169,31 +138,21 @@ function youtubeProbe(videoId) {
   return out;
 }
 
-/**
- * Fetch the clip once and keep it.
+/*
+ * resolve() lived here and is gone (2026-08-24). It fetched a clip and cached
+ * it, and NOTHING had called it since the mirror was retired — run-queue.js has
+ * its own fetchMedia(), reading the same MWK_MEDIA_CACHE, and that is what the
+ * queue actually uses. Two downloaders for one job is how the two drift; the
+ * dead one is the one to remove. downloadYouTube() went with it, as its only
+ * caller. Verified with a positive control before deleting: the same grep that
+ * found no call site finds mediaLib.check() at run-queue.js:209.
  *
- * @param {string} clipId    cache key, e.g. "facebook:1218…"
- * @param {object} src       {url, youtubeId}
- * @returns {{path, via: 'cache'|'facebook'|'youtube', probe: object}}
+ * The lessons they held are not lost — the yt-dlp traps (it appends its own
+ * extension to -o, and it serves AV1 unless the video codec is constrained) and
+ * the reason a download shells out to curl rather than fetch (no IPv6 route on
+ * this box, so undici's 250 ms Happy Eyeballs window expires and it reads as an
+ * expired URL) are in CLAUDE.md and restated on fetchMedia() itself.
  */
-function resolve(clipId, { url = null, youtubeId = null } = {}) {
-  const dest = cachePath(clipId);
-  if (fs.existsSync(dest) && fs.statSync(dest).size >= MIN_BYTES) {
-    return { path: dest, via: 'cache', probe: probe(dest) };
-  }
-  fs.mkdirSync(CACHE, { recursive: true });
-
-  if (url && downloadDirect(url, dest)) {
-    return { path: dest, via: 'facebook', probe: probe(dest) };
-  }
-  if (!youtubeId) {
-    throw new Error(url
-      ? 'the signed url has expired and there is no YouTube copy to fall back to'
-      : 'no media url and no YouTube copy');
-  }
-  downloadYouTube(youtubeId, dest);
-  return { path: dest, via: 'youtube', probe: probe(dest) };
-}
 
 /**
  * Would this file be accepted where we're about to send it?
@@ -261,4 +220,4 @@ function check(platform, p) {
   return problems;
 }
 
-module.exports = { resolve, probe, youtubeProbe, check, cachePath, downloadDirect, downloadYouTube, CACHE };
+module.exports = { probe, youtubeProbe, check, downloadDirect, CACHE };

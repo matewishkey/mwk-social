@@ -226,10 +226,12 @@ test('X is the only platform that puts its link in a thread reply', () => {
   const inReply = Object.keys(platformTable.PLATFORMS)
     .filter((p) => platformTable.get(p).linkPlacement === 'reply');
   assert.deepStrictEqual(inReply, ['twitter']);
-  assert.equal(platformTable.get('twitter').supportsThread, true,
-    'a link in a reply is only possible where threadItems is');
-  assert.equal(platformTable.get('twitter').markerInCaption, false,
-    'the CTA is in the reply now — a caption claiming to carry it would be a lie');
+  // The two fields this used to assert (supportsThread, markerInCaption) were
+  // read by nothing but this test, and a field only a test reads is a field
+  // that proves nothing. linkPlacement is what post.js actually branches on,
+  // and the test below exercises the thread it produces.
+  const { threadWithLink } = require('../scripts/post.js');
+  assert.equal(typeof threadWithLink, 'function', 'nothing builds the thread the placement promises');
 });
 
 test('the root tweet is clean and the link rides in the reply', () => {
@@ -504,4 +506,59 @@ test('nothing claims a terminal is not needed — it is', () => {
   const live = JSON.stringify({ ...cfg, youtubeDescription: { showBlurb: cfg.youtubeDescription.showBlurb } });
   assert.ok(!/terminal/i.test(live.replace(/"blocked":\[[^\]]*\]/, '')),
     'something we say out loud mentions a terminal again');
+});
+
+/*
+ * The workflow page cannot claim the watcher reaches a platform it does not.
+ *
+ * This exact claim has now been wrong three times: post.js printed it keyed off
+ * !linkInCaption, then off commentsApi, and flowFor() was still keyed off
+ * commentsApi as of 2026-08-24 — so social.matewishkey.com/config listed X
+ * under "the hourly watcher posts it" when the watcher has never touched X.
+ * commentWatched() is the one definition; anything that answers this question
+ * has to go through it.
+ */
+test('the workflow page names the watcher exactly where the watcher runs', () => {
+  const platforms = require('../scripts/lib/platforms');
+  const watcher = new Set();
+  const covered = new Set();
+  for (const name of Object.keys(platforms.PLATFORMS)) {
+    const step = platforms.flowFor(name).steps.find((s) => s.step === 'first comment');
+    if (step && step.by === 'watcher') watcher.add(name);
+    if (platforms.commentWatched(name)) covered.add(name);
+  }
+  assert.ok(watcher.size > 0, 'nothing claims the watcher — this would pass vacuously');
+  for (const name of watcher) {
+    assert.ok(covered.has(name),
+      `the workflow page says the watcher comments on ${name}, and commentWatched() says it does not`);
+  }
+  // X is the case that made this necessary: a comments API, and still not watched.
+  assert.equal(platforms.get('twitter').commentsApi, true, 'X lost its comments API — recheck this test');
+  assert.ok(!watcher.has('twitter'), 'the page claims the watcher comments on X again');
+});
+
+/*
+ * Every publish request is caught for itself.
+ *
+ * run-queue.js catches per CUT; publish() then splits again by CAPTION, and one
+ * cut is up to four requests. A throw escaping this inner loop marked every
+ * account in the group failed — including the ones already live — and the queue
+ * page then offers a Re-queue button over published content. TikTok has no
+ * delete API and Instagram cannot delete or edit through any API, so that click
+ * is not recoverable.
+ */
+test('a failed publish request cannot take the published ones down with it', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
+  const loop = src.slice(src.indexOf('for (const body of bodies)'));
+  const body = loop.slice(0, loop.indexOf('\n  return {'));
+  assert.ok(/try\s*{/.test(body), 'the per-request loop does not catch');
+  assert.ok(/catch\s*\(err\)/.test(body), 'the per-request loop does not catch');
+  assert.match(body, /status:\s*'failed'/,
+    'a failed request must name its own platforms failed, not throw the group away');
+  assert.match(body, /if \(!posts\.length && failures\.length\) throw/,
+    'a total failure must still throw — nothing is live, so there is nothing to protect');
+  // The catch has to sit INSIDE the loop, or it is the same bug one line out.
+  assert.ok(body.indexOf('try {') < body.indexOf("api('POST', '/posts'"),
+    'the try opens after the request it is meant to guard');
 });

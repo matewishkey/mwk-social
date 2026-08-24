@@ -69,7 +69,18 @@ function toR2(file, dryRun) {
   if (!type) throw new Error(`no content type for ${ext || 'a file with no extension'} — ${file}`);
   const day = new Date().toISOString().slice(0, 10);
   const slug = path.basename(file, ext).replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
-  const key = `queue/${day}-${slug || 'clip'}${ext}`;
+  /*
+   * The ULID is what stops two files quietly becoming one. The key was
+   * `queue/<day>-<slug><ext>` with nothing unique in it, and an R2 put is an
+   * overwrite: queue two files both called clip.mp4 on the same day and the
+   * second silently replaces the first, while the first queue item still points
+   * at that key — so it publishes the SECOND video, under the FIRST one's
+   * words, with no error anywhere. The Worker's own uploader has always keyed
+   * on a ULID for this reason; this path had not caught up.
+   *
+   * The day and the slug stay because the bucket is browsed by humans.
+   */
+  const key = `queue/${day}-${slug || 'clip'}-${ulid()}${ext}`;
   if (!dryRun) {
     execFileSync('npx', ['wrangler', 'r2', 'object', 'put', `${BUCKET}/${key}`,
       `--file=${file}`, `--content-type=${type}`, '--remote'],

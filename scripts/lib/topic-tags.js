@@ -223,7 +223,38 @@ async function topicsFor(key, source) {
       transcript = await transcribe(videoUrl);
     }
   }
-  if (!process.env.GEMINI_API_KEY) return cached || null;
+  /*
+   * PERSIST THE TRANSCRIPT BEFORE THE MODEL IS ASKED ANYTHING.
+   *
+   * It was only written as part of `result`, after callModel() returned — so a
+   * Gemini timeout threw and a Whisper run that cost real money was discarded.
+   * Worse than the money: the media urls Zernio hands out are signed and
+   * expire, so by the next hourly run there may be nothing left to download and
+   * the clip can never be transcribed at all. The file's own header says a post
+   * must only ever be processed once; this is what makes that true.
+   *
+   * No `rules`, deliberately. A cache entry without one can never satisfy the
+   * RULES_VERSION gate above, so this is a transcript saved for reuse and never
+   * a set of tags served as current.
+   */
+  if (transcript && (!cached || cached.transcript !== transcript)) {
+    writeCache(key, { transcript, at: new Date().toISOString() });
+  }
+
+  /*
+   * No key: hand back the transcript entry, never a stale NAMING.
+   *
+   * This test used to sit above the RULES_VERSION gate, which meant a missing
+   * GEMINI_API_KEY returned a pre-2026-08-21 result carrying the old tech tags
+   * — the exact hole RULES_VERSION was added to close, reopened on the no-key
+   * path. No key now means no tags, which is the documented behaviour anyway:
+   * a plain CTA, never a failed comment.
+   */
+  if (!process.env.GEMINI_API_KEY) {
+    return cached && cached.rules === RULES_VERSION ? cached : null;
+  }
+  // After the no-key return, not before it: "no keys means a plain CTA, never a
+  // failed comment" is the rule, and throwing here with no key would break it.
   if (!transcript) throw new Error('transcript came back empty');
   const named = await callModel(transcript);
   const result = {

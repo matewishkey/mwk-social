@@ -11,11 +11,7 @@
   "_markers": "EVERY substring that means 'this post already carries our CTA'. The guard matches any of them, which is the only reason the short link could be introduced at all: comments posted before it exists carry the long URL forever, and a guard that knew only the new one would re-comment on every past post. 'link in my bio' joined on 2026-08-22 for the same reason in reverse — on Instagram and TikTok a url is not clickable at all, so those comments carry no URL to match on, and without this marker the watcher would re-comment on every one of them for ever.",
   "links": {
     "show": "https://matewishkey.com/show",
-      "episodes": "https://matewishkey.com/episodes/",
-    "live": [
-      "https://youtube.com/@matewishkey",
-      "https://twitch.tv/matewishkey"
-    ]
+      "episodes": "https://matewishkey.com/episodes/"
   },
   "shortLink": {
     "enabled": true,

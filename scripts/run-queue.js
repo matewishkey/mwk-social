@@ -38,10 +38,6 @@ const cacheDir = () => process.env.MWK_MEDIA_CACHE ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
     'mwk-social', 'media');
 
-const load = (file, fallback) => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
-};
-
 function endpoint() {
   const url = process.env.MWK_LOG_URL;
   const token = process.env.MWK_LOG_TOKEN;

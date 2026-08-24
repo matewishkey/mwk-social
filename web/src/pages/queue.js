@@ -45,8 +45,13 @@ export async function queueAction(request, env, email) {
   if (doing === 'cancel' || doing === 'requeue') {
     const id = String(form.get('id') || '');
     const to = doing === 'cancel' ? 'cancelled' : 'queued';
+    // attempts resets here on purpose. The counter exists to stop the box
+    // re-claiming a deterministically-broken item every five minutes with
+    // nobody watching; a person clicking Re-queue IS the condition it was
+    // waiting for, and leaving it at three would let one retry, then stop.
     await env.DB.prepare(
-      `UPDATE queue_item SET status = ?, claimed_at = NULL WHERE id = ? AND status IN ('queued','claimed','failed','cancelled')`,
+      `UPDATE queue_item SET status = ?, claimed_at = NULL, attempts = 0
+        WHERE id = ? AND status IN ('queued','claimed','failed','cancelled')`,
     ).bind(to, id).run();
     return back;
   }

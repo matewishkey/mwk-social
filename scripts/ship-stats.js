@@ -21,9 +21,7 @@
 'use strict';
 
 const net = require('net');
-const fs = require('fs');
 const os = require('os');
-const path = require('path');
 
 // No IPv6 route on this box and the dashboard hostnames resolve AAAA-first, so
 // undici's 250 ms Happy Eyeballs window expires before it falls back to IPv4.
@@ -36,10 +34,6 @@ const voice = require('./lib/voice');
 const events = require('./lib/events');
 
 const DEFAULT_DAYS = 45;
-
-const load = (file, fallback) => {
-  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return fallback; }
-};
 
 const iso = (d) => d.toISOString().slice(0, 10);
 
@@ -97,7 +91,6 @@ function voiceSnapshot() {
     plainVariants: (cfg.firstComment.plain || []).length,
     episodeVariants: (cfg.firstComment.episode || []).length,
     shortLinkHost: (cfg.shortLink && cfg.shortLink.enabled) ? cfg.shortLink.host : null,
-    maxTopic: cfg.tags.maxTopic,
     blockedCount: (cfg.tags.blocked || []).length,
     episodeMixRatio: cfg.firstComment.episodeMixRatio,
     // The blurb goes at the bottom of every YouTube description. While it is

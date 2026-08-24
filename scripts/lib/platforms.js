@@ -13,7 +13,6 @@ const PLATFORMS = {
     landscapeOk: false,           // aspectRange rejects it outright — reels are vertical
     commentsApi: true,             // inbox:* works; the watcher can reach it
     reshare: 'none',
-    editable: false,
     metrics: { views:'yes', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'rare', saves:'partial', clicks:'no', watchTime:'yes' },
     captionMax: 2200,
@@ -24,7 +23,6 @@ const PLATFORMS = {
     // in a Meta Verified test as of 2026; a Reel has no link surface at all.
     linkClickable: { caption: false, comment: false, profile: true },
     linkPlacement: 'profile',      // say where the link is; do not print a dead one
-    markerInCaption: false,
     supportsFirstComment: true,    // native platformSpecificData.firstComment
     deletable: false,              // nothing can be removed via the API — ever
     videoMinSec: 3,
@@ -41,7 +39,6 @@ const PLATFORMS = {
     landscapeOk: false,           // an IG-shaped surface; vertical is what performs
     commentsApi: true,             // readable and repliable, same Meta auth as IG
     reshare: 'none',
-    editable: false,
     metrics: { views:'yes', reach:'no', impressions:'yes', likes:'no', comments:'partial',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 500,               // the #1 cross-posting failure
@@ -51,7 +48,6 @@ const PLATFORMS = {
     // property here where the comment mechanic actually reaches anybody.
     linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',
-    markerInCaption: false,
     supportsFirstComment: false,   // no native field; the watcher does it
     deletable: true,
     videoMaxSec: 300,
@@ -61,7 +57,6 @@ const PLATFORMS = {
     landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
-    editable: false,
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'partial',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 2200,
@@ -71,7 +66,6 @@ const PLATFORMS = {
     // human clicks, which is what a dead url looks like in the data.
     linkClickable: { caption: false, comment: false, profile: true },
     linkPlacement: 'profile',      // the bio is the only live link TikTok has
-    markerInCaption: false,
     supportsFirstComment: false,
     deletable: false,              // posts:unpublish → "TikTok does not support post deletion
                                    // via API" (2026-08-21, against two real duplicates). Same as
@@ -90,11 +84,9 @@ const PLATFORMS = {
     // reply at publish time rather than through the watcher — see linkPlacement.
     commentsApi: true,
     reshare: 'none',
-    editable: false,
     metrics: { views:'no', reach:'no', impressions:'yes', likes:'no', comments:'no',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 280,               // Premium raises this, but 280 keeps it portable
-    urlLength: 23,                 // every URL counts as a t.co link
     hashtagsInCaption: 1,
     linkClickable: { caption: true, comment: true, profile: true },
     // X deprioritises a post carrying an external link to keep people on
@@ -104,8 +96,6 @@ const PLATFORMS = {
     // and its replies in one call, so his words go out clean and the link
     // lands underneath, where the penalty costs nothing.
     linkPlacement: 'reply',
-    markerInCaption: false,        // it rides in the reply now, not the caption
-    supportsThread: true,          // platformSpecificData.threadItems, per PlatformTarget
     supportsFirstComment: false,
     deletable: true,
     // X is the only platform that refuses a non-AAC audio track, and it does so
@@ -124,7 +114,6 @@ const PLATFORMS = {
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
     commentsApi: true,
     reshare: 'manual',             // personal timelines are impossible via any API (Meta rule)
-    editable: true,
     metrics: { views:'partial', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'yes', saves:'no', clicks:'yes', watchTime:'no' },
     captionMax: 63206,
@@ -133,7 +122,6 @@ const PLATFORMS = {
     // constraint here, not clickability — hence the comment rather than the body.
     linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',
-    markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
   },
@@ -142,7 +130,6 @@ const PLATFORMS = {
     landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
-    editable: true,                // posts:update-metadata — title, description, tags, thumbnail
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'yes',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 5000,
@@ -155,7 +142,6 @@ const PLATFORMS = {
     linkClickable: { caption: true, comment: true, profile: true },
     shortsAreDead: true,
     linkPlacement: 'comment',
-    markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
   },
@@ -164,14 +150,12 @@ const PLATFORMS = {
     landscapeOk: true,
     commentsApi: true,
     reshare: 'api',                // platformSpecificData.reshareUrl — company post, personal quote
-    editable: false,
     metrics: { views:'no', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'partial', saves:'no', clicks:'rare', watchTime:'no' },
     captionMax: 3000,
     hashtagsInCaption: 'all',
     linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',      // links in the body cut reach 40-50%
-    markerInCaption: false,
     supportsFirstComment: true,
     deletable: true,
   },
@@ -213,11 +197,25 @@ function flowFor(name) {
   if (p.supportsFirstComment) {
     steps.push({ step: 'first comment', how: 'native — Zernio posts it seconds after publish',
       by: 'native', note: name === 'youtube' ? 'posted and pinned' : null });
-  } else if (p.commentsApi) {
+  } else if (commentWatched(name)) {
+    /*
+     * commentWatched(), not commentsApi. This keyed off the API alone and said
+     * "the hourly watcher posts it" about X — which the watcher has never
+     * touched, because X's CTA ships with the post as a thread reply. That is
+     * the THIRD time this exact claim has been made about a platform the
+     * watcher cannot reach: post.js printed it wrongly twice, once keyed off
+     * !linkInCaption and once off commentsApi, which is why commentWatched()
+     * exists twenty lines above this. It renders on the dashboard's workflow
+     * page, so the wrong answer was live and readable.
+     */
     steps.push({ step: 'first comment', how: 'the hourly watcher posts it', by: 'watcher' });
   } else {
-    steps.push({ step: 'first comment', how: 'impossible — no comments API we can use',
-      by: 'none', note: 'no comments API at all' });
+    steps.push({ step: 'first comment',
+      how: p.commentsApi
+        ? 'none — the CTA ships with the post itself, so a comment would repeat it'
+        : 'impossible — no comments API we can use',
+      by: 'none',
+      note: p.commentsApi ? 'a comments API exists; the link simply does not go there' : 'no comments API at all' });
   }
 
   if (p.linkPlacement === 'profile') {

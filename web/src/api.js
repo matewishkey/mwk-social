@@ -171,6 +171,12 @@ async function claim(body, env) {
   return json({ ok: true, item: null });
 }
 
+/*
+  * How many times the box may claim an item, fail, and hand it back before it
+  * is marked failed and put in front of a person instead.
+  */
+const MAX_ATTEMPTS = 3;
+
 async function result(body, env) {
   const { id, status, result: outcome, note } = body;
   if (!id || !status) return json({ ok: false, error: 'id and status required' }, 400);
@@ -180,13 +186,40 @@ async function result(body, env) {
   const allowed = ['queued', 'posted', 'failed', 'cancelled'];
   if (!allowed.includes(status)) return json({ ok: false, error: 'bad status' }, 400);
 
+  /*
+   * A release back to 'queued' is counted, and the third one stops.
+   *
+   * Putting an item back rather than burning it is right — a platform being
+   * briefly down should not cost the post. But it had no floor. A failure that
+   * throws emits queue.failed rather than queue.posted, so the pace does not
+   * count it either, and a DETERMINISTIC failure re-claimed itself every five
+   * minutes for ever: an expired media url, a silent clip that every platform
+   * refuses, lapsed Zernio auth. 288 claim-and-fail cycles a day, 288 error
+   * events, and an item that never once surfaced as needing a person.
+   *
+   * Three is enough to ride out a platform hiccup and few enough that a real
+   * fault reaches him the same hour. The dashboard's re-queue resets it, since
+   * a human looking at the item is the condition this was waiting for.
+   */
+  let write = status;
+  let text = note || null;
+  if (status === 'queued') {
+    const row = await env.DB.prepare('SELECT attempts FROM queue_item WHERE id = ?').bind(id).first();
+    const attempts = ((row && row.attempts) || 0) + 1;
+    await env.DB.prepare('UPDATE queue_item SET attempts = ? WHERE id = ?').bind(attempts, id).run();
+    if (attempts >= MAX_ATTEMPTS) {
+      write = 'failed';
+      text = `${note || 'could not be posted'} — gave up after ${attempts} attempts`.slice(0, 200);
+    }
+  }
+
   await env.DB.prepare(
     `UPDATE queue_item SET status = ?, posted_at = ?, result = ?, note = ?,
        claimed_at = CASE WHEN ? = 'queued' THEN NULL ELSE claimed_at END
      WHERE id = ?`,
-  ).bind(status, status === 'posted' ? now : null,
-    outcome == null ? null : JSON.stringify(outcome), note || null, status, id).run();
-  return json({ ok: true });
+  ).bind(write, write === 'posted' ? now : null,
+    outcome == null ? null : JSON.stringify(outcome), text, write, id).run();
+  return json({ ok: true, status: write });
 }
 
 /* ------------------------------------------------------------------ links -- */

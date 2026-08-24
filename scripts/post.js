@@ -34,9 +34,20 @@ const path = require('path');
 const REPO = path.join(__dirname, '..');
 const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
 
-// Platforms whose platformSpecificData accepts firstComment (docs.zernio.com
-// platform guides). TikTok has no such field.
-const FIRST_COMMENT_PLATFORMS = new Set(['facebook', 'instagram', 'linkedin', 'youtube']);
+/*
+ * Platforms whose platformSpecificData accepts firstComment (docs.zernio.com
+ * platform guides). TikTok and Threads have no such field.
+ *
+ * DERIVED from the table, not typed out again. It was a hand-written literal
+ * that happened to agree with `supportsFirstComment` — the same shape as the
+ * watcher's own list, which is pinned to commentWatched() by a test precisely
+ * because this kind of drift is expensive here. Flipping a platform's
+ * supportsFirstComment would have changed flowFor(), the caption composition
+ * and the "the watcher adds it" note, while publish() carried on sending
+ * nothing: the wrong answer in three places and no error anywhere.
+ */
+const FIRST_COMMENT_PLATFORMS = new Set(Object.keys(platformTable.PLATFORMS)
+  .filter((name) => platformTable.get(name).supportsFirstComment));
 
 const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 
@@ -391,19 +402,52 @@ async function publish(opts) {
   // A publish carrying video regularly outlives the request. Zernio keeps
   // going after the caller gives up, so a timeout here is *unknown*, never
   // failure — the caller reconciles by searching for the caption it composed.
+  /*
+   * EVERY REQUEST IS CAUGHT FOR ITSELF, and this is the same lesson run-queue.js
+   * learned expensively on 2026-08-21 — one layer further in.
+   *
+   * run-queue catches per CUT. publish() then splits again, by CAPTION, and
+   * today that is up to four requests for one cut. A throw here escaped both
+   * loops, so run-queue's catch marked every account in the group `failed` —
+   * including the ones already live. With a single cut that meant the whole
+   * item recorded as failed, and the queue page then offered a **Re-queue**
+   * button over content that was already published. One click would repost the
+   * lot to platforms that cannot delete: TikTok has no delete API at all and
+   * Instagram cannot delete or edit through any API.
+   *
+   * X is the request that actually does this: its media upload dies at 99%
+   * after the bytes are paid for, and it is the last of the four.
+   *
+   * So a failed request now names its own platforms as failed and the others
+   * keep their real outcome. Only a total failure throws, because then nothing
+   * is live and there is nothing to protect.
+   */
   const posts = [];
   const platforms = [];
+  const failures = [];
   for (const body of bodies) {
-    const { post } = await api('POST', '/posts', { body, timeout: 240000 });
-    posts.push(post);
-    console.log(`post ${post._id} — ${post.status}`);
-    if (!opts.wait || opts.draft || opts.schedule) continue;
-    for (const p of await waitForResults(post._id)) {
-      const where = p.platformPostUrl || p.errorMessage || '';
-      console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${where}`);
-      platforms.push(p);
+    const targets = (body.platforms || []).map((t) => t.platform);
+    try {
+      const { post } = await api('POST', '/posts', { body, timeout: 240000 });
+      posts.push(post);
+      console.log(`post ${post._id} — ${post.status}`);
+      if (!opts.wait || opts.draft || opts.schedule) continue;
+      for (const p of await waitForResults(post._id)) {
+        const where = p.platformPostUrl || p.errorMessage || '';
+        console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${where}`);
+        platforms.push(p);
+      }
+    } catch (err) {
+      console.error(`  ${targets.join('+')} failed: ${err.message}`);
+      failures.push(err);
+      for (const platform of targets) {
+        platforms.push({ platform, status: 'failed', platformPostId: null,
+          platformPostUrl: null, errorMessage: err.message });
+      }
     }
   }
+  // Nothing got out at all — no partial success to protect, so say so loudly.
+  if (!posts.length && failures.length) throw failures[0];
   return { post: posts[0], posts, platforms };
 }
 
