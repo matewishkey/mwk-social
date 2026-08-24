@@ -550,3 +550,66 @@ test('an unknown or absent referer stays unattributed', () => {
     assert.strictEqual(platformFromReferer('facebook.com.evil.net'), null);
   });
 });
+
+/*
+ * The Links page is where he goes to get a link he has to paste somewhere. A
+ * code he cannot copy off the screen is a code he cannot use — the whole reason
+ * the share pages exist is that text cannot be selected out of a terminal, and
+ * the same applies to a table row. So: every row carries a copy button, and it
+ * carries the WHOLE url, not the five-character code on its own.
+ */
+const LINKROWS = [
+  { code: 'n0t4d', campaign: 'bio', platform: 'linkedin', medium: 'profile',
+    target: 'https://matewishkey.com/show', label: 'LinkedIn personal', human: 3, crawler: 1,
+    created_at: new Date().toISOString() },
+  { code: '30zc4', campaign: 'book', platform: 'website', medium: 'show-page',
+    target: 'https://calendar.google.com/appointments/schedules/AAA', human: 0, crawler: 0,
+    created_at: new Date().toISOString() },
+];
+const LINKCAMPS = [
+  { campaign: 'bio', links: 9, human: 3, crawler: 1 },
+  { campaign: 'book', links: 2, human: 0, crawler: 0 },
+];
+
+test('every link on the page can be copied whole', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com',
+    rows: LINKROWS, campaigns: LINKCAMPS, totals: { links: 11, human: 3, crawler: 1 }, total: 2 });
+  for (const r of LINKROWS) {
+    assert.ok(html.includes(`data-t="https://mwkshow.com/${r.code}"`),
+      `${r.code} has no copy button carrying the full url`);
+  }
+  assert.ok(!/data-t="[a-z0-9]{5}"/.test(html), 'a copy button carries a bare code, not a url');
+});
+
+test('a campaign is shown by what it means, not its column value', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com',
+    rows: LINKROWS, campaigns: LINKCAMPS, totals: { links: 11, human: 3, crawler: 1 }, total: 2 });
+  assert.ok(html.includes('Your profiles'), 'the bio campaign is not named in plain English');
+  assert.ok(html.includes('Booking a call'), 'the book campaign is not named in plain English');
+});
+
+test('the page says which links he has to paste and which write themselves', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com', rows: LINKROWS,
+    campaigns: [...LINKCAMPS, { campaign: 'episode', links: 1, human: 0, crawler: 0 }],
+    totals: { links: 12, human: 3, crawler: 1 }, total: 2 });
+  assert.ok(html.includes('you paste it'), 'nothing tells him a bio link is his job');
+  assert.ok(html.includes('automatic'), 'nothing tells him episode links write themselves');
+});
+
+test('the links page still refuses to build a utm', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com', rows: LINKROWS,
+    campaigns: LINKCAMPS, totals: { links: 11, human: 3, crawler: 1 }, total: 2 });
+  // Only what is actually a LINK — the explainer on this page mentions
+  // "?utm_source=" by name to say we do not use one, and a naive scan of the
+  // whole document would trip on our own prose.
+  const urls = [...html.matchAll(/(?:href|data-t)="([^"]*)"/g)].map((m) => m[1]);
+  assert.ok(urls.length > 4, 'no links were rendered — the assertion below would pass vacuously');
+  for (const u of urls) {
+    assert.ok(!/utm_source=|utm_medium=|utm_campaign=/.test(u),
+      `a utm parameter appeared on a rendered link: ${u}`);
+  }
+});
