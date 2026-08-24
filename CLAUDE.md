@@ -241,8 +241,12 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   now composes one **per account** (`campaign: 'reshare'`, `medium: 'comment'`, post key carries the
   account id) and `quoteReshare` puts it in `platformSpecificData.firstComment`, the same field and
   the same place a native post uses. Failing to compose one never costs the repost.
-  **NOT YET VERIFIED LIVE** — Zernio stores any `platformSpecificData` key it is sent, so the worst
-  case is the status quo, but watch the next real repost before believing it.
+  **VERIFIED LIVE 2026-08-24** on the wish-wisely picture: both personal reposts came back from
+  `posts:list` carrying a `firstComment` — Mate Visky's published, Zsuzsanna's pending on its
+  four-hour stagger. The same read confirms the rest of the table in one picture: facebook,
+  linkedin and instagram carry a native comment, **threads carries none** (no such field — the
+  hourly watcher is what covers it) and **twitter carries none** (its CTA ships as a thread reply).
+  `posts:list --limit 5` and reading `platforms[].platformSpecificData.firstComment` is the check.
 - **`--no-first-comment` used to hold for about an hour.** post.js correctly sent none, then the
   watcher read `posts:list`, found a published post with no CTA in its caption and none in its
   comments, and posted one — it had no way to tell a deliberate absence from the gap it exists to
