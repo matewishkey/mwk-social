@@ -260,17 +260,31 @@ const showBlurb = (link = null, { linkLive = true } = {}) => {
  * @returns {string|null} the exact substring to swap, or null if not ours.
  */
 function findBlurb(text) {
-  const raw = config().youtubeDescription.showBlurb;
-  const at = raw.indexOf('{show}');
-  if (at < 0) return null;
-  const before = raw.slice(0, at);
-  const after = raw.slice(at + '{show}'.length);
+  const yd = config().youtubeDescription;
   const body = String(text || '');
-  const start = body.indexOf(before);
-  if (start < 0) return null;
-  const end = body.indexOf(after, start + before.length);
-  if (end < 0) return null;
-  return body.slice(start, end + after.length);
+  /*
+   * Today's wording first, then every wording this channel has carried.
+   *
+   * Without the past list this function is only honest until the next time the
+   * blurb is edited: `before` is the whole blurb up to the slot, so changing one
+   * paragraph makes every description already written unrecognisable, and an
+   * unrecognised blurb takes the REBUILD path — a fresh model-written opening
+   * for all of them. The 2026-08-24 fix taught this function to see past the
+   * link that went into the slot; this teaches it to see past the prose around
+   * it, which is the same lesson one layer out.
+   */
+  for (const raw of [yd.showBlurb, ...(yd.showBlurbPast || [])]) {
+    const at = raw.indexOf('{show}');
+    if (at < 0) continue;
+    const before = raw.slice(0, at);
+    const after = raw.slice(at + '{show}'.length);
+    const start = body.indexOf(before);
+    if (start < 0) continue;
+    const end = body.indexOf(after, start + before.length);
+    if (end < 0) continue;
+    return body.slice(start, end + after.length);
+  }
+  return null;
 }
 
 module.exports = {

@@ -179,6 +179,14 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   so `firstComment.profileCtaBy.youtube` says so instead. **Every value there must also be in
   `markers[]`** and `voice.js` refuses to load a config where it is not — same rule, same reason, as
   `profileCta` itself.
+- **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or 23 videos get
+  rebuilt.** `findBlurb()` matches the constant halves either side of `{show}`, so the wording
+  *around* the slot is part of the key: the day a paragraph changes, every description already on
+  the channel stops being recognised as ours and takes the model-rewriting rebuild path. Same lesson
+  as the tail fix below, one layer out — that one taught it to see past the LINK in the slot, this
+  one past the PROSE around it. Nothing is ever deleted from the list; a video written a year ago
+  still carries the blurb of its day. A test walks every retired blurb and a positive control (the
+  past list ignored) fails it.
 - **`voice.findBlurb()` recognises our tail whatever went into its link slot.** The old check tested
   for two literal shapes (today's tail, and the plain-url one), so a description holding any THIRD
   shape read as "not ours" and took the full rebuild path — which would have handed him twelve

@@ -402,3 +402,50 @@ test('swapping the tail inside a real description touches nothing else', () => {
   assert.ok(b.join('\n').includes('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
   assert.ok(b.join('\n').startsWith('Some opening a model wrote.'), 'the opening was disturbed');
 });
+
+/*
+ * A retired blurb is still ours.
+ *
+ * findBlurb matches the constant halves either side of {show}, so the wording
+ * around the slot is part of the key. Edit one paragraph and every description
+ * already on the channel stops matching — and yt-description.js reads a null
+ * here as "not ours", which takes the REBUILD path: a fresh model-written
+ * opening for all 23 videos, handed over for re-approval. Words he already said
+ * yes to, changed because a sentence above them moved.
+ *
+ * The positive control is the second assertion: with showBlurbPast emptied,
+ * a description carrying the retired wording must come back null. If it does
+ * not, this test proves nothing.
+ */
+test('a description carrying a retired blurb is still recognised as ours', () => {
+  const past = (voice.config().youtubeDescription.showBlurbPast || []);
+  assert.ok(past.length, 'no retired blurb is recorded — this test would pass vacuously');
+
+  for (const raw of past) {
+    const old = raw.split('{show}').join('https://mwkshow.com/abcde');
+    const doc = `An opening a model wrote.\n\n${old}\n\n#MWKShow #PIY #Invoicing`;
+    const found = voice.findBlurb(doc);
+    assert.strictEqual(found, old, 'a retired blurb was not recognised');
+
+    // Swapping it puts today's wording in and leaves the video's own words alone.
+    const swapped = doc.replace(found, voice.showBlurb('https://mwkshow.com/abcde'));
+    assert.ok(swapped.startsWith('An opening a model wrote.'), 'the opening was rebuilt');
+    assert.ok(swapped.includes('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
+    assert.ok(swapped.includes('curious people taking their first steps'),
+      "today's wording did not land");
+  }
+});
+
+test("the blurb change is one line, so the bulk approve still calls it boilerplate", () => {
+  const past = voice.config().youtubeDescription.showBlurbPast || [];
+  const link = 'https://mwkshow.com/abcde';
+  for (const raw of past) {
+    const a = raw.split('{show}').join(link).split('\n');
+    const b = voice.showBlurb(link).split('\n');
+    assert.strictEqual(a.length, b.length,
+      'the blurb changed shape — every description becomes a "rewrite" on the dashboard');
+    const differing = a.filter((line, i) => line !== b[i]).length;
+    assert.strictEqual(differing, 1,
+      `expected one changed line against the retired blurb, got ${differing}`);
+  }
+});
