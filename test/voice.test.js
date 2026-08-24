@@ -370,3 +370,35 @@ test('config/voice.json keeps {show} in the blurb', () => {
   assert.ok(raw.includes('{show}'),
     'without {show} every video shares one untracked link and no episode can be told apart');
 });
+
+/*
+ * yt-description.js updates an existing description by swapping the stale tail
+ * for the current one, rather than rebuilding the whole thing — a rebuild
+ * regenerates the opening with a model and would hand him twenty-one rewritten
+ * summaries to re-approve, words he already said yes to. That swap is only safe
+ * if the two blurbs differ on exactly ONE line. If the blurb ever gains a second
+ * {show}, or the url moves onto its own line, this stops being true and the
+ * "one-line diff" the dashboard shows him becomes a lie.
+ */
+test('the tracked and plain blurbs differ on exactly one line', () => {
+  const plain = voice.showBlurb();
+  const tracked = voice.showBlurb('https://mwkshow.com/abcde');
+  const a = plain.split('\n');
+  const b = tracked.split('\n');
+  assert.strictEqual(a.length, b.length, 'the two blurbs are different shapes');
+  const differing = a.filter((line, i) => line !== b[i]);
+  assert.strictEqual(differing.length, 1,
+    `expected one changed line, got ${differing.length}: ${JSON.stringify(differing)}`);
+});
+
+test('swapping the tail inside a real description touches nothing else', () => {
+  const doc = `Some opening a model wrote.\n\nAnother paragraph of it.\n\n`
+    + `${voice.showBlurb()}\n\n#MWKShow #PIY #Invoicing`;
+  const swapped = doc.replace(voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'));
+  const a = doc.split('\n');
+  const b = swapped.split('\n');
+  const differing = a.map((l, i) => (l === b[i] ? null : i)).filter((i) => i !== null);
+  assert.strictEqual(differing.length, 1, 'the swap changed more than the link line');
+  assert.ok(b.join('\n').includes('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
+  assert.ok(b.join('\n').startsWith('Some opening a model wrote.'), 'the opening was disturbed');
+});

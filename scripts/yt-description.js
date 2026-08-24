@@ -103,6 +103,20 @@ Return JSON only: {"opening":"..."}`;
   return JSON.parse(json.candidates[0].content.parts[0].text).opening.trim();
 }
 
+/*
+ * The per-video link. Idempotent, so this is safe to call as often as it is
+ * useful — the mint key is (target, platform, clipId, campaign, medium) and a
+ * second call returns the same code rather than a new one.
+ */
+async function episodeLink(id, title = null) {
+  const link = await shortlink.mint({
+    platform: 'youtube', medium: 'description', campaign: 'episode',
+    clipId: id, label: title,
+  });
+  if (!link) throw new Error('could not mint the episode link (dashboard unreachable) — retrying next run');
+  return link;
+}
+
 async function build(id) {
   const title = currentTitle(id);
   const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
@@ -126,11 +140,7 @@ async function build(id) {
    * written any day, so falling back to the plain url would buy nothing and
    * cost two rewrites of every video — one to the untracked url and one back.
    */
-  const link = await shortlink.mint({
-    platform: 'youtube', medium: 'description', campaign: 'episode',
-    clipId: id, label: title,
-  });
-  if (!link) throw new Error('could not mint the episode link (dashboard unreachable) — retrying next run');
+  const link = await episodeLink(id, title);
 
   const opening = await summarise(topics.transcript, title);
   const tags = voice.tagLine('youtube', topics.tags);
@@ -198,14 +208,52 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
   for (const id of ids) {
     try {
       const existing = currentDescription(id);
-      if (alreadyWritten.get(id) === existing.trim()) continue;   // exactly what we wrote
+
       if (existing.trim()) {
-        // Already has words someone chose. Draft, file, and touch nothing.
+        /*
+         * A description that is already there. Three cases, cheapest first —
+         * and the ORDER is the fix, not the cases.
+         *
+         * This block used to open with `alreadyWritten.get(id) === existing`,
+         * which skipped before build() was ever reached. That made the guard
+         * mean "unchanged since we wrote it" when the question is "is it still
+         * what we would write now" — so no change to the constant tail could
+         * ever land on a video that already had one. The per-episode link added
+         * on 2026-08-23 would have reached two videos out of twenty-three.
+         * The same disease RULES_VERSION cures in topic-tags.js, in a second
+         * place, and it was found by mate asking whether anything was missing.
+         *
+         * It also keyed off the wrong set: `applied` only holds videos that
+         * went through the approval flow, and most of these were auto-filled
+         * when their description was empty, so they were never in it at all.
+         * The tail itself is the honest test — if the text carries it, we wrote
+         * it, whichever route it took.
+         */
+        const tail = voice.showBlurb(await episodeLink(id));
+        if (existing.includes(tail)) continue;                   // current, nothing to do
+
+        const stale = voice.showBlurb();                         // the plain-url version
+        if (existing.includes(stale)) {
+          /*
+           * Ours, and only the boilerplate tail is out of date. Swap JUST that.
+           * A full rebuild would regenerate the opening with a model and hand
+           * him twenty-one rewritten summaries to re-approve — words he already
+           * said yes to, changed for no reason he asked for. It is also free:
+           * no transcript, no model call.
+           */
+          proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
+            proposed: existing.replace(stale, tail) });
+          continue;
+        }
+
+        // Not recognisably ours, or changed underneath us. Draft, file, touch nothing.
+        if (alreadyWritten.get(id) === existing.trim()) continue;
         const { title, description } = await build(id);
         if (description.trim() === existing.trim()) continue;
         proposals.push({ videoId: id, title, currentText: existing, proposed: description });
         continue;
       }
+
       if (!blurbChosen()) { console.log(`hold  ${id} — empty, but the show blurb is still PENDING`); continue; }
       const { title, description } = await build(id);
       if (dryRun) { console.log(`DRY   ${id} — empty, would fill it in`); continue; }
