@@ -686,3 +686,15 @@ test('a swap filed with no kind still reads as boilerplate', async () => {
   // Every row filed before the column existed. The fallback must keep working.
   assert.equal(boilerplateOnly({ current_text: 'one\ntwo\nthree', proposed: 'one\nTWO\nthree' }), true);
 });
+
+test('the sharing card counts real opens and says what it cannot tell him', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com', rows: LINKROWS,
+    campaigns: LINKCAMPS, totals: { links: 11, human: 3, crawler: 1 }, total: 2,
+    shares: [{ tag: 'natalie', clicks: 2, last_at: new Date().toISOString() }] });
+  assert.match(html, /natalie/);
+  // The honesty is the feature. A link that gets forwarded, and a messenger
+  // that fetches the url to draw a preview, are both normal.
+  assert.match(html, /not that Natalie opened it/);
+  assert.match(html, /forwarded/);
+});

@@ -253,3 +253,18 @@ ALTER TABLE yt_proposal ADD COLUMN kind TEXT;
 -- Reset to 0 by a re-queue from the dashboard: a human looking at it is exactly
 -- the condition the counter was waiting for.
 ALTER TABLE queue_item ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
+
+-- ---------------------------------------------------------------------------
+-- Who he sent this one to, when he shares a link by hand.
+--
+-- mwkshow.com/<code>/<tag> — the tag is a label HE types into the url as he
+-- sends it ("natalie", "tom", "book-club"), so one code serves everybody and he
+-- mints nothing per person. It is his own word, not anything read off the
+-- visitor: still no IP, no user agent, no cookie, no fingerprint, which is what
+-- keeps a redirect out of consent territory.
+--
+-- It says the link labelled natalie was opened. It does NOT say Natalie opened
+-- it — links get forwarded, and a messenger fetches the url to build a preview
+-- the moment it is sent. The bot flag is what keeps the second one honest.
+ALTER TABLE click ADD COLUMN tag TEXT;
+CREATE INDEX IF NOT EXISTS click_tag ON click (tag, at DESC);

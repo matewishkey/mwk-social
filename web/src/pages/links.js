@@ -97,7 +97,7 @@ export async function linksAction(request, env, email) {
 }
 
 export function linksPage({ email, tz, host, rows, campaigns, totals, minted, err,
-  campaign = '', page = 1, size = 50, total = 0, params = '' }) {
+  shares = [], campaign = '', page = 1, size = 50, total = 0, params = '' }) {
   const short = (code) => `https://${host}/${code}`;
   // queue/2026-08-21-dont-call-your-brother.mp4 -> dont-call-your-brother
   const clipName = (key) => (key || '').replace(/^.*\//, '').replace(/\.[a-z0-9]+$/i, '')
@@ -178,6 +178,26 @@ ${card('What the links are for', campaigns.length ? `<div class="wrap"><table>
   }).join('')}</tbody></table></div>`
   : '<p class="empty">Nothing carries a campaign yet — everything minted before 22 August predates the field.</p>')}
 
+${card('Sharing it with someone yourself', `
+<p class="ctx">Put their name on the end of any link and it counts separately. Nothing to mint,
+  nothing to set up — type it as you send it.</p>
+<pre class="egs">https://${esc(host)}/&lt;code&gt;/<b>natalie</b>
+https://${esc(host)}/&lt;code&gt;/<b>tom</b>
+https://${esc(host)}/&lt;code&gt;/<b>book-club</b></pre>
+<p class="ctx">Accents and spaces are fine — <code>Ödön</code> becomes <code>odon</code>,
+  <code>Book Club</code> becomes <code>book-club</code>. A name it cannot read is simply not
+  recorded and the link still works.</p>
+${shares.length ? `<div class="wrap"><table>
+  <thead><tr><th>Who you sent it to</th><th class="n">Opened</th><th>Last</th></tr></thead>
+  <tbody>${shares.map((r) => `<tr>
+    <td><b>${esc(r.tag)}</b></td>
+    <td class="n">${r.clicks}</td>
+    <td class="faint">${esc(ago(r.last_at))}</td></tr>`).join('')}</tbody></table></div>
+<p class="note">Real opens only — a messenger fetches the link to draw its preview the moment you
+  send it, and those are not counted. It tells you the link labelled <i>natalie</i> was opened,
+  not that Natalie opened it: links get forwarded.</p>`
+  : '<p class="empty">Nobody has opened a personal link yet.</p>'}`)}
+
 ${card('Mint one', `
 <form method="post" class="mintform">
   <input type="hidden" name="do" value="mint">
@@ -212,6 +232,9 @@ ${pager({ path: '/links', params, page, size, total, noun: 'links' })}`)}
 .okbox { border-color:var(--ok); } .badbox { border-color:var(--bad); }
 .idea { border-left:3px solid var(--accent); }
 .idea code { background:var(--bg); padding:.1rem .35rem; border-radius:4px; border:1px solid var(--line); }
+.egs { background:var(--bg); border:1px solid var(--line); border-radius:8px;
+  padding:.7rem .8rem; font-size:.85rem; margin:.6rem 0; overflow-x:auto; }
+.egs b { color:var(--accent, #f0524a); }
 .mintform { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.7rem; align-items:end; }
 .mintform label { display:flex; flex-direction:column; gap:.25rem; font-size:.76rem;
   text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }

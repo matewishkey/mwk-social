@@ -306,6 +306,23 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   (`facebook.com/matewishkey`, 93) — a personal timeline is impossible through any Meta API, so
   there is nothing to confuse it with on our side, but the label says "PAGE" anyway because he
   asked the question.
+- **A PERSONAL SHARE IS A NAME ON THE END OF ANY LINK — `mwkshow.com/<code>/<name>`** (his idea,
+  2026-08-24: he is messaging friends the sign-up link and wants to know who opened it). One code
+  serves everybody: the name is a word HE types as he sends it, stored on the CLICK as `tag`, so
+  there is nothing to mint per person. `6kc0k` is the code minted for this (`campaign = personal`,
+  `medium = message`).
+  - **Nothing about the visitor is read to produce it** — still no IP, no user agent, no cookie.
+    It is his own label, which is what keeps this the same shape of promise as the rest of the
+    shortener.
+  - **`decodeURIComponent` BEFORE normalising.** `url.pathname` keeps percent-encoding, so `Ödön`
+    arrives as `%C3%96d%C3%B6n` and stored `c3-96d-c3-b6n`. Found by curling the live redirect with
+    a real accented name — an ASCII test would have passed. Accents are then folded to ASCII
+    (`Ödön` → `odon`, `József` → `jozsef`) or a Hungarian name comes out as rubble.
+  - **The bot flag carries more weight here than anywhere.** A messenger fetches the url to draw
+    its preview the moment he sends it, so every name would show an "open" the second it left his
+    phone. Verified: a `WhatsApp/2.23` user-agent lands as `bot = 1`. Only `bot = 0` is shown.
+  - **It says the link labelled natalie was opened, NOT that Natalie opened it.** Links get
+    forwarded. The page says so in those words; do not let a summary quietly upgrade it.
 - **`/links` on the dashboard is the database, and it can mint by hand.** That was the actual gap:
   a link could only be created as a side effect of publishing, so anything he pastes somewhere
   himself — a bio, a newsletter, a talk — had to be a raw url and was invisible. The seven

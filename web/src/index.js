@@ -242,7 +242,7 @@ async function links(env, tz, email, url) {
   const total = (totalRow && totalRow.n) || 0;
   const page = pageOf(url, LINK_PAGE, total);
 
-  const [rows, campaigns, totals] = await Promise.all([
+  const [rows, campaigns, totals, shares] = await Promise.all([
     // The join back to the video. clip_id is the queue item id, and queue_item
     // carries the media_key — so click -> link -> item -> file is one hop, not
     // a LIKE on a string prefix. The COALESCE keeps the 14 older links working:
@@ -262,6 +262,19 @@ async function links(env, tz, email, url) {
         GROUP BY l.campaign ORDER BY human DESC, links DESC`).all(),
     env.DB.prepare(
       `SELECT COUNT(DISTINCT l.code) AS links, ${counts} FROM link l ${clicks}`).first(),
+    /*
+     * Who he sent a link to, by hand. The tag is his own word off the end of
+     * the url (mwkshow.com/<code>/natalie), so this is the whole answer to
+     * "did the people I messaged actually open it".
+     *
+     * bot = 0 only. A messenger fetches the url to build its preview the moment
+     * he sends it, so counting every hit would show a click on every name the
+     * second it left his phone.
+     */
+    env.DB.prepare(
+      `SELECT tag, COUNT(*) AS clicks, MAX(at) AS last_at
+         FROM click WHERE tag IS NOT NULL AND bot = 0
+        GROUP BY tag ORDER BY last_at DESC LIMIT 60`).all(),
   ]);
 
   return linksPage({
@@ -269,6 +282,7 @@ async function links(env, tz, email, url) {
     rows: rows.results || [],
     campaigns: campaigns.results || [],
     totals: totals || { links: 0, human: 0, crawler: 0 },
+    shares: shares.results || [],
     minted: url.searchParams.get('minted'),
     err: url.searchParams.get('err'),
     campaign, page, size: LINK_PAGE, total, params: url.searchParams,

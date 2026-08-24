@@ -449,3 +449,41 @@ test('every platform known() admits can actually be described', () => {
     assert.doesNotThrow(() => platforms.get(name), `get(${name}) throws behind a true known()`);
   }
 });
+
+/* ------------------------------------------------------- personal shares -- */
+
+/*
+ * mwkshow.com/<code>/<name> — one code, a name per person, nothing minted.
+ *
+ * The parsing matters more than it looks: the redirect took the WHOLE path as
+ * the code, so `/abcde/natalie` matched nothing and quietly sent the visitor to
+ * the fallback. It looked like it worked, which is the worst way for a link to
+ * fail.
+ */
+test('a name on the end of a link normalises to something storable', async () => {
+  const { normaliseTag } = await import('../web/src/links.js');
+  assert.equal(normaliseTag('Natalie'), 'natalie');
+  assert.equal(normaliseTag('Book Club!'), 'book-club');
+  // Hungarian names are the reason accents are folded rather than stripped:
+  // without it Ödön becomes "d-n" and József becomes "j-zsef".
+  assert.equal(normaliseTag('Ödön'), 'odon');
+  assert.equal(normaliseTag('József'), 'jozsef');
+  // Anyone can append anything to a public url, so it is capped and bounded.
+  assert.equal(normaliseTag('a'.repeat(60)).length, 24);
+  assert.match(normaliseTag('a'.repeat(60)), /^[a-z0-9-]+$/);
+  // Unreadable is not recorded, and must never break the link.
+  assert.equal(normaliseTag('---'), null);
+  assert.equal(normaliseTag(''), null);
+  assert.equal(normaliseTag(null), null);
+});
+
+test('the redirect splits the code from the name instead of swallowing both', async () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'links.js'), 'utf8');
+  const fn = src.slice(src.indexOf('export async function redirect'));
+  assert.match(fn, /split\('\/'\)/, 'the path is still taken whole — /code/name would 404 to fallback');
+  assert.match(fn, /normaliseTag\(decodeSafe\(second\)\)/,
+    'the name is not percent-decoded — "Ödön" would store as c3-96d-c3-b6n');
+  assert.match(fn, /INSERT INTO click \(code, at, referer_host, bot, tag\)/,
+    'the name is parsed and then not stored');
+});
