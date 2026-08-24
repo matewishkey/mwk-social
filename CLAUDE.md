@@ -418,22 +418,51 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
     were never gated. Follow takes `targetUserId`, the NUMERIC X id, not the handle.
     **X rate-limits follows hard**: 37 went through back to back, then a solid wall of 429s.
     Retry with a long backoff, do not hammer it.
-- **X: the link goes in a THREAD REPLY, not the post and not a comment** (changed 2026-08-21).
-  A comments API exists again, but the CTA still does NOT go through the watcher: it is published
-  with the post as `platformSpecificData.threadItems`, and a watcher comment on top would be the
-  same link twice under one tweet. `platformSpecificData.threadItems` publishes a
-  root tweet plus its replies in one call, which gets the link out of the tweet that has to
-  travel. `linkPlacement: 'reply'` is the third value that field takes; only X uses it.
-  **threadItems REPLACES the top-level `content` for that platform** — the caption is published as
-  `threadItems[0]`, so the media has to ride there too, and a `content` left at the top level is
-  used for display and search only. It lives in `platformSpecificData` **on the PlatformTarget**,
-  same place as `firstComment`, not at the top level of the body.
-- **X's link penalty is REDUCED by Premium, not removed — an older note here said otherwise and was
-  wrong** (corrected 2026-08-21 against current reporting). X deprioritises a post carrying an
-  external link to keep people on-platform; non-Premium link posts are effectively invisible,
-  Premium ones get a fraction of normal engagement. **Every X post made before 2026-08-21 carried
-  the CTA in its caption and was therefore in the penalised class** — including the two mate posted
-  by hand from the app, both of which got 1 impression.
+- **X: THE LINK IS IN THE TWEET** (changed 2026-08-24, mate's call: *"X change it correctly"*).
+  It rode in a thread reply from 2026-08-21 until then. Two reasons it moved, and the second is
+  the one that decided it:
+  - **The penalty the thread dodged is not in the open-sourced ranker.** Grepped `has_url`,
+    `url_penalty`, `link_penalty`, `contains_link`, `external_link` across `xai-org/x-algorithm`:
+    the only hits are USER features measuring dwell time on a link
+    (`external_link_duration`, `CLIENT_TWEET_EXTERNAL_LINK_LONG_DWELLED`) and an ads threshold —
+    engagement signals, not a demotion. `open_link_score` is one of the predicted-engagement terms
+    the ranker consumes; **its numeric weight is NOT in the repo, so do not quote one.** Positive
+    control on the same search: `favorite` hits 68 files.
+  - **The reply had a cost that was certain.**
+    `home-mixer/filters/oon_retweet_reply_filter.rs` partitions out
+    `in_network == Some(false) && (is_retweet || is_reply)`, and its own test asserts it — an
+    out-of-network reply never enters the For You candidate set. So the CTA was only ever
+    *surfaced* to people already following us. **Say that precisely**: the reply stayed readable to
+    anyone who opened the root tweet; what it could not do is reach a non-follower as a feed item.
+    At 8 followers that was the whole audience for it.
+  - **And it is cheaper.** A URL tweet is 20c flat and the fee REPLACES the base charge, so one
+    tweet is 20c against the thread's 1.5c + 20c. `estCostCents` is 20 now, not 21.5.
+  **Reversing this is one word in the platform table** — `linkPlacement: 'reply'`. `threadWithLink()`
+  and its tests are deliberately still there, because the evidence for the change is an ABSENCE in
+  a code release, which is weaker than a presence. A test fails if `'reply'` comes back without
+  that being deliberate.
+  **`threadItems` mechanics, still true if it is ever reinstated:** it publishes a root tweet plus
+  its replies in one call and **REPLACES the top-level `content` for that platform** — the caption
+  is published as `threadItems[0]`, so the media has to ride there too, and a `content` left at the
+  top level is used for display and search only. It lives in `platformSpecificData` on the
+  PlatformTarget, same place as `firstComment`.
+- **`captionMax` IS ENFORCED NOW, and it became load-bearing the same day.** It sat on the platform
+  table from the beginning read by nothing — the **seventh** decorative field here — which was
+  harmless while X's caption was his words alone and stopped being harmless the moment the link
+  joined them. 280 is not much once a tracked link and a tag are in it. `captionForPlatform()` gives
+  up **the tags first, then the link, and his words never**: if his words alone do not fit, the
+  platform is dropped with a reason rather than truncated into fitting. **X counts every url as 23
+  characters** however long it is, so measuring the raw string would drop a tag line that actually
+  fits. Composition is caught per account for the same reason the request loop is — a throw there
+  is *before* the requests, so one over-long post would otherwise take every platform with it.
+- **X's "link penalty" is REPORTING, not something in the code — and this note has now been wrong
+  in both directions.** It first said the penalty was removed by Premium, was corrected on
+  2026-08-21 to "reduced by Premium", and on 2026-08-24 a read of `xai-org/x-algorithm` found no
+  demotion term at all (see the entry above for the searches and the positive control). **What is
+  actually known**: the two posts mate made by hand from the app carried a link and got 1
+  impression each. That is two data points on an account with 8 followers, which is not evidence of
+  a penalty — it is evidence of 8 followers. **Do not rebuild a mechanic on this claim again
+  without something measurable.**
 - **A URL tweet costs 20c FLAT — the fee replaces the base charge, it does not add to it.**
   Measured off `usage:stats`, not inferred: `content_create: 2` + `content_create_with_url: 5`
   came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly. Re-measured after 37 follows

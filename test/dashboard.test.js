@@ -468,7 +468,7 @@ test('the workflows page says where each platform\'s link actually goes', async 
 
   // X is the one that does append its own tracked link to a post it publishes.
   const x = html.split('<h2>twitter</h2>')[1].split('</section>')[0];
-  assert.match(x, /a second tweet in the same call, with its own tracked code/);
+  assert.match(x, /appended to the caption, with its own tracked code/);
 });
 
 /*

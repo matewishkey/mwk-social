@@ -98,7 +98,32 @@ const PLATFORMS = {
     // therefore in the penalised class. threadItems publishes the root tweet
     // and its replies in one call, so his words go out clean and the link
     // lands underneath, where the penalty costs nothing.
-    linkPlacement: 'reply',
+    /*
+     * The link goes in the TWEET, not in a thread reply (changed 2026-08-24,
+     * mate's call, after reading xai-org/x-algorithm rather than the reporting).
+     *
+     * The thread existed to keep an external link out of the tweet that has to
+     * travel, on the understanding that X demotes a post carrying one. That
+     * premise is not in the open-sourced ranker: grepping has_url, url_penalty,
+     * link_penalty, contains_link and external_link finds only USER features
+     * measuring dwell time on a link, plus an ads threshold — engagement
+     * signals, not a demotion. Positive control on the same search: `favorite`
+     * hits 68 files.
+     *
+     * And the reply had a cost that was certain rather than theoretical.
+     * home-mixer/filters/oon_retweet_reply_filter.rs drops any out-of-network
+     * reply before it reaches the For You candidate set, so the CTA was only
+     * ever SURFACED to people already following us — 8 of them. It stayed
+     * readable to anyone who opened the root tweet, and nobody else.
+     *
+     * Cheaper too: a URL tweet is 20c flat and the fee REPLACES the base charge,
+     * so one tweet is 20c against the thread's 1.5c + 20c.
+     *
+     * Reversing this is one word — 'reply' — and threadWithLink() and its tests
+     * are deliberately still here for that. The evidence is an absence in a
+     * code release, which is weaker than a presence.
+     */
+    linkPlacement: 'caption',
     supportsFirstComment: false,
     deletable: true,
     // X is the only platform that refuses a non-AAC audio track, and it does so
@@ -107,10 +132,11 @@ const PLATFORMS = {
     audioCodecs: ['aac'],
     // Measured off usage:stats, not inferred: 2 content_create + 5
     // content_create_with_url came to xSpendCents 103, so a URL tweet is 20c
-    // FLAT (it replaces the 1.5c charge, it does not add to it). A clean root
-    // plus a link reply is therefore 21.5c against 20c — 1.5c to get the root
-    // tweet out of the penalised class.
-    estCostCents: 21.5,
+    // FLAT — the fee REPLACES the 1.5c base charge rather than adding to it.
+    // It was 21.5 while the link rode in a thread reply: a clean root at 1.5c
+    // plus a reply carrying the url at 20c. One tweet, one fee, since
+    // 2026-08-24.
+    estCostCents: 20,
   },
   facebook: {
     imageOk: true,

@@ -84,7 +84,8 @@ the body cuts reach by 40–50%, and the same habit keeps every other caption cl
   <li><b class="warn">By the watcher</b> on ${esc(list(watched))} — no native field exists there, so
       an hourly job adds it. It also catches any post whose native comment silently failed.</li>
   <li><b class="bad">Not at all</b> on ${esc(list(never))} — there is no comments API we can use, so
-      for those the link goes in the post itself. On X that costs 20c a post; there is no way round it.</li>
+      for those the link goes in the post itself. On X that costs 20c a post, and the fee replaces
+      the base charge rather than adding to it.</li>
 </ul>
 <p>The wording <b>rotates</b>${v.variants ? ` across ${v.variants} variants` : ''}${
   v.episodeMixRatio ? `, and roughly ${Math.round(v.episodeMixRatio * 100)}% of them quote a real guest

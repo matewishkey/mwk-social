@@ -320,17 +320,52 @@ async function linkFor(platform, opts, medium) {
     || voice.config().links.show;
 }
 
-async function captionForPlatform(platform, opts) {
-  const parts = [opts.text];
-  const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
+/*
+ * How long is this caption where it is going?
+ *
+ * X counts every url as 23 characters however long it is — t.co wraps them all
+ * — so measuring the raw string overstates our own short codes and would drop
+ * a post that fits. Everywhere else a character is a character.
+ */
+function captionLength(platform, text) {
+  if (platform !== 'twitter') return text.length;
+  return text.replace(shortlink.URL_RE, 'x'.repeat(23)).length;
+}
 
-  if (linkInCaption(platform)) parts.push(await linkFor(platform, opts, 'caption'));
-  else if (profileCtaInCaption(platform, opts)) parts.push(voice.profileCta(platform));
-  if (tagsInCaption(platform)) {
-    const tags = voice.tagLine(platform, opts.topics || []);
-    if (tags) parts.push(tags);
+/*
+ * Fit the caption to the platform, giving up OUR parts first and never his.
+ *
+ * This became load-bearing the day X's link moved into the tweet: `captionMax`
+ * had sat on the platform table since the beginning enforced by nothing, which
+ * was harmless while X's caption was his words alone and is not now. 280 is not
+ * a lot once a link and a tag are in it.
+ *
+ * The order is the whole point. The tags are ours, so they go first. The link
+ * is ours, so it goes second — a post nobody can act on still beats no post.
+ * His words are never touched, never truncated, never re-wrapped: if they alone
+ * do not fit, the platform was never going to take this post and it is dropped
+ * with a reason rather than mangled into fitting.
+ */
+async function captionForPlatform(platform, opts) {
+  const max = platformTable.get(platform).captionMax || Infinity;
+  const join = (xs) => xs.filter(Boolean).join('\n\n');
+
+  const link = linkInCaption(platform) ? await linkFor(platform, opts, 'caption')
+    : (profileCtaInCaption(platform, opts) ? voice.profileCta(platform) : null);
+  const tags = tagsInCaption(platform) ? voice.tagLine(platform, opts.topics || []) : null;
+
+  for (const [caption, dropped] of [
+    [join([opts.text, link, tags]), null],
+    [join([opts.text, link]), 'the hashtags'],
+    [join([opts.text]), 'the hashtags and the tracked link'],
+  ]) {
+    if (captionLength(platform, caption) <= max) {
+      if (dropped) console.log(`note: ${platform} caption is over ${max} — dropped ${dropped}`);
+      return caption;
+    }
   }
-  return parts.filter(Boolean).join('\n\n');
+  throw new Error(`his words alone are ${captionLength(platform, opts.text)} characters `
+    + `and ${platform} takes ${max}`);
 }
 
 async function publish(opts) {
@@ -345,10 +380,22 @@ async function publish(opts) {
    * share a tagged one, and TikTok and X each get their own because each
    * carries its own tracked link.
    */
+  /*
+   * Composition is caught per account too. captionForPlatform throws when his
+   * words alone will not fit — and a throw here is BEFORE the request loop, so
+   * without this one over-long post would take every platform down with it,
+   * which is the same mistake as the uncaught request loop below, one step
+   * earlier. The platform that cannot carry the post is dropped; the rest go.
+   */
   const composed = [];
   for (const a of accounts) {
-    composed.push({ account: a, caption: await captionForPlatform(a.platform, opts) });
+    try {
+      composed.push({ account: a, caption: await captionForPlatform(a.platform, opts) });
+    } catch (err) {
+      console.log(`skip  ${a.platform} — ${err.message}`);
+    }
   }
+  if (!composed.length) throw new Error('no platform can carry this post');
 
   const groups = new Map();
   for (const c of composed) {
@@ -473,4 +520,4 @@ if (require.main === module) {
   main().catch((err) => { console.error(err.message); process.exit(1); });
 }
 
-module.exports = { publish, resolveAccounts, threadWithLink, FIRST_COMMENT_PLATFORMS };
+module.exports = { publish, resolveAccounts, threadWithLink, captionForPlatform, FIRST_COMMENT_PLATFORMS };

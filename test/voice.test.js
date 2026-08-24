@@ -222,10 +222,22 @@ test('X has a comments API and is still not watched', () => {
  * The link penalty is the half of X's silence that is ours. Pin the placement
  * so nobody moves it back into the caption to save 1.5c.
  */
-test('X is the only platform that puts its link in a thread reply', () => {
+/*
+ * X's link is in the TWEET now (2026-08-24). The thread existed to dodge a
+ * penalty that is not in the open-sourced ranker, and it cost something
+ * certain: oon_retweet_reply_filter.rs drops an out-of-network reply before the
+ * For You candidate set, so the CTA reached followers only.
+ *
+ * threadWithLink() and its two tests below stay — reversing this is one word in
+ * the table, and the evidence for the change is an ABSENCE in a code release,
+ * which is weaker than a presence.
+ */
+test('no platform posts its link as a thread reply any more', () => {
   const inReply = Object.keys(platformTable.PLATFORMS)
     .filter((p) => platformTable.get(p).linkPlacement === 'reply');
-  assert.deepStrictEqual(inReply, ['twitter']);
+  assert.deepStrictEqual(inReply, [], 'the thread CTA is back — was that deliberate?');
+  assert.equal(platformTable.get('twitter').linkPlacement, 'caption',
+    "X's link belongs in the tweet, where a non-follower can see it");
   // The two fields this used to assert (supportsThread, markerInCaption) were
   // read by nothing but this test, and a field only a test reads is a field
   // that proves nothing. linkPlacement is what post.js actually branches on,
@@ -561,4 +573,49 @@ test('a failed publish request cannot take the published ones down with it', () 
   // The catch has to sit INSIDE the loop, or it is the same bug one line out.
   assert.ok(body.indexOf('try {') < body.indexOf("api('POST', '/posts'"),
     'the try opens after the request it is meant to guard');
+});
+
+/*
+ * captionMax became load-bearing the day X's link moved into the tweet.
+ *
+ * It had sat on the platform table since the beginning enforced by nothing —
+ * the seventh field here to be decorative — which was harmless while X's
+ * caption was his words alone. 280 is not a lot once a tracked link and a tag
+ * are in it, and X counts every url as 23 characters however long it is.
+ *
+ * The order things are given up in is the point: ours first, his never.
+ */
+const { captionForPlatform } = require('../scripts/post.js');
+
+test('a long X caption gives up our parts, in order, and never his words', async () => {
+  const opts = (text) => ({ text, topics: ['Invoicing'], postKey: 'test:len',
+    campaign: 'clip', clipId: null, title: null });
+
+  // Comfortable: his words, the link and a tag all fit.
+  const small = await captionForPlatform('twitter', opts('Short thought.'));
+  assert.ok(small.startsWith('Short thought.'), 'his words must lead');
+  assert.ok(/#\w/.test(small), 'a tag should survive at this length');
+
+  // 250 characters: his words plus a 23-char link fit, the tag line does not.
+  const tight = await captionForPlatform('twitter', opts('w'.repeat(250)));
+  assert.ok(tight.startsWith('w'.repeat(250)), 'his words were altered');
+  assert.ok(!/#\w/.test(tight), 'the tags should have been given up first');
+
+  // 275: not even the link fits. His words still go out whole.
+  const tighter = await captionForPlatform('twitter', opts('w'.repeat(275)));
+  assert.strictEqual(tighter, 'w'.repeat(275), 'his words must survive untouched');
+
+  // Over the limit on his words alone: the platform is refused, never truncated.
+  await assert.rejects(() => captionForPlatform('twitter', opts('w'.repeat(300))),
+    /his words alone are 300 characters and twitter takes 280/);
+});
+
+test('a url counts as 23 on X, so a short code does not cost us a tag', async () => {
+  // Measuring the raw string would make our own mwkshow.com code look longer
+  // than X counts it and drop a tag line that actually fits.
+  const caption = await captionForPlatform('twitter', { text: 'w'.repeat(230),
+    topics: ['Invoicing'], postKey: 'test:url', campaign: 'clip', clipId: null, title: null });
+  assert.ok(caption.startsWith('w'.repeat(230)));
+  assert.ok(caption.length > 280 || /#\w/.test(caption),
+    'either the raw string exceeds 280 (proving urls are discounted) or a tag survived');
 });
