@@ -658,6 +658,9 @@ where everything here loads every session whether it is relevant or not.
   pace, account health, what is waiting on mate. The sweep every restart starts with.
 - **`mwk-post`** — his words or a clip to a queued post: the voice, the hashtag rule, the media
   checks, `scripts/queue-add.js`, and what will actually happen once it is in.
+- **`mwk-image`** — a STILL rather than a clip: the two platforms that cannot take one, the file
+  whose extension lies, padding instead of cropping, and the brand band from
+  `mwk-og-image-generator` including both of its traps.
 
 **When a rule here turns out to be one a skill enforces, move it into the skill and leave this file
 pointing at it.** Two copies of a rule is how one of them drifts.

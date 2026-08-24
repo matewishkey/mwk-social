@@ -16,14 +16,22 @@ said publish in those words.**
 
 ## 1. The words are his
 
-Never write marketing copy. His dictation IS the post — copy it across, fix nothing but a typo.
+Never write marketing copy. When he dictates, his dictation IS the post — copy it across, fix
+nothing but a typo.
 
 When he asks for options, or says "add small wording", write plainly in his register: first
 person, the viewer as the subject, ordinary language. Never "expert", "teacher", "free",
 "guaranteed" or "safe", and never a claim that anyone became a developer. `matewishkey.com/brand`
-is the authority and its rules are recorded beside the text in `config/voice.json`.
+is the authority — **read it, it moves** — and its rules are recorded beside the text in
+`config/voice.json`.
 
-**Show him what you wrote before it goes.** Words published under his name have to be his.
+**When there is media and no dictation, draft the dullest honest version and QUEUE it** (mate,
+2026-08-24: *"The accountability is still on your side"*). The queue is the review gate; an
+unqueued post is a stall, not caution. Say the words are yours and easy to replace, and offer
+alternatives underneath rather than in front of him. Never PUBLISH words he has not seen — that
+is what queueing protects.
+
+A still picture rather than a clip: `mwk-image`.
 
 ## 2. The hashtags are for normal humans, never for tech people
 
