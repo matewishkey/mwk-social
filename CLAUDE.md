@@ -263,6 +263,23 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   card and every fetch hits the redirect — the first live post logged 18 "clicks" on one link in
   three minutes. The User-Agent is read to DECIDE and then discarded; only the flag is stored, so
   nothing personal is kept. **Only `bot = 0` is ever shown as a click.**
+- **UNCHANGED IS NOT THE SAME AS CURRENT, and conflating them froze every description**
+  (2026-08-24, found because mate asked whether anything was missing — no test caught it).
+  `yt-description.js` opened its loop with `alreadyWritten.get(id) === existing.trim()` and skipped
+  **before `build()` was ever reached**, so no change to the constant tail could land on a video
+  that already had one: the per-episode link added the day before would have reached **2 videos out
+  of 23**. Measured: 2 proposals before the fix, 21 after. It also keyed off the wrong set —
+  `applied` only holds videos that went through the approval flow, and most were auto-filled while
+  empty, so they were never in it. **The tail itself is the honest test**: if the text carries it,
+  we wrote it, whichever route it took. Same disease `RULES_VERSION` cures in `topic-tags.js`, in a
+  second place — so when adding anything to the constant part of a generated artefact, ask how it
+  reaches the ones already written.
+- **A stale tail is SWAPPED, never rebuilt.** `build()` regenerates the opening with a model, so
+  rebuilding would hand him 21 rewritten summaries to re-approve — words he already said yes to,
+  changed for no reason he asked for. When only the tail is out of date it is replaced in place: no
+  transcript, no model call, and the diff is one line. **Two tests pin what makes that safe** — the
+  plain and tracked blurbs must differ on exactly ONE line, or the "one-line change" the dashboard
+  shows him is a lie.
 - **The show-notes loop did not converge**: `build()` regenerates the opening with a model every
   run, so an applied description never matches byte for byte and immediately re-proposed itself.
   `/youtube/pending` returns what was last WRITTEN as well as what is approved, and a video already
@@ -573,6 +590,16 @@ here would publish their existence. Read that note before filing a cross-repo is
 
 - **Facebook posts to Pages only** — personal timelines are impossible via any API (Meta rule).
   Tokens ~60 days; watch `accounts:health`.
+- **LinkedIn: ARTICLES AND NEWSLETTERS ARE IMPOSSIBLE, and it is LinkedIn's limit, not Zernio's.**
+  Long-form (`linkedin.com/article/new/`) has never been exposed by the LinkedIn API, so no tool can
+  do it — Zernio's own docs list it under "What You Can't Do". Long-form goes in LinkedIn's web
+  editor by hand, or on `matewishkey.com` with the pipeline posting a link to it. Verified against
+  the docs and independently, 2026-08-24.
+- **Company page video runs to 30 minutes against a personal profile's 10.** Text limits are the
+  same on both. **Documents/carousels and polls are DOCUMENTED as supported and have never been
+  tested here** — a third-party source claims the API does not carry them, so treat both as unproven
+  until one actually publishes. This repo has shipped four declared-but-never-read platform fields;
+  do not add a fifth by trusting a table.
 - **LinkedIn**: 3,000-char limit; duplicate content → 422; external links suppress reach
   (−40–50%) — hence the first-comment mechanic. Reshare/quote-repost an existing post via REST
   `platformSpecificData.reshareUrl` + `content` (not exposed as a `posts:create` flag;
