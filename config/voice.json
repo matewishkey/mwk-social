@@ -204,20 +204,21 @@
     },
     "_profileCtaBy": "Per-platform overrides of profileCta, for a surface where \"my bio\" is the wrong words. YouTube is the one so far: a url in a SHORT's description or comment is plain text, deliberately, to cut spam — but the CHANNEL's own links stay clickable and are YouTube's documented route out of a Short. Every value here MUST also be in markers[] above, exactly like profileCta, or the duplicate guard stops recognising a comment we wrote and the watcher comments again on every one of them for ever.",
     "_profileCta": "What {show} becomes on a platform where a url in a post or a comment is PLAIN TEXT — Instagram and TikTok, both verified. Printing a tracked short code there burns a code nobody can click and reads in the numbers as 'posted, no interest' rather than 'never reachable': five TikTok codes took zero human clicks between them. This string MUST also appear in markers[] above, or the duplicate guard stops recognising these comments and the watcher re-comments on every one, for ever.",
-    "_register": "Written informally on purpose — lowercase openings, dropped commas, 'dont'. Hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker.",
+    "_register": "Plain, correct English. Capitals, apostrophes and full stops as normal. This REVERSED an earlier decision to write informally on purpose — lowercase openings, dropped commas, 'dont' — which mate called on 2026-08-24: it read as careless rather than relaxed, and a comment under a video is the show's shop window. Warmth comes from the ROTATION and from what the sentences say, not from dropped punctuation. Still hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker.",
     "plain": [
-      "Do not let others solve your problem with AI. Prompt it Yourself!\nCome to the show and let's build what You wish for!\n\n{show}",
-      "one wish is one show. bring me something you wish your computer did, and we build it on your own machine while we talk.\n\n{show}",
-      "if theres something you wish your computer did, thats the whole show. three to four hours, unedited.\n\n{show}",
-      "dont let someone else prompt it for you. come and build the thing yourself.\n\n{show}",
-      "no experience needed and no camera skills either. a real problem and your own computer is the whole list.\n\n{show}",
-      "you keep what we build, and you can change it afterwards without me. thats the point of it.\n\n{show}",
-      "somebodys problem, out of their own work, built on their own computer. thats one show.\n\n{show}"
+      "Do not let others solve your problem with AI. Prompt it yourself.\nCome to the show and let's build what you wish for.\n\n{show}",
+      "One wish is one show. Bring me something you wish your computer did, and we build it on your own machine while we talk.\n\n{show}",
+      "If there's something you wish your computer did, that's the whole show. Three to four hours, unedited.\n\n{show}",
+      "Don't let someone else prompt it for you. Come and build the thing yourself.\n\n{show}",
+      "No experience needed, and no camera skills either. A real problem and your own computer is the whole list.\n\n{show}",
+      "You keep what we build, and you can change it afterwards without me. That's the point of it.\n\n{show}",
+      "Somebody's problem, out of their own work, built on their own computer. That's one show.\n\n{show}",
+      "If you need help taking the first few steps, come to the show.\n\n{show}"
     ],
     "episode": [
-      "\"{wish}\"\n\nthats what someone brought to the show — {episodeTitle}. yours could be next.\n\n{show}",
-      "someone turned up and said: \"{wish}\"\n\nwe built it, unedited: {episodeUrl}\n\nwhats yours? {show}",
-      "last one on the show wished for this: \"{wish}\"\n\n{episodeTitle} — {episodeUrl}\n\nbring me yours: {show}"
+      "\"{wish}\"\n\nThat's what someone brought to the show — {episodeTitle}. Yours could be next.\n\n{show}",
+      "Someone turned up and said: \"{wish}\"\n\nWe built it, unedited: {episodeUrl}\n\nWhat's yours? {show}",
+      "The last one on the show wished for this: \"{wish}\"\n\n{episodeTitle} — {episodeUrl}\n\nBring me yours: {show}"
     ]
   },
   "youtubeDescription": {
