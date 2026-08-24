@@ -34,8 +34,9 @@ at once, straight from a shell — these are the actual live posts:
   YouTube show blurb. One file to change what gets posted.
 - `scripts/first-comment.js` — makes sure everything published has its comment.
   Facebook, Instagram, LinkedIn and YouTube get it natively at publish time;
-  Threads has no such field, so this picks it up. TikTok and X have no usable
-  comments API at all. The wording rotates, and some comments quote a real guest
+  Threads has no such field, so this picks it up. TikTok has no usable comments
+  API at all; X has one, but its link ships with the post as a thread reply, so a
+  watcher comment would be the same link twice under one tweet. The wording rotates, and some comments quote a real guest
   wish from the show's feed.
 - `docs/playbook.md` — the rules this pipeline runs on, and what each platform
   will and won't allow.
@@ -49,9 +50,10 @@ at once, straight from a shell — these are the actual live posts:
   and `GEMINI_API_KEY`; without them the comment still goes out, just untagged.
   Results are cached per post under `~/.local/state/mwk-social/topics/`.
 - `web/` — the dashboard on Cloudflare Workers + D1, behind an email one-time
-  PIN at `social.matewishkey.com`. Five pages: what the pipeline has been doing
+  PIN at `social.matewishkey.com`. Six pages: what the pipeline has been doing
   and what needs a human, the stats, the queue, YouTube show notes awaiting
-  approval, and a workflow map of what happens on each platform. Fed by
+  approval, every short link and what it earned, and a workflow map of what
+  happens on each platform. Fed by
   `scripts/ship-events.js` (every two minutes) and `scripts/ship-stats.js`
   (hourly).
 - **Everything publishes from here.** The pipeline used to also mirror reels
@@ -110,7 +112,7 @@ scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
 
 ## What's worth measuring
 
-At this size, followers are not the scoreboard — five of the eight connected
+At this size, followers are not the scoreboard — five of the ten connected
 channels are still in single digits, and one (LinkedIn personal) holds almost
 all of the audience. The stats page is built around five things
 instead, in this order:

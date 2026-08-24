@@ -25,7 +25,9 @@ Two ways the call-to-action gets under a post:
 |---|---|---|
 | **At publish time** | `platformSpecificData.firstComment`, posted by Zernio seconds after the post | Facebook, Instagram, LinkedIn, YouTube |
 | **Afterwards** | `scripts/first-comment.js`, hourly — Threads has no native field, and it also catches a native comment that silently failed | + Threads |
-| **In the caption** | no comment API exists | TikTok, X |
+| **In the caption** | no comment API exists, so the link rides in the post itself | TikTok |
+| **In a thread reply** | `platformSpecificData.threadItems`, published with the post — X has a comments API, but a watcher comment would be the same link twice under one tweet, and the root tweet has to stay clean | X |
+| **Nowhere — the bio instead** | a url is dead text in a caption AND a comment on both, so the CTA names the bio and mints no code | Instagram, TikTok |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
 carries the marker — whoever put it there.
@@ -248,8 +250,8 @@ two runtimes. Not now.
 
 ## The dashboard
 
-`social.matewishkey.com` — five pages behind Cloudflare Access with an email one-time PIN:
-overview, stats, the queue, YouTube show notes and the workflow map. `web/` holds it;
+`social.matewishkey.com` — six pages behind Cloudflare Access with an email one-time PIN:
+overview, stats, the queue, YouTube show notes, the links database and the workflow map. `web/` holds it;
 `web/deploy.sh` ships it from this box, never on push.
 
 | | |
@@ -282,7 +284,9 @@ the far end or must outlive Zernio's ~12-month window.
 
 **The cursor advances only on a 2xx.** Anything else leaves it where it was and the same events go
 again next run; replays are free because the sink is `INSERT OR IGNORE` on a stable ULID. And the
-uploader sends an **empty batch when idle**, at least every fifteen minutes — without that
+uploader sends an **empty batch when idle**, every ten minutes — deliberately UNDER the
+dashboard's fifteen-minute stale mark, or the beat lands after the page has given up and the tile
+flickers red for nothing. Two constants in two runtimes that only make sense as a pair — without that
 heartbeat, "nothing happened" and "the box is off" are the same picture, which is the one thing a
 status page must never do.
 

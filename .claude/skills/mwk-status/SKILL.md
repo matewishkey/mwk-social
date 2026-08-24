@@ -67,7 +67,8 @@ to `*:45`. There is **no time-of-day window** — only six a day, ninety minutes
     console.log("BROKEN",a.platform,a.username,JSON.stringify(a.issues));})'
 ```
 
-Eight accounts. **`warning` is routine — never report it as a fault.** Zernio refreshes tokens
+Ten accounts (three of them LinkedIn — two people and the company page — plus a Reddit
+connection nothing in this pipeline posts to). **`warning` is routine — never report it as a fault.** Zernio refreshes tokens
 lazily, so an account passes through `warning` with "Token expired or expiring soon (auto-refresh
 pending)" and returns to `healthy` on its own. Only `needsReconnect: true` or `status: error` is
 a problem.
