@@ -181,11 +181,14 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   generaterated."* Every bio code now carries `post_key = 'account:<zernio account id>'` and a
   label naming the account and what KIND of thing it is — `LinkedIn — Mate Wish Key (COMPANY page)`
   against `LinkedIn — Mate Visky (personal profile)`.
-- **So a new bio code MUST pass `postKey: 'account:<id>'`, and this is now load-bearing.** `postKey`
-  is part of the mint key, so minting one without it will NOT match the existing row and will
-  quietly create a second code for the same profile — one in his bio, one collecting nothing.
-  Resolve the id from `accounts:list`, which is the source of truth; never type one, and never put
-  one in this file (the repo is public).
+- **So a new bio code MUST pass a `postKey` naming the profile, and this is now load-bearing.**
+  `postKey` is part of the mint key, so minting one without it will NOT match the existing row and
+  will quietly create a second code for the same profile — one in his bio, one collecting nothing.
+  Two forms, and both are in use: **`account:<zernio id>`** for a profile the pipeline is connected
+  to (resolve the id from `accounts:list`, never type one, and never put one in this file — the
+  repo is public), and **`manual:<slug>`** for a profile it is not, which is how his own personal
+  Facebook profile gets a link (`manual:facebook-personal`). Anywhere he pastes a link by hand and
+  we have no account for takes the `manual:` form.
 - **Which account is which, verified 2026-08-24 against `accounts:follower-stats`, not assumed:**
   LinkedIn has THREE — `Mate Wish Key` is the company page (2 followers), `Mate Visky` (2,152) and
   `Zsuzsanna Elma Fay` (5,040) are personal. Facebook has ONE and it is a **Page**
