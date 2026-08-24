@@ -82,13 +82,24 @@ at once, straight from a shell — these are the actual live posts:
   CTA. Idempotent, and never fatal: with no dashboard the plain URL goes out and
   the comment still happens. **Link-preview fetches are not counted as clicks** —
   a platform fetching the URL to build its card would otherwise read as traffic.
-- `scripts/lib/reshare.js` — LinkedIn reposting. The company page posts it, the
-  personal account reposts that — plainly, with no commentary, which is the usual
-  case. A thought on top is optional and always his words, never generated.
+- `scripts/lib/reshare.js` — LinkedIn reposting. The company page posts it, then
+  every personal account reposts that — plainly, with no commentary, which is the
+  usual case, and staggered four hours apart so two accounts never repost the same
+  thing in the same minute. A thought on top is optional and always his words,
+  never generated. Each repost carries **its own** tracked CTA comment: the
+  company page and the personal profiles are different audiences, and until
+  2026-08-24 the profiles holding all of them got a bare repost with no link at
+  all.
 - `scripts/yt-description.js` — writes YouTube descriptions from each video's own
   transcript. `--sync` fills in videos that have none and files a *proposal* for
   anything that already has a description, which does nothing until it is
-  approved on the dashboard.
+  approved on the dashboard. A **Short** gets no tracked code: YouTube renders
+  every url in a Short's description as plain text, so the tail names the channel
+  instead — which is YouTube's own route out of a Short.
+- `scripts/lib/comment-state.js` — which published posts the watcher has dealt
+  with. Shared, because the publisher writes it too: an item queued with the
+  first comment switched off is recorded here, or the watcher would fill the
+  deliberate gap back in an hour later.
 - `scripts/install-timers.sh` — installs the five systemd `--user` timers: the
   comment check hourly, the queue every five minutes (stopping at `:45`, to
   leave the comment watcher a clear run at `:00`), the event uploader every two

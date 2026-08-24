@@ -28,14 +28,13 @@
 'use strict';
 
 const { execFileSync } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
 
 const { topicsFor } = require('./lib/topic-tags');
 const { getComments, replyToPost, cli: zernio } = require('./lib/api');
 const voice = require('./lib/voice');
 const events = require('./lib/events');
+const platformTable = require('./lib/platforms');
+const { youtubeProbe } = require('./lib/media');
 
 // Anything already carrying this string counts as "first comment done" —
 // including the one Zernio itself posted at publish time. It and the wording,
@@ -52,9 +51,12 @@ const shortlink = require('./lib/shortlink');
 // is only an upper bound, and the next hourly run picks it up the moment it can.
 const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
 
-// TikTok is absent because its API exposes no comments at all, and X because
-// its comment endpoints 403 on this plan — both take their link in the caption
-// instead (on X that is also the cheaper way round; see CLAUDE.md).
+// TikTok is absent because its API exposes no comments at all. X is absent for
+// a different reason and the distinction has been got wrong twice: it HAS a
+// comments API since 2026-08-22, but its CTA ships with the post as a thread
+// reply, so a watcher comment would be the same link twice under one tweet.
+// platforms.commentWatched() is the single definition and a test pins this list
+// against it — do not edit one without the other.
 const ALL_PLATFORMS = ['instagram', 'facebook', 'linkedin', 'youtube', 'threads'];
 
 function parseArgs(argv) {
@@ -84,23 +86,12 @@ function usage() {
   console.log('                        [--platforms p1,p2] [--message TEXT]');
 }
 
-function statePath() {
-  return process.env.MWK_COMMENT_STATE ||
-    path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
-      'mwk-social', 'first-comments.json');
-}
-
-function loadState() {
-  try { return JSON.parse(fs.readFileSync(statePath(), 'utf8')); } catch { return {}; }
-}
-
-// Written after every single decision, not once at the end: a long backfill
-// that gets interrupted must not lose the record of what it already posted.
-function saveState(state) {
-  const p = statePath();
-  fs.mkdirSync(path.dirname(p), { recursive: true });
-  fs.writeFileSync(p, JSON.stringify(state, null, 2) + '\n');
-}
+// Shared with run-queue.js, which writes a suppression entry here when a post
+// is queued with the first comment switched off. Without that the flag held for
+// about an hour and then this watcher filled the "gap" back in.
+const commentState = require('./lib/comment-state');
+const loadState = commentState.load;
+const saveState = commentState.save;
 
 // Stories can't be commented on and expire anyway.
 const isStory = (post, pf) =>
@@ -260,11 +251,37 @@ async function main() {
       // Rotated per post so no two consecutive comments read the same, and
       // sometimes quoting a real guest wish from the show's feed.
       const override = opts.message || process.env.MWK_FIRST_COMMENT;
+
+      /*
+       * Can a url in THIS comment actually be followed?
+       *
+       * This watcher was the fourth place a link gets minted and the only one
+       * that never learned the rule. Instagram is on its list precisely to
+       * catch a native first comment that silently failed — and it would then
+       * write a tracked mwkshow.com code into an Instagram comment, where no
+       * url is clickable at all. That is the exact mistake fixed in post.js on
+       * 2026-08-22 and left standing here.
+       *
+       * YouTube is the media-dependent one: a vertical video under three
+       * minutes is a Short, and a url in a Short's comment is plain text. No
+       * probe means no claim, same as linkDeadFor.
+       */
+      const live = platformTable.linkIsLive(target.platform)
+        && !(target.platform === 'youtube'
+          && platformTable.linkDeadFor('youtube', youtubeProbe(target.postId)));
+
       // One code per (platform, post), so a click says which channel and which
       // clip earned it. Idempotent, and null if the dashboard is unreachable —
       // in which case the plain URL goes out and the comment still happens.
-      const showUrl = override ? null : await shortlink.mint({
+      //
+      // campaign and medium are part of the MINT KEY, not decoration: without
+      // them this path's codes landed with all three attribution columns null
+      // and the click could name a post but never a placement. There is no
+      // clip id to give — this watcher only ever sees a published post, never
+      // the queue item behind it — so post_key stays the only join.
+      const showUrl = (override || !live) ? null : await shortlink.mint({
         platform: target.platform, postKey: target.key, label: target.url || null,
+        campaign: 'clip', medium: 'comment',
       });
       const composed = override
         ? { text: override, variant: 'override', index: -1 }
@@ -272,6 +289,11 @@ async function main() {
             platform: target.platform,
             topicTags,
             showUrl,
+            linkLive: live,
+            // A caption that already carries the tags must not get them again
+            // underneath. On Instagram both would spend the 5-cap twice, since
+            // it counts caption and comments together.
+            noTags: platformTable.get(target.platform).hashtagsInCaption !== 0,
             avoidIndex: state.__lastVariant?.[target.platform] ?? -1,
           });
       const body = composed.text;

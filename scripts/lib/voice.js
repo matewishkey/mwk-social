@@ -50,6 +50,14 @@ function config() {
     if (blurb && !blurb.includes('{show}')) {
       throw new Error(`${CONFIG_PATH}: youtubeDescription.showBlurb must contain {show} — without it every video would share one untracked link`);
     }
+    // Same rule as profileCta, for the same reason: the guard finds the CTA by
+    // matching the text, so a phrasing it does not know is a comment we wrote
+    // and cannot recognise — and the watcher writes another one, every run.
+    for (const [platform, phrase] of Object.entries(cached.firstComment.profileCtaBy || {})) {
+      if (!cached.markers.includes(phrase)) {
+        throw new Error(`${CONFIG_PATH}: firstComment.profileCtaBy.${platform} "${phrase}" is not in markers[] — the guard would re-comment on every one of them`);
+      }
+    }
   }
   return cached;
 }
@@ -66,6 +74,19 @@ const markers = () => config().markers.slice();
 const carriesCta = (text) => {
   const t = String(text || '');
   return config().markers.some((m) => t.includes(m));
+};
+
+/**
+ * What {show} becomes where no url can be followed.
+ *
+ * Per platform, because "link in my bio" is Instagram's words and would be
+ * nonsense under a YouTube Short — there the clickable thing is the channel,
+ * which is YouTube's own documented way out of a Short. Falls back to the
+ * default, so a platform that needs no override does not need an entry.
+ */
+const profileCta = (platform = null) => {
+  const fc = config().firstComment;
+  return (platform && (fc.profileCtaBy || {})[platform]) || fc.profileCta;
 };
 
 const shortLink = () => config().shortLink || { enabled: false };
@@ -165,7 +186,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
 
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
   let text = pool[index]
-    .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : fc.profileCta)
+    .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : profileCta(platform))
     .replace(/\{wish\}/g, episode ? episode.wish : '')
     .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
     .replace(/\{episodeUrl\}/g, episode ? episode.url : '');
@@ -214,12 +235,45 @@ function tagLine(platform, topicTags = []) {
  * YouTube's own analytics will not tell us. With no argument it renders the
  * plain sign-up url, which is what every description carried before 2026-08-23.
  */
-const showBlurb = (link = null) => {
+const showBlurb = (link = null, { linkLive = true } = {}) => {
   const raw = config().youtubeDescription.showBlurb;
-  return raw.split('{show}').join(link || config().links.show);
+  // A Short's description renders every url as plain text, so a code printed
+  // there is one nobody can follow — twelve of the twenty-four videos on the
+  // channel were in exactly that state. Where the link is dead the slot names
+  // the channel instead, which is YouTube's own route out of a Short.
+  return raw.split('{show}').join(linkLive ? (link || config().links.show) : profileCta('youtube'));
 };
+
+/*
+ * Find OUR blurb inside a description, whatever went into its {show} slot.
+ *
+ * The point is that "ours" must not mean "carries the exact link we would mint
+ * today". yt-description used to test for two literal shapes — the current tail
+ * and the plain-url one — so a description holding any THIRD shape (an older
+ * code, a Short's channel phrasing) read as "not ours", took the full rebuild
+ * path, and came back as a model-rewritten summary for him to re-approve. Words
+ * he already said yes to, changed for no reason he asked for.
+ *
+ * Matching the constant halves either side of the slot recognises every shape
+ * at once and keeps the fix to the one line that is actually out of date.
+ *
+ * @returns {string|null} the exact substring to swap, or null if not ours.
+ */
+function findBlurb(text) {
+  const raw = config().youtubeDescription.showBlurb;
+  const at = raw.indexOf('{show}');
+  if (at < 0) return null;
+  const before = raw.slice(0, at);
+  const after = raw.slice(at + '{show}'.length);
+  const body = String(text || '');
+  const start = body.indexOf(before);
+  if (start < 0) return null;
+  const end = body.indexOf(after, start + before.length);
+  if (end < 0) return null;
+  return body.slice(start, end + after.length);
+}
 
 module.exports = {
   config, marker, markers, carriesCta, shortLink, alwaysTags, blockedTags, maxTopicTags, capFor,
-  firstComment, tagLine, latestEpisodes, showBlurb, hash, CONFIG_PATH,
+  firstComment, tagLine, latestEpisodes, showBlurb, findBlurb, profileCta, hash, CONFIG_PATH,
 };

@@ -297,7 +297,7 @@ async function captionForPlatform(platform, opts) {
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
 
   if (linkInCaption(platform)) parts.push(await linkFor(platform, opts, 'caption'));
-  else if (profileCtaInCaption(platform, opts)) parts.push(voice.config().firstComment.profileCta);
+  else if (profileCtaInCaption(platform, opts)) parts.push(voice.profileCta(platform));
   if (tagsInCaption(platform)) {
     const tags = voice.tagLine(platform, opts.topics || []);
     if (tags) parts.push(tags);

@@ -32,6 +32,7 @@ const platforms = require('./lib/platforms');
 const mediaLib = require('./lib/media');
 const { publish } = require('./post');
 const reshare = require('./lib/reshare');
+const commentState = require('./lib/comment-state');
 
 const cacheDir = () => process.env.MWK_MEDIA_CACHE ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
@@ -263,6 +264,10 @@ async function main() {
         });
         for (const p of result.platforms || []) {
           outcome.push({ platform: p.platform, status: p.status,
+            // The PLATFORM's own id, which is the only thing addressable — every
+            // inbox: command 404s on the Zernio one, and it is the key the
+            // first-comment watcher files a post under.
+            postId: p.platformPostId || null,
             url: p.platformPostUrl || null, error: p.errorMessage || null });
         }
       } catch (err) {
@@ -275,6 +280,23 @@ async function main() {
     const call_ = verdict(outcome);
     anyLive = call_.anyLive;
     await call('/queue/result', { id: item.id, ...call_.result }, api);
+
+    /*
+     * "No first comment" has to mean it, past the first hour.
+     *
+     * post.js correctly sends no native comment for this item — and then the
+     * hourly watcher read posts:list, found a published post with no CTA in its
+     * caption and none in its comments, and posted one. It had no way to tell a
+     * deliberate absence from the gap it exists to fill. Recording the decision
+     * under the key it looks up is what makes the flag a decision rather than a
+     * one-hour delay.
+     */
+    if (item.firstComment === false) {
+      const suppressed = commentState.suppress(
+        outcome.filter((o) => o.postId).map((o) => ({ platform: o.platform, postId: o.postId, url: o.url })),
+        `queued with the first comment switched off (${item.id})`);
+      if (suppressed) console.log(`first comment suppressed on ${suppressed} post(s) — the watcher will leave them alone`);
+    }
 
     // The event is what makes a queued post count against the shared daily cap.
     events.emit('queue.posted', {
@@ -300,7 +322,16 @@ async function main() {
       // already live, and a repost that cannot happen must never turn a
       // published item into a failed one.
       let shared = [];
-      try { shared = await reshare.reshareAll(li.url, item.reshareText); }
+      try {
+        shared = await reshare.reshareAll(li.url, item.reshareText, {
+          // So each repost mints its own code against the same clip: the
+          // company page and the two personal profiles are three different
+          // audiences and "which one earned this click" has to have an answer.
+          clipId: item.retryOf || item.id,
+          topics: item.topics || [],
+          firstComment: item.firstComment !== false,
+        });
+      }
       catch (err) {
         shared = [];
         console.error(`could not read the LinkedIn accounts, so nothing was reposted: ${err.message}`);
@@ -311,7 +342,8 @@ async function main() {
         if (r.ok) {
           const when = r.delayMinutes
             ? `in ${Math.round(r.delayMinutes / 60)}h` : 'now';
-          console.log(`repost from ${r.account} — ${when}${item.reshareText ? ', with your words' : ' (plain repost)'}`);
+          console.log(`repost from ${r.account} — ${when}${item.reshareText ? ', with your words' : ' (plain repost)'}`
+            + `${r.cta ? ', with its own tracked CTA' : ''}`);
           events.emit('linkedin.reshared', { message: `quote-reshared from ${r.account}`,
             platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}|${r.account}` });
         } else {

@@ -39,6 +39,8 @@ const { api, cli } = require('./lib/api');
 const { topicsFor } = require('./lib/topic-tags');
 const voice = require('./lib/voice');
 const shortlink = require('./lib/shortlink');
+const platforms = require('./lib/platforms');
+const { youtubeProbe } = require('./lib/media');
 
 /*
  * The YouTube account id, resolved from the connection list rather than baked in
@@ -104,17 +106,50 @@ Return JSON only: {"opening":"..."}`;
 }
 
 /*
- * The per-video link. Idempotent, so this is safe to call as often as it is
- * useful — the mint key is (target, platform, clipId, campaign, medium) and a
- * second call returns the same code rather than a new one.
+ * Is this video a Short, and therefore a place where a link cannot be followed?
+ *
+ * YouTube renders every url in a Short's description as plain text, deliberately,
+ * to cut spam — its own help page says so, and the clickable route out of a
+ * Short is the CHANNEL's links. This file minted a tracked code for every video
+ * regardless, so on 2026-08-24 twelve of the twenty-four videos on the channel
+ * carried a code nobody could ever click. `platforms.linkDeadFor()` is the rule
+ * and it already governed the publish path; this is the one place it never
+ * reached. No probe means no claim, exactly as it does everywhere else.
  */
-async function episodeLink(id, title = null) {
+const isShort = (id) => platforms.linkDeadFor('youtube', youtubeProbe(id));
+
+/*
+ * The tail of one video's description — the show blurb with its link slot
+ * filled in for THIS video.
+ *
+ * On a normal video that is a per-video tracked code, which is the only way to
+ * learn which episode is pulling: YouTube reports impressions and CTR in
+ * Studio's UI and exposes neither through any API. On a Short it is the channel
+ * phrasing instead and nothing is minted — a code spent where no click can
+ * happen reads in the numbers as indifference rather than as unreachable, which
+ * is the more expensive of the two mistakes.
+ *
+ * Idempotent by construction: the mint key is (target, platform, clipId,
+ * campaign, medium), so a re-run returns the SAME code and the description stays
+ * byte-identical. That matters more than it looks — the show-notes loop compares
+ * against what was last written, and a link that changed every run would
+ * re-propose every video for ever.
+ */
+async function tailFor(id, title = null) {
+  if (isShort(id)) return voice.showBlurb(null, { linkLive: false });
   const link = await shortlink.mint({
     platform: 'youtube', medium: 'description', campaign: 'episode',
     clipId: id, label: title,
   });
+  /*
+   * A failed mint is FATAL here, and that is a deliberate departure from the
+   * first-comment rule (mint, but never let it block the comment). A comment
+   * gets one shot and is better untracked than missing. A description can be
+   * written any day, so falling back to the plain url would buy nothing and
+   * cost two rewrites of every video — one to the untracked url and one back.
+   */
   if (!link) throw new Error('could not mint the episode link (dashboard unreachable) — retrying next run');
-  return link;
+  return voice.showBlurb(link);
 }
 
 async function build(id) {
@@ -122,29 +157,10 @@ async function build(id) {
   const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
   if (!topics) throw new Error('no transcript available (YouTube has not captioned it yet)');
 
-  /*
-   * One tracked link per VIDEO, which is the only way to learn which episode is
-   * actually pulling — YouTube reports impressions and CTR in Studio's UI and
-   * exposes neither through any API, so a click on our own link is the whole
-   * scoreboard.
-   *
-   * Idempotent by construction: the mint key is (target, platform, clipId,
-   * campaign, medium), so a re-run returns the SAME code and the description
-   * stays byte-identical. That matters more than it looks — the show-notes loop
-   * compares against what was last written, and a link that changed every run
-   * would re-propose every video for ever.
-   *
-   * A failed mint is FATAL here, and that is a deliberate departure from the
-   * first-comment rule (mint, but never let it block the comment). A comment
-   * gets one shot and is better untracked than missing. A description can be
-   * written any day, so falling back to the plain url would buy nothing and
-   * cost two rewrites of every video — one to the untracked url and one back.
-   */
-  const link = await episodeLink(id, title);
-
+  const tail = await tailFor(id, title);
   const opening = await summarise(topics.transcript, title);
   const tags = voice.tagLine('youtube', topics.tags);
-  return { title, description: `${opening}\n\n${voice.showBlurb(link)}\n\n${tags}` };
+  return { title, description: `${opening}\n\n${tail}\n\n${tags}` };
 }
 
 /** Has the show blurb been chosen, or is it still my paraphrase? */
@@ -229,20 +245,26 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
          * The tail itself is the honest test — if the text carries it, we wrote
          * it, whichever route it took.
          */
-        const tail = voice.showBlurb(await episodeLink(id));
-        if (existing.includes(tail)) continue;                   // current, nothing to do
+        const tail = await tailFor(id);
+        const ours = voice.findBlurb(existing);
+        if (ours === tail) continue;                             // current, nothing to do
 
-        const stale = voice.showBlurb();                         // the plain-url version
-        if (existing.includes(stale)) {
+        if (ours) {
           /*
            * Ours, and only the boilerplate tail is out of date. Swap JUST that.
            * A full rebuild would regenerate the opening with a model and hand
            * him twenty-one rewritten summaries to re-approve — words he already
            * said yes to, changed for no reason he asked for. It is also free:
            * no transcript, no model call.
+           *
+           * findBlurb, not two literal comparisons. The old pair tested for the
+           * current tail and the plain-url one and nothing else, so a
+           * description holding any THIRD shape read as "not ours" and took the
+           * rebuild path — which is what the twelve Shorts would have done the
+           * moment their dead tracked code had to come out.
            */
           proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
-            proposed: existing.replace(stale, tail) });
+            proposed: existing.replace(ours, tail) });
           continue;
         }
 

@@ -204,3 +204,217 @@ test('the queue works out which platforms have a dead link for the clip', () => 
   assert.match(src, /linkDead:/, 'run-queue must pass linkDead, or the Shorts rule is unread again');
   assert.match(src, /platforms\.linkDeadFor\(/);
 });
+
+/* ------------------------------------------- the four mint sites, 2026-08-24 */
+
+/*
+ * Twelve of the twenty-four videos on the channel are Shorts, and every one of
+ * them had a tracked code written into its description — where YouTube renders
+ * a url as plain text, deliberately, to cut spam. `linkDeadFor` was the rule and
+ * it governed the publish path only; yt-description.js minted regardless. Same
+ * declared-but-not-read shape as the four platform fields before it, in the one
+ * file the fix never reached.
+ */
+test('the YouTube description asks whether the video is a Short before minting', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');
+  assert.match(src, /platforms\.linkDeadFor\('youtube'/,
+    'yt-description must decide with linkDeadFor, or a Short gets a code nobody can click');
+  assert.match(src, /youtubeProbe\(/, 'the Shorts rule needs the video shape, not the platform alone');
+  // The dead branch must not reach the minter at all. Both positions are
+  // asserted present first: indexOf returns -1 for a line that is GONE, and
+  // -1 < anything is true, so the ordering check alone passed the revert.
+  const tail = src.slice(src.indexOf('async function tailFor'), src.indexOf('async function build'));
+  const guard = tail.indexOf('isShort(id)');
+  const mint = tail.indexOf('shortlink.mint');
+  assert.ok(guard >= 0, 'tailFor no longer asks whether the video is a Short');
+  assert.ok(mint >= 0, 'tailFor no longer mints at all — has this moved?');
+  assert.ok(guard < mint, 'the Short check has to come BEFORE the mint, or the code is spent either way');
+});
+
+test('a Short gets the channel phrasing and no url at all', () => {
+  const dead = voice.showBlurb(null, { linkLive: false });
+  assert.ok(!/mwkshow\.com|matewishkey\.com\/show/.test(dead),
+    `a followable-looking link survived into a Short's description: ${dead}`);
+  assert.ok(dead.includes(voice.profileCta('youtube')));
+  assert.ok(voice.carriesCta(dead), 'the guard must still recognise it as ours');
+});
+
+test("the channel phrasing is YouTube's, not Instagram's", () => {
+  assert.notEqual(voice.profileCta('youtube'), voice.profileCta('instagram'),
+    '"link in my bio" is nonsense under a YouTube Short — the channel is the clickable thing');
+  assert.equal(voice.profileCta('facebook'), voice.config().firstComment.profileCta,
+    'a platform with no override falls back to the default');
+});
+
+/*
+ * The plain, tracked and Short tails must all differ on exactly one line, or
+ * the "one-line change" the dashboard shows him is a lie.
+ */
+test('every shape of the tail differs from the others on exactly one line', () => {
+  const shapes = [voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'),
+    voice.showBlurb(null, { linkLive: false })];
+  for (const a of shapes) {
+    for (const b of shapes) {
+      if (a === b) continue;
+      const la = a.split('\n');
+      const lb = b.split('\n');
+      assert.equal(la.length, lb.length, 'the tails must have the same number of lines');
+      assert.equal(la.filter((l, i) => l !== lb[i]).length, 1);
+    }
+  }
+});
+
+/*
+ * findBlurb is what stops a third shape reading as "not ours" and taking the
+ * full rebuild path — which would hand him a model-rewritten summary to
+ * re-approve for every one of the twelve Shorts.
+ */
+test('our tail is recognised whatever went into its link slot', () => {
+  const doc = (tail) => `something happened in this video.\n\n${tail}\n\n#MWKShow #PIY`;
+  for (const tail of [voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'),
+    voice.showBlurb('https://mwkshow.com/zzzzz'), voice.showBlurb(null, { linkLive: false })]) {
+    assert.equal(voice.findBlurb(doc(tail)), tail);
+  }
+});
+
+test('findBlurb says no to a description that is not ours', () => {
+  assert.equal(voice.findBlurb('subscribe for more content!'), null);
+  assert.equal(voice.findBlurb(''), null);
+});
+
+test('swapping a Short off its dead code touches nothing else', () => {
+  const doc = `we looked at the invoice thing.\n\n${voice.showBlurb('https://mwkshow.com/abcde')}\n\n#MWKShow #PIY #Invoicing`;
+  const swapped = doc.replace(voice.findBlurb(doc), voice.showBlurb(null, { linkLive: false }));
+  const changed = doc.split('\n').filter((l, i) => l !== swapped.split('\n')[i]);
+  assert.equal(changed.length, 1, `a swap changed ${changed.length} lines: ${changed.join(' / ')}`);
+  assert.ok(swapped.startsWith('we looked at the invoice thing.'));
+  assert.ok(swapped.endsWith('#MWKShow #PIY #Invoicing'));
+});
+
+/*
+ * The watcher is the fourth mint site and was the only one no test covered. It
+ * minted with campaign, medium and clip all null, and — worse — it would write
+ * a live mwkshow.com code into an Instagram comment, which is the exact mistake
+ * post.js was fixed for on 2026-08-22.
+ */
+test('the watcher asks whether a url can be followed before minting', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  assert.match(src, /platformTable\.linkIsLive\(target\.platform\)/,
+    'the watcher must not print a url where none is clickable');
+  assert.match(src, /linkLive: live/, 'and it must tell voice.firstComment so the CTA names the bio');
+  assert.match(src, /linkDeadFor\('youtube'/, 'a Short is dead for the comment too, not only the description');
+});
+
+test('every code the watcher mints names its campaign and its placement', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  const call = src.slice(src.indexOf('await shortlink.mint({'), src.indexOf('const composed'));
+  for (const field of ['campaign:', 'medium:']) {
+    assert.ok(call.includes(field), `${field} must reach the mint, or the click has no placement`);
+  }
+  assert.match(src, /noTags: platformTable\.get\(target\.platform\)\.hashtagsInCaption/,
+    'a caption that already carries the tags must not get them again underneath');
+});
+
+/*
+ * The company page has 2 followers; the two personal profiles hold 7,192
+ * between them and until 2026-08-24 their reposts carried no CTA and no code at
+ * all — the entire LinkedIn audience with nothing to follow and nothing to
+ * measure.
+ */
+test('a LinkedIn repost carries its own tracked CTA', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'lib', 'reshare.js'), 'utf8');
+  const fn = src.slice(src.indexOf('async function reshareComment'), src.indexOf('/**\n * @param {string} postUrl'));
+  assert.match(fn, /campaign: 'reshare'/);
+  assert.match(fn, /medium: 'comment'/);
+  assert.match(fn, /accountId/, 'the code has to be per ACCOUNT, or three audiences share one number');
+  assert.match(src, /platformData\.firstComment = firstComment/,
+    'the comment must reach platformSpecificData, same place a native post puts it');
+});
+
+test('the queue hands the reshare its clip, so a repost click joins to a video', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+  const call = src.slice(src.indexOf('reshare.reshareAll('), src.indexOf('catch (err)', src.indexOf('reshare.reshareAll(')));
+  assert.match(call, /clipId:/);
+  assert.match(call, /firstComment:/);
+});
+
+/*
+ * `--no-first-comment` used to hold for about an hour: post.js sent none, and
+ * then the watcher found a published post with no CTA anywhere and filled the
+ * "gap" in. Nothing told it the absence was a decision.
+ */
+test('a post queued with no first comment is recorded so the watcher leaves it', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+  assert.match(src, /commentState\.suppress\(/,
+    'the decision has to be written down, or the watcher reverses it an hour later');
+  assert.match(src, /postId: p\.platformPostId/,
+    'the suppression key is the PLATFORM post id — the Zernio one 404s on every inbox: command');
+});
+
+test('the watcher and the publisher read the same state file', () => {
+  const readFileSync = require('node:fs').readFileSync;
+  const join = require('node:path').join;
+  for (const f of ['first-comment.js', 'run-queue.js']) {
+    assert.match(readFileSync(join(__dirname, '..', 'scripts', f), 'utf8'), /lib\/comment-state/,
+      `${f} must use the shared state module, or the two keep separate ideas of what is done`);
+  }
+});
+
+test('suppressing a post makes the watcher skip it, and never rewrites a real comment', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-state-'));
+  const before = process.env.MWK_COMMENT_STATE;
+  process.env.MWK_COMMENT_STATE = path.join(dir, 'first-comments.json');
+  try {
+    delete require.cache[require.resolve('../scripts/lib/comment-state')];
+    const state = require('../scripts/lib/comment-state');
+    assert.equal(state.suppress([{ platform: 'facebook', postId: '123', url: 'u' }]), 1);
+    assert.equal(state.load()['facebook:123'].commentedAt, null);
+    // A post already commented on must survive a later suppression untouched.
+    const s = state.load();
+    s['facebook:456'] = { commentedAt: '2026-08-24T00:00:00Z', variant: 'plain/1' };
+    state.save(s);
+    assert.equal(state.suppress([{ platform: 'facebook', postId: '456' }]), 0);
+    assert.equal(state.load()['facebook:456'].commentedAt, '2026-08-24T00:00:00Z');
+  } finally {
+    if (before === undefined) delete process.env.MWK_COMMENT_STATE;
+    else process.env.MWK_COMMENT_STATE = before;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+/*
+ * A description that is genuinely out of date has to be able to come BACK for a
+ * decision. The upsert guarded on state alone, which stopped the churn it was
+ * written for and then silently stopped this too: 19 of 22 re-proposals were
+ * dropped on 2026-08-24 while the response still said they were filed, twelve of
+ * them Shorts carrying a link YouTube renders as plain text.
+ */
+test('an out-of-date description can be re-proposed; an unchanged one cannot', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'api.js'), 'utf8');
+  const sql = src.slice(src.indexOf('INSERT INTO yt_proposal'), src.indexOf(').bind(i.videoId'));
+  assert.match(sql, /yt_proposal\.proposed <> excluded\.proposed/,
+    'comparing the text is what stops the churn — a state check alone drops real changes');
+  assert.match(sql, /state IN \('approved', 'applied'\)/,
+    'an approved-but-unwritten row carries the OLD words and must be reopened too');
+  assert.ok(!/'rejected'/.test(sql), 'he said no — asking again is not what no means');
+  assert.match(sql, /state = 'proposed', decided_at = NULL/,
+    'a reopened row has to lose its old decision, or it looks approved');
+});
+
+test('the propose endpoint reports what landed, not what was sent', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'api.js'), 'utf8');
+  const fn = src.slice(src.indexOf('async function propose'), src.indexOf('const pending'));
+  assert.match(fn, /meta\.changes/, '"filed: 22" when nineteen were dropped is a number somebody believes');
+  assert.ok(!/filed: items\.length/.test(fn));
+});

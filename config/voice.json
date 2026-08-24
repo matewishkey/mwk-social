@@ -5,7 +5,8 @@
   "markers": [
     "matewishkey.com/show",
     "mwkshow.com/",
-    "link in my bio"
+    "link in my bio",
+    "the link is on my channel page"
   ],
   "_markers": "EVERY substring that means 'this post already carries our CTA'. The guard matches any of them, which is the only reason the short link could be introduced at all: comments posted before it exists carry the long URL forever, and a guard that knew only the new one would re-comment on every past post. 'link in my bio' joined on 2026-08-22 for the same reason in reverse — on Instagram and TikTok a url is not clickable at all, so those comments carry no URL to match on, and without this marker the watcher would re-comment on every one of them for ever.",
   "links": {
@@ -198,6 +199,10 @@
     "episodeMixRatio": 0.4,
     "_episodeMixRatio": "Roughly this share of comments quote a real guest wish from the feed. The rest are the plain invitation. If the feed is unreachable, every comment falls back to a plain variant.",
     "profileCta": "link in my bio",
+    "profileCtaBy": {
+      "youtube": "the link is on my channel page"
+    },
+    "_profileCtaBy": "Per-platform overrides of profileCta, for a surface where \"my bio\" is the wrong words. YouTube is the one so far: a url in a SHORT's description or comment is plain text, deliberately, to cut spam — but the CHANNEL's own links stay clickable and are YouTube's documented route out of a Short. Every value here MUST also be in markers[] above, exactly like profileCta, or the duplicate guard stops recognising a comment we wrote and the watcher comments again on every one of them for ever.",
     "_profileCta": "What {show} becomes on a platform where a url in a post or a comment is PLAIN TEXT — Instagram and TikTok, both verified. Printing a tracked short code there burns a code nobody can click and reads in the numbers as 'posted, no interest' rather than 'never reachable': five TikTok codes took zero human clicks between them. This string MUST also appear in markers[] above, or the duplicate guard stops recognising these comments and the watcher re-comments on every one, for ever.",
     "_register": "Written informally on purpose — lowercase openings, dropped commas, 'dont'. Hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker.",
     "plain": [

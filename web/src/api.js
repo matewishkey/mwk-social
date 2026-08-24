@@ -257,19 +257,45 @@ async function fileAction(body, env) {
  * exactly as it is: re-drafting must never quietly un-approve something, or
  * reset a "keep what's there" back into the queue on the next run.
  */
+/*
+ * File drafted descriptions for a decision.
+ *
+ * The WHERE clause is the whole story. It used to be `state = 'proposed'` alone,
+ * which stopped the churn it was written for — build() regenerates the opening
+ * with a model every run, so an applied description never matches byte for byte
+ * and re-proposed itself for ever — and then quietly stopped something else:
+ * a description that was genuinely OUT OF DATE could never be re-proposed
+ * either. On 2026-08-24 that was 19 of 22, dropped silently while the response
+ * still said "filed: 22". Twelve of them were Shorts holding a link YouTube
+ * renders as plain text, so the fix computed the right change and the database
+ * threw it away.
+ *
+ * Comparing the TEXT is the better guard anyway: an identical re-proposal is a
+ * no-op whatever state the row is in, so the churn cannot come back, while a
+ * real change reopens the row for a decision. An APPROVED row is reopened too —
+ * one approved before a voice change carries the old words, and writing it
+ * would publish exactly what was just fixed. A REJECTED row is left alone: he
+ * said no, and asking again is not what "no" means.
+ */
 async function propose(body, env) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) return json({ ok: true, filed: 0 });
   const now = new Date().toISOString();
-  await env.DB.batch(items.map((i) => env.DB.prepare(
+  const res = await env.DB.batch(items.map((i) => env.DB.prepare(
     `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at)
      VALUES (?,?,?,?,'proposed',?)
      ON CONFLICT(video_id) DO UPDATE SET
        title = excluded.title, current_text = excluded.current_text,
-       proposed = excluded.proposed, proposed_at = excluded.proposed_at
-     WHERE yt_proposal.state = 'proposed'`,
+       proposed = excluded.proposed, proposed_at = excluded.proposed_at,
+       state = 'proposed', decided_at = NULL, decided_by = NULL, applied_at = NULL
+     WHERE yt_proposal.state = 'proposed'
+        OR (yt_proposal.state IN ('approved', 'applied')
+            AND yt_proposal.proposed <> excluded.proposed)`,
   ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now)));
-  return json({ ok: true, filed: items.length });
+  // What actually landed, not what was sent — "filed: 22" when nineteen were
+  // dropped is the kind of number somebody believes.
+  const filed = res.reduce((n, r) => n + ((r.meta && r.meta.changes) || 0), 0);
+  return json({ ok: true, filed, sent: items.length });
 }
 
 const pending = async (_body, env) => json({

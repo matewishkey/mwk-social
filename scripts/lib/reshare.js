@@ -20,6 +20,8 @@
 'use strict';
 
 const { api, cli } = require('./api');
+const voice = require('./voice');
+const shortlink = require('./shortlink');
 
 /*
  * The LinkedIn accounts: one company page, and EVERY personal profile behind it.
@@ -55,24 +57,63 @@ function linkedinAccounts() {
  */
 const RESHARE_LAG_MINUTES = Number(process.env.MWK_RESHARE_LAG_MINUTES || 240);
 
+/*
+ * The CTA comment for ONE repost, with its own tracked code.
+ *
+ * Its own, per account, and that is the whole point. Until 2026-08-24 a repost
+ * carried no comment and no code at all: the company page — two followers — got
+ * the tracked call to action, and the two personal profiles holding 7,192
+ * between them got a bare repost with no route to the sign-up page except
+ * clicking through to the company post and finding its comment there. That is
+ * essentially the entire LinkedIn audience with nothing to follow and nothing
+ * to measure.
+ *
+ * Keyed on the reposting ACCOUNT, so "which of the three earned this click" has
+ * an answer. Never fatal, same rule as everywhere else: no dashboard means the
+ * plain sign-up url, never a repost that does not happen.
+ */
+async function reshareComment(account, { clipId = null, topics = [], postKey = null } = {}) {
+  const accountId = account._id || account.id;
+  const key = postKey || `reshare:${accountId}`;
+  const showUrl = await shortlink.mint({
+    platform: 'linkedin', postKey: key, clipId,
+    campaign: 'reshare', medium: 'comment',
+    label: `LinkedIn repost — ${account.displayName || account.username || accountId}`,
+  });
+  return voice.firstComment(key, {
+    platform: 'linkedin',
+    topicTags: topics,
+    showUrl,
+    // LinkedIn takes its hashtags in the body, and a repost has no body of its
+    // own — so unlike a native post, the comment IS where they belong.
+    noTags: false,
+  }).text;
+}
+
 /**
  * @param {string} postUrl  the company post to repost
  * @param {string} [comment] his words. Omitted or blank gives a plain repost.
  * @param {object} [account] which account reposts; defaults to the personal one.
  * @param {number} [delayMinutes] 0 posts now; anything else schedules it.
+ * @param {string} [firstComment] the CTA comment Zernio posts under the repost.
  */
-async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0) {
+async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0, firstComment = null) {
   if (!postUrl) throw new Error('nothing to reshare — no post url');
 
   const who = account || linkedinAccounts().personal[0];
   if (!who) throw new Error('no personal LinkedIn account in accounts:list');
 
   // reshareUrl is not exposed as a posts:create flag, so this goes to REST.
+  const platformData = { reshareUrl: postUrl };
+  // Same field and the same place as a native post's — on the PlatformTarget,
+  // not the top level. LinkedIn is one of the four platforms Zernio posts it
+  // for, seconds after the repost goes live.
+  if (firstComment) platformData.firstComment = firstComment;
   const body = {
     platforms: [{
       platform: 'linkedin',
       accountId: who._id || who.id,
-      platformSpecificData: { reshareUrl: postUrl },
+      platformSpecificData: platformData,
     }],
   };
   if (delayMinutes > 0) {
@@ -95,7 +136,8 @@ async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0) 
  * from the others, and must never cost the post itself, which is already live.
  * Same rule as the publish groups in run-queue.js, learned the same way.
  */
-async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES } = {}) {
+async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES,
+  clipId = null, topics = [], firstComment = true } = {}) {
   const { personal } = linkedinAccounts();
   const results = [];
   for (let i = 0; i < personal.length; i++) {
@@ -105,8 +147,21 @@ async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES }
     // repost the same post in the same minute.
     const delay = i * lagMinutes;
     try {
-      const post = await quoteReshare(postUrl, comment, who, delay);
+      // Composed per account so each repost carries its own code. A failure to
+      // compose one must not cost the repost — the same rule the comment on a
+      // native post follows, for the same reason.
+      let cta = null;
+      if (firstComment) {
+        try {
+          cta = await reshareComment(who, { clipId, topics,
+            postKey: `reshare:${clipId || postUrl}:${who._id || who.id}` });
+        } catch (err) {
+          console.error(`could not compose the CTA for ${name}, reposting without it: ${err.message}`);
+        }
+      }
+      const post = await quoteReshare(postUrl, comment, who, delay, cta);
       results.push({ account: name, ok: true, id: post && post._id, delayMinutes: delay,
+        cta: Boolean(cta),
         at: delay ? new Date(Date.now() + delay * 60000).toISOString() : null });
     } catch (err) {
       results.push({ account: name, ok: false, error: err.message, delayMinutes: delay });
@@ -115,4 +170,4 @@ async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES }
   return results;
 }
 
-module.exports = { quoteReshare, reshareAll, linkedinAccounts, RESHARE_LAG_MINUTES };
+module.exports = { quoteReshare, reshareAll, reshareComment, linkedinAccounts, RESHARE_LAG_MINUTES };

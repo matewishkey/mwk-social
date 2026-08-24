@@ -166,14 +166,61 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   behave exactly like Instagram: the CTA names the bio and no code is minted. **This is the fourth
   field on that table to ship declared-but-never-read** — after `linkPlacement`, `landscapeOk` and
   `hashtagsInCaption`. Wire it or do not add it.
+- **HALF THE YOUTUBE DESCRIPTIONS CARRIED A LINK NOBODY COULD CLICK** (2026-08-24, found by an
+  audit he asked for, not by a test). **12 of the 24 videos on the channel are Shorts** — verified
+  with a positive control, `/shorts/<id>` answers 200 for those twelve and 303s to `/watch` for the
+  other twelve — and YouTube renders every url in a Short's description as plain text, deliberately.
+  `yt-description.js` minted an `episode` code for all 24 regardless: `linkDeadFor()` governed the
+  publish path and **never reached this file**. It does now (`tailFor()` asks `isShort()` BEFORE it
+  mints), and a test pins the order — asserting both positions are present first, because `indexOf`
+  returns -1 for a deleted line and `-1 < anything` passed the revert on the first attempt.
+- **`voice.profileCta(platform)` — "link in my bio" is Instagram's words, not everyone's.** Under a
+  YouTube Short the clickable thing is the CHANNEL (YouTube's own documented route out of a Short),
+  so `firstComment.profileCtaBy.youtube` says so instead. **Every value there must also be in
+  `markers[]`** and `voice.js` refuses to load a config where it is not — same rule, same reason, as
+  `profileCta` itself.
+- **`voice.findBlurb()` recognises our tail whatever went into its link slot.** The old check tested
+  for two literal shapes (today's tail, and the plain-url one), so a description holding any THIRD
+  shape read as "not ours" and took the full rebuild path — which would have handed him twelve
+  model-rewritten summaries to re-approve the moment the dead codes came out. Matching the constant
+  halves either side of `{show}` keeps every one of them a one-line swap. **Three tails now exist
+  (plain, tracked, Short) and a test pins that any two differ on exactly one line.**
+- **THE HOURLY WATCHER WAS THE FOURTH MINT SITE AND THE ONLY ONE NO TEST COVERED** (fixed
+  2026-08-24). `first-comment.js` knew none of the link rules: it would write a live `mwkshow.com`
+  code into an **Instagram** comment — the exact mistake post.js was fixed for on 2026-08-22, still
+  standing on the path that exists to catch a native comment that silently failed — and it minted
+  with `campaign`, `medium` and `clip_id` all null. Evidence in the table: `pgapk`, `jvssw`, `zbg4d`,
+  all `created_by = pipeline`, all three columns empty. It now asks `linkIsLive()` (plus
+  `linkDeadFor` for a YouTube Short), mints `campaign: 'clip', medium: 'comment'`, and passes
+  `noTags` for a platform whose caption already carries them. **There is no clip id on this path** —
+  it only ever sees a published post, never the queue item behind it — so `post_key` stays the join.
+- **THE LINKEDIN REPOSTS CARRIED NO CTA AND NO CODE AT ALL** (fixed 2026-08-24). The company page —
+  2 followers — got the tracked comment; **Mate Visky (2,152) and Zsuzsanna Elma Fay (5,040) got a
+  bare repost**, so essentially the whole LinkedIn audience had no route to the sign-up page but
+  clicking through to the company post and finding its comment there. `reshare.reshareComment()`
+  now composes one **per account** (`campaign: 'reshare'`, `medium: 'comment'`, post key carries the
+  account id) and `quoteReshare` puts it in `platformSpecificData.firstComment`, the same field and
+  the same place a native post uses. Failing to compose one never costs the repost.
+  **NOT YET VERIFIED LIVE** — Zernio stores any `platformSpecificData` key it is sent, so the worst
+  case is the status quo, but watch the next real repost before believing it.
+- **`--no-first-comment` used to hold for about an hour.** post.js correctly sent none, then the
+  watcher read `posts:list`, found a published post with no CTA in its caption and none in its
+  comments, and posted one — it had no way to tell a deliberate absence from the gap it exists to
+  fill. `scripts/lib/comment-state.js` is now shared by both: `run-queue.js` writes a suppression
+  entry keyed `<platform>:<native post id>` when the item said no. **It never overwrites an entry
+  that already exists**, or a post really commented on would be rewritten to look as though it
+  never was.
 - **Every link carries a campaign now, and it is part of the MINT KEY.** `link` gained `campaign`,
-  `medium`, `created_by`, `note` and `utm`. Same destination from the bio and from a reply = two
+  `medium`, `created_by` and `note`. Same destination from the bio and from a reply = two
   codes, or "which one earned this" has no answer — which is the state every link minted before
   2026-08-22 was in: 40 codes, all pointing at `matewishkey.com/show`, no campaign dimension at all.
   `medium` is the *placement* (`profile`/`caption`/`comment`/`reply`), `platform` is the source.
-  The redirect appends them as `utm_source`/`utm_medium`/`utm_campaign` **only when `utm = 1`**
-  (defaulted on for our own hostnames, off for anyone else's) and **never overwrites a parameter
-  already on the target** — one he typed is a decision.
+- **The redirect hands NOTHING to the destination — no `utm_`, no cookie, no banner** (mate's call,
+  2026-08-22: keep it slim). A `utm` column existed for about an hour and was dropped; an earlier
+  note here described the appending behaviour as if it shipped, which it never did. The code
+  already carries platform, placement and campaign, so a utm would count the same click twice in
+  somebody else's system. `web/src/links.js` passes the target through byte for byte and a test
+  fails if a utm parameter is ever added back.
 - **THE REPOINT WORKED, AND THIS IS THE EVIDENCE** (2026-08-24, the day after the codes went in).
   Mate replaced both 15-minute booking calendars. Both short codes were repointed in one `UPDATE`
   and **the website was not touched** — the five links on `/show` kept working through the change.

@@ -119,6 +119,36 @@ function probe(file) {
   };
 }
 
+/*
+ * The shape of a YouTube video WITHOUT downloading it.
+ *
+ * probe() needs the file; this needs only the metadata, which is what the
+ * question "is this a Short" actually turns on — and it is asked about videos
+ * we may have no local copy of at all, including everything uploaded straight
+ * to the channel. Returns the same two fields linkDeadFor() reads, so the two
+ * probes are interchangeable at the point of decision.
+ *
+ * Memoised per process: yt-description asks for every video in the sweep and a
+ * second network round trip per id buys nothing. Null on any failure — a probe
+ * we could not take must never be read as "not a Short", so callers treat null
+ * the way linkDeadFor does: no probe, no claim.
+ */
+const ytProbeCache = new Map();
+function youtubeProbe(videoId) {
+  if (ytProbeCache.has(videoId)) return ytProbeCache.get(videoId);
+  let out = null;
+  try {
+    const raw = sh('yt-dlp', ['-q', '--no-warnings', '--print', '%(width)s %(height)s %(duration)s',
+      '--', `https://www.youtube.com/watch?v=${videoId}`], 60000).trim().split('\n')[0];
+    const [width, height, durationSec] = raw.split(/\s+/).map(Number);
+    if (width > 0 && height > 0 && Number.isFinite(durationSec)) {
+      out = { width, height, durationSec, aspect: Number((width / height).toFixed(4)) };
+    }
+  } catch { out = null; }
+  ytProbeCache.set(videoId, out);
+  return out;
+}
+
 /**
  * Fetch the clip once and keep it.
  *
@@ -189,4 +219,4 @@ function check(platform, p) {
   return problems;
 }
 
-module.exports = { resolve, probe, check, cachePath, downloadDirect, downloadYouTube, CACHE };
+module.exports = { resolve, probe, youtubeProbe, check, cachePath, downloadDirect, downloadYouTube, CACHE };
