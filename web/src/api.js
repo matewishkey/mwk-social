@@ -282,16 +282,17 @@ async function propose(body, env) {
   if (!items.length) return json({ ok: true, filed: 0 });
   const now = new Date().toISOString();
   const res = await env.DB.batch(items.map((i) => env.DB.prepare(
-    `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at)
-     VALUES (?,?,?,?,'proposed',?)
+    `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at, kind)
+     VALUES (?,?,?,?,'proposed',?,?)
      ON CONFLICT(video_id) DO UPDATE SET
        title = excluded.title, current_text = excluded.current_text,
-       proposed = excluded.proposed, proposed_at = excluded.proposed_at,
+       proposed = excluded.proposed, proposed_at = excluded.proposed_at, kind = excluded.kind,
        state = 'proposed', decided_at = NULL, decided_by = NULL, applied_at = NULL
      WHERE yt_proposal.state = 'proposed'
         OR (yt_proposal.state IN ('approved', 'applied')
             AND yt_proposal.proposed <> excluded.proposed)`,
-  ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now)));
+  ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now,
+    i.kind === 'swap' || i.kind === 'rebuild' ? i.kind : null)));
   // What actually landed, not what was sent — "filed: 22" when nineteen were
   // dropped is the kind of number somebody believes.
   const filed = res.reduce((n, r) => n + ((r.meta && r.meta.changes) || 0), 0);

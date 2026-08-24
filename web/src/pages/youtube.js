@@ -18,14 +18,30 @@ const STATE = {
 };
 
 /*
- * Does this proposal change exactly one line of what is live?
+ * Is this proposal boilerplate only, or were his words replaced?
  *
- * That is the difference between "the sign-up line moved" and "your words were
- * rewritten", and it is the only distinction that matters when deciding a stack
- * of these at once. Same line count, exactly one index differing — anything
- * else, including a line added or removed, counts as a rewrite and is shown as
- * one. Erring toward "rewritten" is the safe direction: the cost of the mistake
- * is one extra click, against quietly replacing something he wrote.
+ * `kind` is the answer when the box supplied one: yt-description.js knows which
+ * path it took, 'swap' meaning findBlurb matched and only the blurb changed.
+ * Reading it beats re-deriving it here — the diff below is a PROXY, and it was
+ * only ever right while the boilerplate happened to be one line. The brand
+ * update on 2026-08-24 made the blurb's opening three lines and the proxy
+ * immediately called 23 untouched summaries "rewritten".
+ *
+ * The diff stays as the fallback for rows filed before `kind` existed.
+ */
+export function boilerplateOnly(p) {
+  if (p.kind === 'swap') return true;
+  if (p.kind === 'rebuild') return false;
+  return tailOnly(p);
+}
+
+/*
+ * The fallback: does this proposal change exactly one line of what is live?
+ *
+ * Same line count, exactly one index differing — anything else, including a
+ * line added or removed, counts as a rewrite. Erring toward "rewritten" is the
+ * safe direction: the cost of the mistake is one extra click, against quietly
+ * replacing something he wrote.
  */
 export function tailOnly(p) {
   const current = String(p.current_text || '');
@@ -64,9 +80,9 @@ export async function youtubeAction(request, env, email) {
    */
   if (['approve-tails', 'approve-all'].includes(doing)) {
     const rows = (await env.DB.prepare(
-      `SELECT video_id, current_text, proposed FROM yt_proposal WHERE state = 'proposed'`,
+      `SELECT video_id, current_text, proposed, kind FROM yt_proposal WHERE state = 'proposed'`,
     ).all()).results || [];
-    const ids = rows.filter((r) => doing === 'approve-all' || tailOnly(r)).map((r) => r.video_id);
+    const ids = rows.filter((r) => doing === 'approve-all' || boilerplateOnly(r)).map((r) => r.video_id);
     if (ids.length) {
       const now = new Date().toISOString();
       await env.DB.batch(ids.map((v) => env.DB.prepare(
@@ -89,7 +105,8 @@ export function youtubePage({ email, tz, waiting, settled, snapshots, byState = 
         <div><b>${esc(p.title || p.video_id)}</b>
           <span class="faint">${esc(p.video_id)} · drafted ${esc(ago(p.proposed_at))}</span></div>
         <span class="pills">${p.state === 'proposed' ? `<span class="pill ${
-          tailOnly(p) ? 'p-plain' : 'p-warn'}">${tailOnly(p) ? 'one line' : 'rewritten'}</span>` : ''
+          boilerplateOnly(p) ? 'p-plain' : 'p-warn'}">${
+          boilerplateOnly(p) ? 'boilerplate' : 'rewritten'}</span>` : ''
         }<span class="pill ${cls}">${esc(label)}</span></span>
       </header>
       <div class="cols">
@@ -115,19 +132,19 @@ export function youtubePage({ email, tz, waiting, settled, snapshots, byState = 
    * swaps" ask for different amounts of trust, and only one of them is honest.
    */
   const bulk = (rows) => {
-    const tails = rows.filter(tailOnly).length;
+    const tails = rows.filter(boilerplateOnly).length;
     if (rows.length < 2) return '';
     return `<div class="acts bulk">
       ${tails ? `<form method="post" class="inline-form">
         <input type="hidden" name="do" value="approve-tails">
-        <button class="primary">Approve the ${tails} boilerplate ${tails === 1 ? 'swap' : 'swaps'}</button>
+        <button class="primary">Approve the ${tails} boilerplate ${tails === 1 ? 'change' : 'changes'}</button>
       </form>` : ''}
       ${tails < rows.length ? `<form method="post" class="inline-form">
         <input type="hidden" name="do" value="approve-all">
         <button>Approve all ${rows.length}, rewrites included</button>
       </form>` : ''}
-      <span class="faint">A boilerplate swap changes one line — the sign-up link or the tags.
-        A rewrite replaces words that are already up there.</span>
+      <span class="faint">A boilerplate change touches only the show blurb, never the video's own
+        summary. A rewrite replaces words that are already up there.</span>
     </div>`;
   };
 

@@ -264,7 +264,7 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
            * moment their dead tracked code had to come out.
            */
           proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
-            proposed: existing.replace(ours, tail) });
+            proposed: existing.replace(ours, tail), kind: 'swap' });
           continue;
         }
 
@@ -272,7 +272,8 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
         if (alreadyWritten.get(id) === existing.trim()) continue;
         const { title, description } = await build(id);
         if (description.trim() === existing.trim()) continue;
-        proposals.push({ videoId: id, title, currentText: existing, proposed: description });
+        proposals.push({ videoId: id, title, currentText: existing, proposed: description,
+          kind: 'rebuild' });
         continue;
       }
 

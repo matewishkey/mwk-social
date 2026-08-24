@@ -86,7 +86,10 @@ test('a pinned variant beats the rotation, on every platform and every key', () 
   const pinned = new Set(['a', 'b', 'c'].flatMap((k) => ['instagram', 'facebook', 'youtube']
     .map((p) => voice.firstComment(k, { platform: p, variantIndex: 0 }).text)));
   assert.strictEqual(pinned.size, 1, 'pinning still varied the comment');
-  assert.ok([...pinned][0].startsWith('Do not let others solve your problem'));
+  // Against the config, not against a copy of the prose. Hard-coding variant 0's
+  // opening here meant every wording change broke a test about PINNING.
+  const first = voice.config().firstComment.plain[0].split('\n')[0];
+  assert.ok([...pinned][0].startsWith(first), `pinned variant 0 did not render "${first}"`);
 });
 
 test('pinning a variant that does not exist is refused', () => {
@@ -436,16 +439,15 @@ test('a description carrying a retired blurb is still recognised as ours', () =>
   }
 });
 
-test("the blurb change is one line, so the bulk approve still calls it boilerplate", () => {
+test('a retired blurb swaps out without touching the video\'s own words', () => {
   const past = voice.config().youtubeDescription.showBlurbPast || [];
   const link = 'https://mwkshow.com/abcde';
+  assert.ok(past.length, 'no retired blurb recorded — this would pass vacuously');
   for (const raw of past) {
-    const a = raw.split('{show}').join(link).split('\n');
-    const b = voice.showBlurb(link).split('\n');
-    assert.strictEqual(a.length, b.length,
-      'the blurb changed shape — every description becomes a "rewrite" on the dashboard');
-    const differing = a.filter((line, i) => line !== b[i]).length;
-    assert.strictEqual(differing, 1,
-      `expected one changed line against the retired blurb, got ${differing}`);
+    const old = raw.split('{show}').join(link);
+    const doc = `The video's own summary.\n\n${old}\n\n#MWKShow #PIY #Invoicing`;
+    const swapped = doc.replace(voice.findBlurb(doc), voice.showBlurb(link));
+    assert.ok(swapped.startsWith("The video's own summary."), 'the summary was disturbed');
+    assert.ok(swapped.endsWith('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
   }
 });

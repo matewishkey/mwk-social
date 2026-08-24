@@ -644,12 +644,12 @@ test('the bulk buttons count the swaps and the rewrites separately', async () =>
     PROP({ video_id: 'c', proposed: 'wholly\ndifferent\nwords\nhere' })];
   const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting, settled: [],
     snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
-  assert.match(html, /Approve the 2 boilerplate swaps/);
+  assert.match(html, /Approve the 2 boilerplate changes/);
   assert.match(html, /Approve all 3, rewrites included/);
   assert.match(html, /value="approve-tails"/);
   assert.match(html, /value="approve-all"/);
   // The pill is what tells him WHICH is which before he clicks either.
-  assert.equal((html.match(/>one line</g) || []).length, 2);
+  assert.equal((html.match(/>boilerplate</g) || []).length, 2);
   assert.equal((html.match(/>rewritten</g) || []).length, 1);
 });
 
@@ -658,4 +658,31 @@ test('a single proposal gets no bulk bar at all', async () => {
   const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting: [PROP()], settled: [],
     snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
   assert.ok(!html.includes('approve-tails'), 'one proposal does not need approving in bulk');
+});
+
+/*
+ * `kind` beats the diff, and this is why the diff cannot be the only answer.
+ *
+ * The line-count proxy is right only while the boilerplate happens to be one
+ * line. The brand update on 2026-08-24 made the blurb's opening three lines, so
+ * every proposal became a multi-line diff — while each video's own summary was
+ * untouched. Labelling those "rewritten" lies in the expensive direction: he
+ * clicks through 23 diffs to approve nothing he needed to read, or stops
+ * trusting the label and approves everything without looking.
+ */
+test('the box says which kind it is, and that beats the diff', async () => {
+  const { boilerplateOnly } = await src('pages/youtube.js');
+  const multiline = { current_text: 'a\nb\nc', proposed: 'X\nY\nc' };
+  assert.equal(boilerplateOnly({ ...multiline }), false,
+    'without a kind, a multi-line diff is a rewrite — the fallback');
+  assert.equal(boilerplateOnly({ ...multiline, kind: 'swap' }), true,
+    'a swap is boilerplate however many lines the blurb spans');
+  assert.equal(boilerplateOnly({ current_text: 'a\nb', proposed: 'a\nZ', kind: 'rebuild' }), false,
+    'a rebuild is a rewrite even when it happens to touch one line');
+});
+
+test('a swap filed with no kind still reads as boilerplate', async () => {
+  const { boilerplateOnly } = await src('pages/youtube.js');
+  // Every row filed before the column existed. The fallback must keep working.
+  assert.equal(boilerplateOnly({ current_text: 'one\ntwo\nthree', proposed: 'one\nTWO\nthree' }), true);
 });

@@ -219,3 +219,21 @@ CREATE INDEX IF NOT EXISTS link_campaign ON link (campaign, created_at DESC);
 -- Dropped rather than left standing: a table nothing writes is a table somebody
 -- reads in six months and believes.
 DROP TABLE IF EXISTS reply_target;
+
+-- ---------------------------------------------------------------------------
+-- What KIND of change a proposal is, decided by the box that made it rather
+-- than guessed from the text at render time.
+--
+-- The dashboard's bulk approve splits "one line of boilerplate moved" from
+-- "your words were replaced", and it was inferring that from a line-by-line
+-- diff. That inference holds only while the boilerplate happens to be one line.
+-- The 2026-08-24 brand update made the blurb's opening three lines, and every
+-- proposal would have been labelled a rewrite while each video's own summary
+-- was in fact untouched — the label lying in the direction that makes him click
+-- through 23 diffs to approve nothing he needed to read.
+--
+-- yt-description.js knows which path it took: 'swap' means findBlurb matched and
+-- only the blurb was replaced, 'rebuild' means the description was regenerated.
+-- NULL is every row filed before this column existed; the dashboard falls back
+-- to the diff for those.
+ALTER TABLE yt_proposal ADD COLUMN kind TEXT;

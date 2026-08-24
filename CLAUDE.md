@@ -179,6 +179,18 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   so `firstComment.profileCtaBy.youtube` says so instead. **Every value there must also be in
   `markers[]`** and `voice.js` refuses to load a config where it is not — same rule, same reason, as
   `profileCta` itself.
+- **`matewishkey.com/brand` IS the voice, it MOVES, and it renders `VOICE.md` at that repo's root —
+  read it, never restate it.** Checked 2026-08-24 and it had moved: the headline is now **three
+  lines in that order** — *"Why let others solve your problems with AI? / Prompt it yourself! /
+  Mate Wish Key is a show about curious people taking their first steps solving problems with AI,
+  with a little guidance along the way."* His words for the set: *"This is the full story."* They
+  are one unit and are not split. **The exclamation mark on `yourself!` is load-bearing, not
+  decoration** — the page marks `AI?` and `yourself!` in red so the marked words alone carry the
+  argument, and a typo-cleanup pass flattened it to a full stop within the hour. Two more rules that
+  bit on the same read: **no em dashes anywhere the site speaks** (two episode variants had them),
+  and the visitor-facing wishes sentence is exactly *"you can bring up to three, and you do not have
+  to choose which one first"*. Still unreconciled and flagged to him, not silently changed: the page
+  says **"I, never we"** while the blurb says "we build it" and "what we build".
 - **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or 23 videos get
   rebuilt.** `findBlurb()` matches the constant halves either side of `{show}`, so the wording
   *around* the slot is part of the key: the day a paragraph changes, every description already on
