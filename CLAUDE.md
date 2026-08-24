@@ -174,6 +174,19 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   The redirect appends them as `utm_source`/`utm_medium`/`utm_campaign` **only when `utm = 1`**
   (defaulted on for our own hostnames, off for anyone else's) and **never overwrites a parameter
   already on the target** — one he typed is a decision.
+- **THE REPOINT WORKED, AND THIS IS THE EVIDENCE** (2026-08-24, the day after the codes went in).
+  Mate replaced both 15-minute booking calendars. Both short codes were repointed in one `UPDATE`
+  and **the website was not touched** — the five links on `/show` kept working through the change.
+  That is the entire argument for the shortener over pasting destinations directly, and it is no
+  longer theoretical.
+- **A booking code is bound by PURPOSE, not by destination** — `manual:pretalk-public` and
+  `manual:pretalk-private`. `target` is part of the mint key, so a code identified only by where it
+  points stops being findable the moment it is repointed, and the next mint would quietly make a
+  second one. Bind anything whose destination can move.
+- **Public vs private is `MWK: Public Show pre-talk` against `MWK: Private coaching pre-talk`**, and
+  the mapping was confirmed by fetching each calendar and reading its own title rather than trusting
+  the order they arrived in. `30zc4` is public (hero + the free-show tier), `g9q8j` is private (the
+  one-to-one and team tiers).
 - **A PROFILE LINK NAMES ITS ACCOUNT, OR IT IS USELESS** (2026-08-24, and mate found it, not a
   test). Nine bio codes were labelled `linkedin bio` and `facebook bio` — with three LinkedIn
   accounts connected and Facebook posting only to Pages, neither label answered the only question
