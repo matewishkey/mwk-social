@@ -174,6 +174,24 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   The redirect appends them as `utm_source`/`utm_medium`/`utm_campaign` **only when `utm = 1`**
   (defaulted on for our own hostnames, off for anyone else's) and **never overwrites a parameter
   already on the target** — one he typed is a decision.
+- **A PROFILE LINK NAMES ITS ACCOUNT, OR IT IS USELESS** (2026-08-24, and mate found it, not a
+  test). Nine bio codes were labelled `linkedin bio` and `facebook bio` — with three LinkedIn
+  accounts connected and Facebook posting only to Pages, neither label answered the only question
+  that matters: **which one?** His words: *"these are confusings it has to be correctly
+  generaterated."* Every bio code now carries `post_key = 'account:<zernio account id>'` and a
+  label naming the account and what KIND of thing it is — `LinkedIn — Mate Wish Key (COMPANY page)`
+  against `LinkedIn — Mate Visky (personal profile)`.
+- **So a new bio code MUST pass `postKey: 'account:<id>'`, and this is now load-bearing.** `postKey`
+  is part of the mint key, so minting one without it will NOT match the existing row and will
+  quietly create a second code for the same profile — one in his bio, one collecting nothing.
+  Resolve the id from `accounts:list`, which is the source of truth; never type one, and never put
+  one in this file (the repo is public).
+- **Which account is which, verified 2026-08-24 against `accounts:follower-stats`, not assumed:**
+  LinkedIn has THREE — `Mate Wish Key` is the company page (2 followers), `Mate Visky` (2,152) and
+  `Zsuzsanna Elma Fay` (5,040) are personal. Facebook has ONE and it is a **Page**
+  (`facebook.com/matewishkey`, 93) — a personal timeline is impossible through any Meta API, so
+  there is nothing to confuse it with on our side, but the label says "PAGE" anyway because he
+  asked the question.
 - **`/links` on the dashboard is the database, and it can mint by hand.** That was the actual gap:
   a link could only be created as a side effect of publishing, so anything he pastes somewhere
   himself — a bio, a newsletter, a talk — had to be a raw url and was invisible. The seven
