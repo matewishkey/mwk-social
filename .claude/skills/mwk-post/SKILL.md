@@ -122,6 +122,16 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   against one cap of five.
 - **Every code minted carries the queue item id**, so a click answers "which platform, which
   placement, which video" on `/links`. Nothing to do by hand; `run-queue.js` passes it down.
+- **A LinkedIn post is three posts and three codes**: the company page publishes it, then every
+  personal profile reposts that — staggered four hours apart, each with **its own** tracked CTA
+  comment. The company page has 2 followers and the personals hold 7,192, so a repost with no link
+  was most of the audience with nowhere to go (fixed 2026-08-24).
+- **A vertical clip under three minutes sent to YouTube is a SHORT, and a url in a Short is plain
+  text** — description and comment alike. `run-queue.js` works this out per clip and the CTA names
+  the channel instead of spending a code. The pipeline only sends YouTube the wide cut, so this
+  normally does not arise; it matters if you ever route the tall one there.
+- **`--no-first-comment` means it now.** The publisher records the decision where the hourly watcher
+  looks, so the flag is not just a one-hour delay any more.
 
 Then give him the caption, the platforms, when it goes, and
 https://social.matewishkey.com/queue — where he can cancel or bump it.
