@@ -30,8 +30,14 @@ const PLATFORMS = {
     videoMinSec: 3,
     videoMaxSec: 900,
     aspectRange: [0.5, 1.0],
+    imageOk: true,
+    // The IMAGE range, which is not the video one above. Exactly 1.91:1 is
+    // rejected (float edge, bitten live) — pad a wide screenshot to about 1.78
+    // with its own background colour rather than cropping it.
+    imageAspectRange: [0.75, 1.91],
   },
   threads: {
+    imageOk: true,           // same Meta surface as Instagram; a still posts fine
     landscapeOk: false,           // an IG-shaped surface; vertical is what performs
     commentsApi: true,             // readable and repliable, same Meta auth as IG
     reshare: 'none',
@@ -51,6 +57,7 @@ const PLATFORMS = {
     videoMaxSec: 300,
   },
   tiktok: {
+    imageOk: false,          // photo posts need contentType photo and have never been exercised here
     landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
@@ -74,6 +81,7 @@ const PLATFORMS = {
     videoMaxSec: 3600,        // creator-info's live value; read it per account rather than trusting this
   },
   twitter: {
+    imageOk: true,
     landscapeOk: true,
     // Read and reply both 403'd until 2026-08-22, and we had that written down
     // as a limit of the plan. It was not: `xCapabilities.inbox` is a per-account
@@ -112,6 +120,7 @@ const PLATFORMS = {
     estCostCents: 21.5,
   },
   facebook: {
+    imageOk: true,
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
     commentsApi: true,
     reshare: 'manual',             // personal timelines are impossible via any API (Meta rule)
@@ -129,6 +138,7 @@ const PLATFORMS = {
     deletable: true,
   },
   youtube: {
+    imageOk: false,          // a video platform; there is nothing a still picture can be posted AS
     landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
@@ -150,6 +160,7 @@ const PLATFORMS = {
     deletable: true,
   },
   linkedin: {
+    imageOk: true,
     landscapeOk: true,
     commentsApi: true,
     reshare: 'api',                // platformSpecificData.reshareUrl — company post, personal quote

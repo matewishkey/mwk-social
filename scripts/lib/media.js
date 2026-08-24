@@ -96,13 +96,32 @@ function downloadYouTube(videoId, dest) {
   }
 }
 
-/** What the file actually is — the only description of the video we can trust. */
+/*
+ * The ffprobe container names for a still picture. Each single-image demuxer is
+ * its own format, so this is a list rather than a guess at the codec: a PNG is
+ * `png_pipe`, a JPEG `jpeg_pipe` or `image2`, and a codec name alone would not
+ * separate a still PNG from a video that happens to use one.
+ */
+const IMAGE_CONTAINERS = /(^|,)(image2|png_pipe|jpeg_pipe|mjpeg_pipe|webp_pipe|bmp_pipe|tiff_pipe)($|,)/;
+
+/** What the file actually is — the only description of the media we can trust. */
 function probe(file) {
   const raw = sh('ffprobe', ['-v', 'error', '-print_format', 'json',
     '-show_format', '-show_streams', '--', file], 60000);
   const json = JSON.parse(raw);
   const video = (json.streams || []).find((s) => s.codec_type === 'video');
   if (!video) throw new Error(`${path.basename(file)} has no video stream`);
+  /*
+   * A still picture presents as a video stream with one frame, so every field
+   * below reads plausibly and every VIDEO rule then fails it: no audio track,
+   * codec png rather than h264, nought seconds against a three-second minimum.
+   * That is exactly what happened to the first image ever queued here — all six
+   * platforms were dropped and the run failed with "no account can take this
+   * post", which reads like a connection problem and is not one.
+   *
+   * ffprobe names the container, and for a still it is one of the *_pipe demuxers.
+   */
+  const isImage = IMAGE_CONTAINERS.test(String(json.format.format_name || ''));
   const audio = (json.streams || []).find((s) => s.codec_type === 'audio');
   const width = Number(video.width);
   const height = Number(video.height);
@@ -116,6 +135,7 @@ function probe(file) {
     codec: video.codec_name,
     hasAudio: !!audio,
     audioCodec: audio ? audio.codec_name : null,
+    isImage,
   };
 }
 
@@ -182,6 +202,28 @@ function resolve(clipId, { url = null, youtubeId = null } = {}) {
 function check(platform, p) {
   const cfg = platforms.get(platform);
   const problems = [];
+
+  /*
+   * A still picture is a different set of rules, not a lenient version of the
+   * video ones. Duration, audio and H.264 mean nothing here; what matters is
+   * whether the platform takes a still at all, and the aspect range for IMAGES,
+   * which is not the video range — Instagram's video range tops out at square
+   * while its images go to 1.91:1.
+   */
+  if (p.isImage) {
+    if (!cfg.imageOk) problems.push(`${platform} has no way to post a still picture`);
+    if (cfg.imageAspectRange) {
+      const [lo, hi] = cfg.imageAspectRange;
+      // EXCLUSIVE at the top on purpose. An image at exactly 1.91:1 is rejected
+      // by Instagram — a float edge, bitten live — so the fix is to pad to about
+      // 1.78 rather than to widen the tolerance here.
+      if (p.aspect < lo - 1e-9 || p.aspect >= hi) {
+        problems.push(`aspect ${p.aspect} is outside ${platform}'s images ${lo}–${hi}`);
+      }
+    }
+    return problems;
+  }
+
   if (cfg.videoMinSec && p.durationSec < cfg.videoMinSec) {
     problems.push(`${p.durationSec}s is under ${platform}'s ${cfg.videoMinSec}s minimum`);
   }
