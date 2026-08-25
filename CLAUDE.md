@@ -566,6 +566,35 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - YouTube metadata in bulk: `posts:update-metadata <id> --platform youtube --videoId <vid>
   --accountId <acc> --description/--title/--tags/--thumbnailUrl/--playlistId`
   (`--videoId` on non-Zernio videos documented but NOT yet tested).
+- **A CUSTOM THUMBNAIL CAN BE PUSHED TO AN ALREADY-PUBLISHED VIDEO, AND ZERNIO'S DOCS SAY IT
+  CANNOT** (verified live 2026-08-25). docs.zernio.com/platforms/youtube lists custom thumbnails
+  as publish-time only, via `mediaItems`, and says nothing about them under Update Post Metadata —
+  yet the CLI carries `--thumbnailUrl` on that command. `POST /posts/_/update-metadata` with
+  `{ platform: 'youtube', videoId, accountId, thumbnailUrl }` came back
+  `updatedFields: ["thumbnailUrl"]`, **and that echo proves nothing on its own** — the same page
+  of this file already records that `platformSpecificData` stores any key you send it. It was
+  checked at YouTube's end instead: the served `i.ytimg.com/vi/<id>/maxresdefault.jpg` went from
+  63,150 to 62,926 bytes, RMSE 0.002 against the file that went up. So the write landed and
+  YouTube re-encoded it.
+  - **Round-tripping a video's OWN current thumbnail is the safe positive control here.** The
+    byte change proves the write; the picture on the channel never moves. Done on the 0-view
+    `bxJcl8kmqhk`, which now carries as a custom thumbnail the frame it was already showing.
+  - **14 of the 28 videos can take one — the other 14 are Shorts and cannot**, classified with
+    this repo's own `isShort`, not by eye. The Shorts case was NOT write-tested: YouTube and
+    Zernio agree it is unsupported, and the only harmless test would have padded a vertical frame
+    to 16:9, which is a visible change if it landed anywhere.
+  - **1280x720, at least 640 wide, JPEG or PNG, 2 MB** — YouTube's `thumbnails.set` docs and
+    Zernio's page agree. `mwk-og-image-generator` already carries a `youtube-thumb` format at
+    exactly 1280x720, so the image supply is solved.
+- **A/B TESTING THUMBNAILS HAS NO API, AND WOULD NOT CONCLUDE HERE IF IT DID** (researched
+  2026-08-25). Test & Compare is YouTube Studio, desktop, advanced features on, up to 3 variants,
+  won on watch time per impression — and **Shorts are excluded outright**. The Data API exposes 21
+  resources and none of them is an experiment (positive control on the same read: the list does
+  carry `PlaylistImages` and `Watermarks`, so it is not a truncated fetch); `Thumbnails` is a
+  set-only resource; the revision history through 6 Aug 2026 never mentions a test. **And the
+  arithmetic closes it anyway**: a variant wants 1,000–5,000 impressions to settle, and our
+  best long-form video has **95 views lifetime** — 236 across all fourteen. Do not build this,
+  and do not re-research it until a video clears four figures.
 - Webhooks exist and would replace the hourly poll (`post.external.created` fires when a
   natively-authored post is first detected, `post.platform.published` per platform target) — not
   used: they need a public HTTPS endpoint, and detection still waits on the same ~90 min sync,

@@ -64,7 +64,6 @@ in the wrong place.
 | Write state after **every** decision | A backfill killed at two minutes had posted 13 comments and recorded none |
 | A caption that already has the link gets no comment | Otherwise the same URL appears twice under one post |
 | Wait for the transcript rather than posting untagged | The comment is one-shot; it can't be edited later |
-| No `--flag` on `post-everywhere.sh` | A stray `--dry-run` was read as the video argument and published for real |
 | An item that has put **anything** live is never queued again | X's media upload failed at 99%; the exception unwound past four platforms that had already published, the item went back to `queued`, and the next tick posted the lot again — three copies on TikTok, Facebook and LinkedIn before it was stopped by hand |
 | Each publish group is caught where it happens | One group throwing used to abandon the groups behind it *and* discard the record of the ones in front |
 

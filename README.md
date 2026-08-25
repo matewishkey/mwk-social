@@ -22,13 +22,10 @@ at once, straight from a shell — these are the actual live posts:
   [mwk-og-image-generator](https://github.com/matewishkey/mwk-og-image-generator)
   and branded by code.
 - `assets/` — also holds the ImageMagick announcement card (1080×1080), wide
-  version (1920×1080) and the 10s launch video.
-- `scripts/generate-assets.sh` — regenerates the three ImageMagick/ffmpeg assets
-  (the AI og-card comes from mwk-og-image-generator).
+  version (1920×1080) and the 10s launch video. These are the launch-day
+  artefacts as published; they are kept, not regenerated.
 - `scripts/post.js` — publishes to any set of connected accounts and attaches the
   standard first comment natively, so it lands seconds after the post does.
-- `scripts/post-everywhere.sh` — the original one-liner entry point, now a thin
-  wrapper over `post.js`.
 - `config/voice.json` — everything the pipeline says out loud: the rotating first-comment
   variants, the identity and brand tags, per-platform hashtag caps, the tag blocklist and the
   YouTube show blurb. One file to change what gets posted.
@@ -117,9 +114,8 @@ npm install                      # installs @zernio/cli locally
 # open the printed URLs, authorize, then:
 ./node_modules/.bin/zernio accounts:list # grab your account IDs
 
-scripts/generate-assets.sh
-export ZERNIO_IMAGE_ACCOUNTS=<id1>,<id2>
-scripts/post-everywhere.sh "Your announcement text" assets/ship-card.png
+scripts/install-timers.sh        # the timers that publish and watch
+scripts/with-secrets.sh scripts/queue-add.js --body "Your post" --media clip.mp4
 ```
 
 ## What's worth measuring
