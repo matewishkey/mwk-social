@@ -216,8 +216,12 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   argument, and a typo-cleanup pass flattened it to a full stop within the hour. Two more rules that
   bit on the same read: **no em dashes anywhere the site speaks** (two episode variants had them),
   and the visitor-facing wishes sentence is exactly *"you can bring up to three, and you do not have
-  to choose which one first"*. Still unreconciled and flagged to him, not silently changed: the page
-  says **"I, never we"** while the blurb says "we build it" and "what we build".
+  to choose which one first"*. **The one thing the brand page and the blurb disagree on is SETTLED, in the
+  blurb's favour**: the page says *"I, never we"* while the blurb says "we build it" and "what we
+  build", and mate's call on 2026-08-24 was *"For sure keeping we here is great there is no problem
+  at all."* That "we" is him and the guest, not a company, which is what the page's rule is actually
+  about. **Do not raise it again** — it reads like a fresh finding every time somebody re-reads the
+  brand page.
 - **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or 23 videos get
   rebuilt.** `findBlurb()` matches the constant halves either side of `{show}`, so the wording
   *around* the slot is part of the key: the day a paragraph changes, every description already on
