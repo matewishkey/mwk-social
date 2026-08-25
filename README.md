@@ -174,13 +174,13 @@ which is exactly why the CTA has its own short domain.
   out-of-network reply is dropped before the For You feed — so the CTA only ever
   reached people already following us. One tweet is also 20c against the
   thread's 21.5c, because the URL fee replaces the base charge.
-- **Instagram caps hashtags at 5. We never spend that budget twice.** The cap is real;
-  "caption and comments count together" is NOT something Instagram states — it traces to
-  marketing blogs and was retracted on 2026-08-24. We kept the behaviour and dropped the
-  certainty, because never spending it twice is free if the stricter reading is wrong. That
-  is why its caption carries none — the comment spends all five, two always-on
-  tags and three describing the clip. Tags in both places would spend the budget
-  twice for nothing.
+- **Instagram caps hashtags at 5, and we never spend that budget twice.** The cap is
+  Instagram's. The "caption and comments count together" part is NOT — that claim, and
+  the penalties usually listed beside it, trace to marketing blogs rather than to
+  Instagram, and were retracted on 2026-08-24. The behaviour stayed anyway: never
+  spending the budget twice is free, and costs nothing if the stricter reading turns
+  out to be wrong. So the caption carries none and the comment spends all five — two
+  always-on tags and three describing the clip.
 - **One video per post, on every platform.** So a vertical cut and a landscape cut
   are two separate posts: the reel goes to Instagram, TikTok and Threads, the wide
   one to Facebook, YouTube, LinkedIn and X.

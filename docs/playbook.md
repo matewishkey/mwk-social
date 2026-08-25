@@ -41,9 +41,8 @@ in the wrong place.
   A cap tighter than the pair truncates it, so X's one tag is `#MWKShow`.
 - **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
   table decides: Facebook, YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and
-  Threads keep the caption clean, because we never spend Instagram's cap of 5 twice (a defensive
-  choice — the combined-counting claim is not Instagram's, see CLAUDE.md)
-  and putting them in both would spend the budget twice.
+  Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive
+  choice, not a rule Instagram states (see CLAUDE.md).
   "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
   is just `#PIY`.
 - **Topic tags describe the video**, derived from its own transcript. If it's about trading it
@@ -82,13 +81,18 @@ in the wrong place.
 | **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there anyway — the CTA names the bio. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
 
-### The two that cost money or reach if you get them wrong
+### The two worth getting right
 
-**Instagram caps hashtags at 5, and we never spend that budget twice.** The cap is Instagram's;
-the "caption and comments count together" part is NOT, and was retracted on 2026-08-24 — it
-traces to marketing blogs. The behaviour stayed because it costs nothing if the stricter reading
-is wrong. Enforced since
-18 Dec 2025; over the cap and the post loses Explore, hashtag pages and Reels recommendations.
+One costs real money when you get it wrong. The other used to be listed beside it as
+costing reach, and that turned out to be unsourced — it is kept as a cheap precaution,
+not as a known penalty.
+
+**Instagram caps hashtags at 5, and we never spend that budget twice.** The cap is Instagram's.
+The "caption and comments count together" part is NOT — and neither are the penalties this
+paragraph used to list beside it (losing Explore, hashtag pages and Reels recommendations).
+Both trace to marketing blogs rather than to Instagram, and both were retracted on 2026-08-24;
+the enforcement date that sat here went with them, being unverifiable and in the same breath.
+The behaviour stayed because it costs nothing if the stricter reading is wrong.
 So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
 always-on tags and three describing the clip.
 
