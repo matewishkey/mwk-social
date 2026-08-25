@@ -8,6 +8,7 @@
 const test = require('node:test');
 const assert = require('node:assert');
 const path = require('node:path');
+const fs = require('node:fs');
 
 const src = (f) => import(path.join(__dirname, '..', 'web', 'src', f));
 
@@ -212,6 +213,113 @@ test('with no clicks the page says why there is nothing to show', async () => {
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [], snapshots: {} });
   assert.match(html, /Only Facebook reports clicks natively/);
   assert.match(html, /none have been minted/, 'with no links at all, say so');
+});
+
+/* ------------------------------------------------------- stats: trends -- */
+
+/*
+ * Every one of these three lies in the FLATTERING direction, which is why each
+ * gets a positive control: a guard that cannot fail is not a guard, and the
+ * cheapest way to prove one works is to break it and watch the test go red.
+ */
+
+// The day the page is rendered, and the days either side of it.
+const isoDay = (n) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
+const row = (date, over = {}) => ({
+  date, platform: 'facebook', post_count: 1, impressions: 0, reach: 0, views: 0,
+  likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0, ...over,
+});
+// The whole tile block, found by its label — the value sits BEFORE the label
+// and the trend pill AFTER it, so either half alone finds only one of them.
+const tileFor = (html, label) => (html.split('<div class="tile')
+  .find((part) => part.includes(`<span>${label}</span>`)) || '');
+const reachPill = (html) => {
+  const pills = tileFor(html, 'people reached').match(/<span class="pill [^"]*">([^<]*)<\/span>/g) || [];
+  return pills.length ? pills[pills.length - 1] : '';
+};
+
+/*
+ * A morning is not a week. Today's numbers are still arriving, so putting them
+ * against seven complete days draws a change that is only the clock — and it
+ * would read as a collapse every morning and a recovery every night.
+ */
+test('today is in neither comparison window', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const steady = [row(isoDay(-8), { reach: 100 }), row(isoDay(-1), { reach: 100 })];
+
+  const withToday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
+    daily: [...steady, row(isoDay(0), { reach: 10000 })] });
+  assert.match(reachPill(withToday), /about the same/,
+    'a huge partial day must not move a week-on-week figure');
+
+  // Positive control: the SAME spike one day earlier is a complete day, and it
+  // must move the number. Without this the assertion above would also pass on a
+  // page that had simply stopped comparing anything.
+  const withYesterday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
+    daily: [...steady, row(isoDay(-2), { reach: 10000 })] });
+  assert.doesNotMatch(reachPill(withYesterday), /about the same/,
+    'a complete day inside the window must still count');
+});
+
+/*
+ * TikTok's first row is 17 Aug. Compare its last seven days against the seven
+ * before and the denominator is one day of data, so a channel that did nothing
+ * new reads as several hundred percent up.
+ */
+test('a channel with no history behind the older window shows its start date, not a percentage', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const daily = [row(isoDay(-8), { reach: 10 }), row(isoDay(-2), { reach: 400 })];
+  const card = (html) => html.split('<h2>facebook</h2>')[1].split('</section>')[0];
+
+  const young = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
+    daily, platformSince: { facebook: isoDay(-3) } });
+  assert.match(card(young), /since /, 'name the start date');
+  assert.doesNotMatch(card(young).split('<dl')[0], /[+-]\d+%/,
+    'a channel younger than the comparison must not be given a percentage');
+
+  // Positive control: the same numbers from a channel that WAS reporting before
+  // the older window opened do get a percentage.
+  const old = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
+    daily, platformSince: { facebook: isoDay(-60) } });
+  assert.match(card(old).split('<dl')[0], /[+-]\d+%/,
+    'a channel with real history behind it should get a real percentage');
+});
+
+/*
+ * The one that would have been believed. A third LinkedIn account was connected
+ * on 22 Aug carrying 5,040 followers — summed, that is +5,043 overnight and the
+ * best week the show has ever had. It is an integration, not an audience.
+ */
+test('an account connected part-way through is not counted as growth', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const followerHistory = [
+    { day: isoDay(-3), account_id: 'a', platform: 'facebook', username: 'mwk', followers: 89 },
+    { day: isoDay(-1), account_id: 'a', platform: 'facebook', username: 'mwk', followers: 91 },
+    // Connected on the last day only, bringing an audience with it.
+    { day: isoDay(-1), account_id: 'b', platform: 'linkedin', username: 'Zsuzsanna', followers: 5040 },
+  ];
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], clicks: [], snapshots: {},
+    followers: [], followerHistory, accountSince: { a: isoDay(-3), b: isoDay(-1) } });
+
+  const tile = tileFor(html, 'followers');
+  assert.match(tile, /<b>91<\/b>/, 'the total must be the accounts held throughout, not 5,131');
+  assert.ok(!/5131|5\.1k/.test(tile), 'a connection must never be folded into the total');
+  assert.match(html, /Zsuzsanna/, 'and the account left out has to be named, not silently dropped');
+  assert.match(html, /connected part-way through/);
+});
+
+/*
+ * A bar chart that skips its empty days draws them as if they never happened:
+ * two posts a week apart sit side by side and the gap disappears — and the gap
+ * is the thing worth seeing, because cadence is the lever we control.
+ */
+test('the reach chart draws every day in the span, not only the days with rows', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
+    daily: [row('2026-08-01', { reach: 5 }), row('2026-08-10', { reach: 5 })] });
+  const chart = html.split('Reach by day')[1].split('</svg>')[0];
+  assert.equal((chart.match(/<rect/g) || []).length, 10,
+    'first to last inclusive is ten bars, eight of them empty');
 });
 
 /* ---------------------------------------------------------------- queue -- */
@@ -685,6 +793,46 @@ test('a swap filed with no kind still reads as boilerplate', async () => {
   const { boilerplateOnly } = await src('pages/youtube.js');
   // Every row filed before the column existed. The fallback must keep working.
   assert.equal(boilerplateOnly({ current_text: 'one\ntwo\nthree', proposed: 'one\nTWO\nthree' }), true);
+});
+
+/*
+ * The box works out which kind of change a proposal is; the ingest door decides
+ * whether to believe it. Those are two files, and the door silently rewrites
+ * anything it does not recognise to NULL — so a kind added to one and not the
+ * other is thrown away with no error, which is exactly what happened to
+ * 'append' on the day it was written. Read both and compare.
+ */
+test('every proposal kind the box files is one the door accepts', () => {
+  const read = (...f) => fs.readFileSync(path.join(__dirname, '..', ...f), 'utf8');
+  const filed = [...new Set([...read('scripts', 'yt-description.js')
+    .matchAll(/kind:\s*'([a-z]+)'/g)].map((m) => m[1]))];
+  const list = read('web', 'src', 'api.js').match(/const PROPOSAL_KINDS = \[([^\]]*)\]/);
+  assert.ok(list, 'the allow-list must stay findable by name');
+  const accepted = [...list[1].matchAll(/'([a-z]+)'/g)].map((m) => m[1]);
+
+  assert.ok(filed.length >= 3, `expected the three kinds, found ${filed.join(', ')}`);
+  for (const kind of filed) {
+    assert.ok(accepted.includes(kind),
+      `yt-description.js files kind '${kind}' and api.js drops it to null`);
+  }
+});
+
+/*
+ * An append is what a video gets when YouTube never captioned it: there is no
+ * transcript, so there is no summary to write, and his own words stay exactly
+ * as they are with the show blurb added underneath. Nothing of his is replaced.
+ */
+test('an appended blurb keeps his words, so it is not a rewrite', async () => {
+  const { boilerplateOnly, tailOnly } = await src('pages/youtube.js');
+  const append = { current_text: 'his own words', kind: 'append',
+    proposed: 'his own words\n\nWhy let others solve your problems with AI?\nPrompt it yourself!' };
+  assert.equal(boilerplateOnly(append), true);
+  // The positive control is the fallback disagreeing: added lines read as a
+  // rewrite to the diff, which is why the label has to be believed over it.
+  assert.equal(tailOnly(append), false,
+    'the diff proxy calls this a rewrite — the kind is what makes it right');
+  // And his words must genuinely survive, or "append" is the wrong word for it.
+  assert.ok(append.proposed.startsWith(append.current_text));
 });
 
 test('the sharing card counts real opens and says what it cannot tell him', async () => {

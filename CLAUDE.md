@@ -415,6 +415,36 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   transcript, no model call, and the diff is one line. **Two tests pin what makes that safe** — the
   plain and tracked blurbs must differ on exactly ONE line, or the "one-line change" the dashboard
   shows him is a lie.
+- **A VIDEO YOUTUBE NEVER CAPTIONS FAILED EVERY RUN, FOR EVER, AND NOBODY WAS TOLD** (fixed
+  2026-08-25, found by reading the timer log rather than by a test). `build()` needs a transcript
+  for the opening paragraph, so `FAIL <id> — no transcript available` was the whole outcome for
+  three videos — one of them for **131 hours**, a 19-second Short that in all likelihood will never
+  be captioned at all. Each carried his own words and **no route to the sign-up page**, blocked by a
+  summary they did not need. `MWK_CAPTION_GRACE_HOURS` existed in `first-comment.js` and **not
+  here**, which is the whole bug: waiting is right, and what was missing is what happens when the
+  wait does not end. Past the grace the tail is now proposed on its own (`kind: 'append'`, his words
+  kept whole, no topic tags because those come from the transcript too); inside it, a plain `defer`
+  line. **Only the missing-transcript message is recovered** — a model error or a failed mint still
+  throws, or every real fault becomes a quietly degraded description.
+  - **Age comes from `%(timestamp)s`, and yt-dlp prints the literal string `NA` when a field is
+    absent.** `Number('NA')` is NaN, and NaN compares false against the grace — so an unguarded
+    read takes the impatient branch on every video that lacks a timestamp. `null` means wait.
+  - **The Short rule reaches this path too, and that was checked rather than assumed**: the
+    19-second vertical got `the link is on my channel page` and minted nothing, the 35-minute
+    landscape got a tracked `mwkshow.com` code. Same `linkDeadFor()` that governs publishing.
+- **A `kind` THE BOX FILES AND THE DOOR DOES NOT KNOW IS SILENTLY NULL.** `propose()` in
+  `web/src/api.js` carried an inline `i.kind === 'swap' || i.kind === 'rebuild' ? i.kind : null`, so
+  `append` landed as NULL on both proposals the day it was written — the label the box had worked
+  out was thrown away at the ingest door and the dashboard fell back to guessing from the diff,
+  which calls an append a rewrite. It is `PROPOSAL_KINDS` now, and **a test reads the kinds out of
+  `yt-description.js` and fails if `api.js` would drop one** (positive control: removing `append`
+  fails it). Adding a kind is two files; the failure was that the second gave no sign.
+- **THE YOUTUBE DESCRIPTION IS THE BIGGEST CLICK SOURCE WE HAVE — 37 of 90 human clicks**, all
+  `campaign = episode, medium = description` (measured 2026-08-25). Nothing else is close: X's
+  reply 7, the website's own booking links 7, threads' comment 4, facebook's 3, **Instagram 1 and
+  TikTok 0**, which is the link-is-dead-there finding showing up in the numbers exactly as
+  predicted. So a video sitting without the blurb is not a tidiness problem — it is the best
+  channel we have, switched off for that episode.
 - **The show-notes loop did not converge**: `build()` regenerates the opening with a model every
   run, so an applied description never matches byte for byte and immediately re-proposed itself.
   `/youtube/pending` returns what was last WRITTEN as well as what is approved, and a video already
@@ -668,6 +698,26 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `markers[]` lists every substring that counts and `voice.carriesCta()` matches any; tests pin
   both the old and the new. Minting is **idempotent** (a re-run must render the identical comment)
   and **never fatal** (no dashboard → plain URL → the comment still goes out).
+- **THE STATS PAGE HAS TRENDS NOW, AND EVERY WAY A TREND CAN LIE HERE LIES IN THE FLATTERING
+  DIRECTION** (2026-08-25, his ask: "not only show the current values"). Last seven COMPLETE days
+  against the seven before. The three guards, each with a positive control in the suite — break it
+  and a test goes red:
+  - **Today is in neither window.** A morning against seven full days draws a collapse that is only
+    the clock. (Zernio's dates are UTC days and so is the Worker's clock; the Brisbane display never
+    enters the arithmetic.)
+  - **A channel younger than the older window gets its START DATE, not a percentage.** TikTok's
+    first row is 17 Aug — its older window holds one day, so a channel that did nothing new reads
+    as several hundred percent up. `platformSince` is queried over the WHOLE table, not the
+    rendered thirty days, or a channel running for months is called new because the page starts
+    there. Five of seven channels are gated today; facebook and youtube are the two with real
+    history behind them.
+  - **CONNECTING AN ACCOUNT IS NOT GROWTH.** Zsuzsanna's LinkedIn arrived on 22 Aug with 5,040
+    followers: summed, that is **+5,043 overnight** and the best week the show has ever had. The
+    total counts only accounts present at BOTH ends (2.3k across 8, not 7.3k across 10) and the
+    ones left out are named underneath. Follower movement is per account, never a sum.
+  **The reasoning lives in the header of `web/src/pages/stats.js`** — read it there, do not restate
+  it. Also fixed on the way past: the bar chart skipped its empty days, so a gap in cadence — the
+  one lever we control — was drawn as if it never happened.
 - **Snapshots over SQL projections, where the box already knows the answer.** `platforms`, `voice`
   and `pace` are computed on the box and shipped whole — the platform table and the pace are
   computed by the code that uses them, so rebuilding either in D1 would only add a way for the two
