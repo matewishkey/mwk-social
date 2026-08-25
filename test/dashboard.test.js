@@ -149,17 +149,52 @@ const DAILY = [
     views: 50, likes: 2, comments: 1, shares: 0, saves: 0, clicks: 0 },
 ];
 
-test('a channel only shows the metrics it actually reports', async () => {
+// One channel's row out of the side-by-side table.
+const chanRow = (html, platform) => {
+  const at = html.indexOf(`<b>${platform}</b>`);
+  return at < 0 ? '' : html.slice(at, html.indexOf('</tr>', at));
+};
+
+/*
+ * Each channel's "seen" number is whichever measurement it actually reports,
+ * and the row has to SAY which — reach counts unique accounts, impressions
+ * count every appearance on a screen, and a play is neither. Naming the
+ * denominator inline is the whole defence against ranking them against each
+ * other.
+ */
+test('every channel names the measurement its own number is', async () => {
   const { statsPage } = await src('pages/stats.js');
   const { flows } = require('../scripts/lib/platforms.js');
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: DAILY, followers: [], clicks: [],
     snapshots: { platforms: { body: { flows: flows() } } } });
-  // YouTube reports no reach at all, so a reach row there would be a structural
-  // zero pretending to be a measurement.
-  const youtubeCard = html.split('<h2>youtube</h2>')[1].split('</section>')[0];
-  assert.ok(!/>reach</.test(youtubeCard), 'youtube must not show a reach row');
-  assert.match(youtubeCard, />views</);
-  assert.match(youtubeCard, /Not reported here:.*reach/);
+
+  // YouTube reports no reach at all, so calling its number reach would be a
+  // structural zero pretending to be a measurement.
+  const youtube = chanRow(html, 'youtube');
+  assert.ok(youtube, 'youtube should have a row');
+  assert.match(youtube, /plays/, "youtube's number is plays, and must say so");
+  assert.ok(!/unique people|of reach/.test(youtube), 'youtube must not claim reach');
+
+  // Facebook does report reach, and its row must name that instead.
+  const facebook = chanRow(html, 'facebook');
+  assert.match(facebook, /unique people/, "facebook's number is reach, and must say so");
+  assert.match(facebook, /of reach/);
+});
+
+/*
+ * The two comparable columns have to stay marked as the comparable ones. They
+ * are the answer to "which of these numbers can I put side by side" — every
+ * other column on the row is on a scale of its own.
+ */
+test('the table marks which columns actually compare across channels', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: DAILY, followers: [], clicks: [],
+    snapshots: {} });
+  assert.match(html, /class="cmp">per post/);
+  assert.match(html, /class="cmp">clicks \(our links\)/);
+  assert.match(html, /only ones that compare across channels/);
+  // And the reason has to travel with them, or it is decoration.
+  assert.match(html, /24 August 2026/, 'the YouTube view-counting change is why a play is not a play');
 });
 
 test('channels with almost no followers are left off the trend on purpose', async () => {
@@ -269,19 +304,18 @@ test('today is in neither comparison window', async () => {
 test('a channel with no history behind the older window shows its start date, not a percentage', async () => {
   const { statsPage } = await src('pages/stats.js');
   const daily = [row(isoDay(-8), { reach: 10 }), row(isoDay(-2), { reach: 400 })];
-  const card = (html) => html.split('<h2>facebook</h2>')[1].split('</section>')[0];
 
   const young = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
     daily, platformSince: { facebook: isoDay(-3) } });
-  assert.match(card(young), /since /, 'name the start date');
-  assert.doesNotMatch(card(young).split('<dl')[0], /[+-]\d+%/,
+  assert.match(chanRow(young, 'facebook'), /since /, 'name the start date');
+  assert.doesNotMatch(chanRow(young, 'facebook'), /[+-]\d+%/,
     'a channel younger than the comparison must not be given a percentage');
 
   // Positive control: the same numbers from a channel that WAS reporting before
   // the older window opened do get a percentage.
   const old = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
     daily, platformSince: { facebook: isoDay(-60) } });
-  assert.match(card(old).split('<dl')[0], /[+-]\d+%/,
+  assert.match(chanRow(old, 'facebook'), /[+-]\d+%/,
     'a channel with real history behind it should get a real percentage');
 });
 
@@ -793,6 +827,45 @@ test('a swap filed with no kind still reads as boilerplate', async () => {
   const { boilerplateOnly } = await src('pages/youtube.js');
   // Every row filed before the column existed. The fallback must keep working.
   assert.equal(boilerplateOnly({ current_text: 'one\ntwo\nthree', proposed: 'one\nTWO\nthree' }), true);
+});
+
+/*
+ * The site-wide "engagement rate" divided actions from every channel by reach
+ * from the three that report it — seven channels on top, three underneath. On
+ * the real window that read 5.5% where the same-set figure was 3.8%, and even
+ * that mixes unique-accounts with plays.
+ *
+ * Actions per post divides two numbers that mean the same thing on every
+ * channel, so it is the one headline that survives being compared over time.
+ */
+test('the headline quality number cannot mix denominators', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  // Two channels: one reports reach, one reports nothing but views. Both earn
+  // actions. Ten platform-posts, twenty actions => 2.0 per post, whatever each
+  // channel happens to expose.
+  const rows = [
+    { date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
+      views: 0, likes: 10, comments: 0, shares: 0, saves: 0, clicks: 0 },
+    { date: isoDay(-3), platform: 'youtube', post_count: 5, reach: 0, impressions: 0,
+      views: 9999, likes: 10, comments: 0, shares: 0, saves: 0, clicks: 0 },
+  ];
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [],
+    snapshots: {} });
+
+  const tile = tileFor(html, 'actions per post');
+  assert.ok(tile, 'the headline tile should be actions per post');
+  assert.match(tile, /<b>2\.0<\/b>/, '20 actions over 10 posts is 2.0, whatever the reach was');
+
+  // YouTube's 9,999 views must not touch it. Under the old formula the
+  // denominator was facebook's reach alone and youtube's actions still counted.
+  const noViews = statsPage({ email: 'm@x.com', tz: TZ, followers: [], clicks: [], snapshots: {},
+    daily: rows.map((r) => ({ ...r, views: r.views ? 1 : 0 })) });
+  assert.match(tileFor(noViews, 'actions per post'), /<b>2\.0<\/b>/,
+    'changing a denominator nothing should depend on moved the headline');
+
+  // And the page must not still be claiming a site-wide percentage.
+  assert.ok(!/<span>engagement rate<\/span>/.test(html),
+    'the mixed-denominator rate is back on the page');
 });
 
 /*

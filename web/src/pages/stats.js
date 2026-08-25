@@ -6,7 +6,9 @@
  * are worth watching, in this order —
  *
  *   1. reach / views      did anyone see it
- *   2. engagement rate    did anyone care (normalised, so it survives growth)
+ *   2. actions per post   did anyone care (per post, so it compares across
+ *                         channels — see the channel table for why a RATE
+ *                         cannot)
  *   3. link clicks        the only number tied to the actual goal, guest sign-ups
  *   4. cadence            posts per week — the biggest lever we fully control
  *   5. follower growth    last, and only where there is a base to grow
@@ -88,12 +90,6 @@ function spark(series, label = '') {
   return `<svg class="spark" viewBox="0 0 100 20" preserveAspectRatio="none" role="img"
     aria-label="${esc(label)}"><polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"/></svg>`;
 }
-
-const RATE = (m) => {
-  const seen = m.reach || m.impressions || m.views || 0;
-  const acts = (m.likes || 0) + (m.comments || 0) + (m.shares || 0) + (m.saves || 0);
-  return seen ? (acts / seen) * 100 : null;
-};
 
 /*
  * now against before, as something that can be rendered.
@@ -190,7 +186,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
     for (const k of ['posts', ...FLOWS]) a[k] = (a[k] || 0) + p[k];
     return a;
   }, {});
-  const rate = RATE(tot);
 
   /*
    * Cadence is DAYS WE POSTED, not posts. daily_metric is one row per platform,
@@ -222,8 +217,31 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   const clicksNow = clicksIn(recentFrom, recentTo);
   const clicksBefore = clicksIn(priorFrom, priorTo);
 
-  const rateNow = RATE(recent);
-  const rateBefore = RATE(prior);
+  /*
+   * ACTIONS PER POST replaced the site-wide engagement RATE, because that rate
+   * could not be computed honestly and was overstating us by half.
+   *
+   * The old site-wide rate (deleted with this change) took the first of
+   * `reach || impressions || views` a channel offered, and summing those across
+   * channels sums three different measurements into one denominator. Worse, on
+   * this account only facebook, instagram and linkedin report reach at all — so
+   * the numerator counted actions from all SEVEN channels and the denominator
+   * covered THREE. Measured on the real window: 348 actions over 6,356 reach
+   * read as 5.5%, where the same-set figure is 3.8%, and even that mixes units.
+   *
+   * A post is a post on every channel, so actions per post divides two numbers
+   * that mean the same thing everywhere. It is also the column the channel
+   * table marks as comparable, so the headline and the detail now agree.
+   *
+   * (`posts` is per PLATFORM-post — one clip to seven channels is seven posts —
+   * which is the right denominator here: each is a separate thing that can earn
+   * a reaction. Cadence, the tile beside it, deliberately counts days instead.)
+   */
+  const actionsOf = (t) => (t.likes || 0) + (t.comments || 0) + (t.shares || 0) + (t.saves || 0);
+  const perPostOf = (t) => (t.posts ? actionsOf(t) / t.posts : 0);
+  const perPostAll = perPostOf(tot);
+  const perPostNow = perPostOf(recent);
+  const perPostBefore = perPostOf(prior);
 
   // A short, readable name for a destination — the whole url is noise in a table.
   const label = (url) => {
@@ -250,56 +268,132 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   const reachSeries = allDays.map((d) => ({ label: d, value: (byDate[d] || {}).reach || 0 }));
   const clickSeries = allDays.map((d) => ({ label: d, value: clickOn[d] || 0 }));
 
-  // ---- per-channel cards -------------------------------------------------
+  /* ---- one row per channel, and only the columns that mean the same thing --
+   *
+   * This replaced seven separate cards, each showing whichever metrics its own
+   * platform happened to expose. Mate, 2026-08-25: "right now i see different
+   * numbers but not one nice numbers". He was right, and the problem was worse
+   * than layout — the numbers were not comparable, and nothing said so.
+   *
+   * What was researched, and what it changes:
+   *
+   *   "SEEN" IS THREE DIFFERENT MEASUREMENTS. Meta's own developer docs define
+   *   impressions as "total number of times the media object has been seen" and
+   *   reach as "total number of unique accounts that have seen" it. Our seven
+   *   channels report reach (facebook, instagram, linkedin), views (youtube,
+   *   tiktok) or impressions (twitter) — so the denominators sit on different
+   *   scales and a percentage built on them cannot be ranked across channels.
+   *
+   *   AND A VIEW IS NOT A VIEW. YouTube's own Help Centre: from 24 AUGUST 2026
+   *   a view is counted the moment playback begins, on every format — before
+   *   that, long-form needed real watch time. TikTok counts one on autoplay.
+   *   So "views" is the cheapest number on one channel and the dearest on
+   *   another, and on YouTube it changed unit YESTERDAY.
+   *
+   *   ON INSTAGRAM AND THREADS, views AND impressions ARE THE SAME NUMBER —
+   *   measured here, not assumed: 990 against 990, and 53 against 53 over the
+   *   whole window. Two names for one reading.
+   *
+   *   THE OLD SITE-WIDE RATE MADE IT WORSE. It preferred reach, then
+   *   impressions, then views. reach <= impressions by definition, so every channel reporting
+   *   reach got a structurally higher percentage than one reporting
+   *   impressions: facebook reads 2.7% on reach and 2.1% on the same actions
+   *   over impressions. Half the ranking was which metric the API happened to
+   *   expose.
+   *
+   * So the table separates the two kinds of column, and says which is which.
+   * COMPARABLE: posts, actions, actions per post, and our own tracked clicks —
+   * a post is a post everywhere, and a click on a short link is one redirect
+   * hit with the crawlers filtered out, measured identically on every channel.
+   * NOT COMPARABLE: seen, and the rate built on it. Those are still shown,
+   * because they are what we have, but each names its own denominator inline —
+   * which is the practice the engagement-rate literature recommends for exactly
+   * this reason.
+   */
   const ORDER = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
-  const channels = Object.values(byPlatform)
+  const SEEN_NOUN = { reach: 'unique people', views: 'plays', impressions: 'times on screen' };
+  const trackedFor = Object.fromEntries(clicks.map((c) => [c.platform, c.n]));
+
+  const channelStats = Object.values(byPlatform)
     .sort((a, b) => ORDER.indexOf(a.platform) - ORDER.indexOf(b.platform))
     .map((p) => {
       const shown = metricsFor[p.platform] || {};
       /*
        * What this channel counts as "seen" — the one it actually reports.
        *
-       * The last clause is the one that matters: if the platform snapshot has
-       * not shipped yet, `shown` is empty and every card fell back to
-       * impressions, so a channel measured in reach or views drew a flat zero
-       * line and a trend of nothing. The declared answer wins where there is
-       * one; otherwise go by what the rows actually carry.
+       * The last clause matters: with no platform snapshot shipped, `shown` is
+       * empty and every channel fell back to impressions, so one measured in
+       * reach or views drew a flat zero line and a trend of nothing.
        */
       const declared = (k) => shown[k] && shown[k] !== 'no';
       const seenKey = declared('reach') ? 'reach'
         : declared('views') ? 'views'
         : declared('impressions') ? 'impressions'
         : p.reach ? 'reach' : p.views ? 'views' : 'impressions';
+      const actions = p.likes + p.comments + p.shares + p.saves;
+      const seen = p[seenKey] || 0;
       const mine = (rows) => totals(rows.filter((r) => r.platform === p.platform));
-      const rNow = mine(recentRows);
-      const rBefore = mine(priorRows);
-      const blocked = fairFor(p.platform);
-      const series = allDays.map((d) => ({
-        label: d,
-        value: (daily.find((r) => r.date === d && r.platform === p.platform) || {})[seenKey] || 0,
-      }));
+      return {
+        platform: p.platform,
+        posts: p.posts,
+        actions,
+        perPost: p.posts ? actions / p.posts : 0,
+        seen,
+        seenKey,
+        rate: seen ? (actions / seen) * 100 : null,
+        tracked: trackedFor[p.platform] || 0,
+        blocked: fairFor(p.platform),
+        now: mine(recentRows),
+        before: mine(priorRows),
+        series: allDays.map((d) => ({
+          label: d,
+          value: (daily.find((r) => r.date === d && r.platform === p.platform) || {})[seenKey] || 0,
+        })),
+      };
+    });
 
-      const rows = [
-        ['posts', p.posts, 'yes'],
-        ['reach', p.reach, shown.reach],
-        ['impressions', p.impressions, shown.impressions],
-        ['views', p.views, shown.views],
-        ['likes', p.likes, shown.likes],
-        ['comments', p.comments, shown.comments],
-        ['shares', p.shares, shown.shares],
-        ['saves', p.saves, shown.saves],
-      ].filter(([, , avail]) => avail && avail !== 'no');
-      const r = RATE(p);
-      return `<section class="card"><header>
-          <h2>${esc(p.platform)}</h2>
-          ${r == null ? '' : `<span class="pill ${r >= 5 ? 'p-ok' : r >= 2 ? 'p-warn' : 'p-plain'}">${r.toFixed(1)}% engaged</span>`}
-        </header><div class="card-body">
-          ${spark(series, `${p.platform} ${seenKey} by day`)}
-          <div class="trend">${esc(seenKey)} this week ${pill(change(rNow[seenKey], rBefore[seenKey], blocked))}</div>
-          <dl class="kv">${rows.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(num(v))}</dd></div>`).join('')}</dl>
-          <p class="note">${esc(unreported(shown))}</p>
-        </div></section>`;
-    }).join('');
+  /* An inline bar, drawn against the biggest value in its own column. */
+  const meter = (value, max, tone = 'accent') => `<div class="meter">
+      <i class="m-${tone}" style="width:${max > 0 ? Math.max((value / max) * 100, value > 0 ? 3 : 0) : 0}%"></i>
+    </div>`;
+
+  const maxPerPost = Math.max(...channelStats.map((c) => c.perPost), 0);
+  const maxTracked = Math.max(...channelStats.map((c) => c.tracked), 0);
+
+  const channelTable = channelStats.length ? `<div class="wrap"><table class="chan">
+    <thead><tr>
+      <th>channel</th>
+      <th class="num">posts</th>
+      <th class="num">actions</th>
+      <th class="cmp">per post</th>
+      <th class="cmp">clicks (our links)</th>
+      <th class="num">seen</th>
+      <th class="num">rate</th>
+      <th class="num">week</th>
+    </tr></thead>
+    <tbody>${channelStats.map((c) => `<tr>
+      <td class="nowrap"><b>${esc(c.platform)}</b></td>
+      <td class="num">${c.posts}</td>
+      <td class="num">${esc(num(c.actions))}</td>
+      <td class="bar">${meter(c.perPost, maxPerPost)}<span>${c.perPost.toFixed(1)}</span></td>
+      <td class="bar">${meter(c.tracked, maxTracked, 'ok')}<span>${c.tracked}</span></td>
+      <td class="num">${esc(num(c.seen))}
+        <div class="faint den">${esc(SEEN_NOUN[c.seenKey] || c.seenKey)}</div></td>
+      <td class="num">${c.rate == null ? '—' : `${c.rate.toFixed(1)}%`}
+        <div class="faint den">of ${esc(c.seenKey)}</div></td>
+      <td class="num">${pill(change(c.now[c.seenKey], c.before[c.seenKey], c.blocked))}</td>
+    </tr>`).join('')}</tbody></table></div>
+  <p class="note"><b>The two shaded columns are the only ones that compare across channels.</b>
+    A post is a post everywhere, and a click is one hit on our own short link with preview crawlers
+    filtered out — both measured identically on all seven.</p>
+  <p class="note"><b>Seen and rate cannot be ranked against each other, and each names its own
+    denominator for that reason.</b> Reach counts unique accounts, impressions count every time
+    something was on a screen, and a play is neither — so the same post reads as a win on one scale
+    and a dud on another. Two of these changed meaning this year: YouTube began counting a view the
+    moment playback starts on <b>24 August 2026</b>, where long-form used to need real watch time,
+    and TikTok counts one on autoplay. On Instagram and Threads views and impressions are literally
+    the same number here — 990 against 990, and 53 against 53.</p>`
+    : '<p class="empty">No metrics shipped yet.</p>';
 
   // ---- followers: per account, because a connection is not growth ---------
   const fDays = [...new Set(followerHistory.map((r) => r.day))].sort();
@@ -397,7 +491,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
     <td class="num">${esc(fmt(now))}</td>
     <td class="num faint">${esc(fmt(before))}</td>
     <td class="num">${pill(change(now, before, blocked))}</td></tr>`;
-  const pct1 = (v) => (v == null ? '—' : `${v.toFixed(1)}%`);
 
   const wow = `<div class="wrap"><table>
     <thead><tr><th></th>
@@ -410,7 +503,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       ${wowRow('likes, comments, shares, saves',
         recent.likes + recent.comments + recent.shares + recent.saves,
         prior.likes + prior.comments + prior.shares + prior.saves)}
-      ${wowRow('engagement rate', rateNow, rateBefore, pct1)}
+      ${wowRow('actions per post', perPostNow, perPostBefore, (v) => v.toFixed(1))}
       ${wowRow('link clicks (people)', clicksNow, clicksBefore, (v) => String(v))}
       ${wowRow('days we posted', cadenceNow, cadenceBefore, (v) => `${v}/7`)}
     </tbody></table></div>
@@ -428,9 +521,9 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   ${trendTile(num(tot.reach || tot.impressions || 0), 'people reached', 'plain', 'did anyone see it',
     change(recent.reach || recent.impressions, prior.reach || prior.impressions))}
   ${trendTile(num(tot.views || 0), 'video views', 'plain', '', change(recent.views, prior.views))}
-  ${trendTile(rate == null ? '—' : `${rate.toFixed(1)}%`, 'engagement rate',
-    rate == null ? 'plain' : rate >= 5 ? 'ok' : rate >= 2 ? 'warn' : 'bad', 'did anyone care',
-    change(rateNow, rateBefore))}
+  ${trendTile(perPostAll.toFixed(1), 'actions per post',
+    perPostAll >= 4 ? 'ok' : perPostAll >= 2 ? 'warn' : 'bad', 'did anyone care',
+    change(perPostNow, perPostBefore))}
   ${trendTile(human, 'link clicks', human ? 'ok' : 'plain',
     crawler || unknown ? `${crawler + unknown} not counted` : 'people, not crawlers',
     change(clicksNow, clicksBefore))}
@@ -457,8 +550,7 @@ ${card('Link clicks by day', clickSeries.some((d) => d.value)
         <span>${esc(allDays[allDays.length - 1] || '')}</span></div>`
   : '<p class="empty">No clicks from a person yet, so there is no shape to draw.</p>')}
 
-<h2 class="sec">By channel</h2>
-<div class="chgrid">${channels || '<div class="card"><div class="card-body empty">No metrics shipped yet.</div></div>'}</div>
+${card('Channels, side by side', channelTable)}
 
 <div class="two">
   ${card('Clicks by channel', clickRows)}
@@ -472,8 +564,16 @@ ${card('Link clicks by day', clickSeries.some((d) => d.value)
 
 <style>
 .sec { font-size:.82rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:1.6rem 0 .8rem; }
-.chgrid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1.1rem; }
-.chgrid .card { margin:0; }
+table.chan td { vertical-align:middle; }
+table.chan th.cmp, table.chan td.bar { background:var(--accent-soft); }
+th.cmp { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); }
+td.bar { min-width:9rem; }
+td.bar span { font-variant-numeric:tabular-nums; font-weight:650; font-size:.85rem; }
+.meter { display:inline-block; width:5.5rem; height:.5rem; background:var(--line); border-radius:99px;
+  overflow:hidden; margin-right:.5rem; vertical-align:middle; }
+.meter i { display:block; height:100%; background:var(--accent); }
+.meter i.m-ok { background:var(--ok); }
+.den { font-size:.68rem; font-weight:400; line-height:1.2; }
 .two { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1.1rem; margin-top:1.1rem; }
 .two .card { margin:0; }
 .bars { width:100%; height:74px; display:block; }

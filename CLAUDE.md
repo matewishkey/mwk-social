@@ -735,6 +735,37 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `markers[]` lists every substring that counts and `voice.carriesCta()` matches any; tests pin
   both the old and the new. Minting is **idempotent** (a re-run must render the identical comment)
   and **never fatal** (no dashboard → plain URL → the comment still goes out).
+- **THE CHANNELS ARE ONE TABLE NOW, AND MOST OF THE NUMBERS ON IT CANNOT BE COMPARED — WHICH IS
+  THE POINT OF THE TABLE** (2026-08-25, his ask: *"one view for the channels: clicks, reach, and
+  engagement level... i do not know if the clicks and the engagement levels are similar, research
+  the topic"*). Seven per-channel cards became one row each. What the research changed:
+  - **"Seen" is three different measurements.** Meta's own developer docs: impressions = *"total
+    number of times the media object has been seen"*, reach = *"total number of unique accounts
+    that have seen"* it. Ours report reach (facebook, instagram, linkedin), views (youtube,
+    tiktok) or impressions (twitter). Different scales, so a percentage built on them cannot be
+    ranked across channels. Every row names its own denominator inline — which is what the
+    engagement-rate literature recommends for exactly this reason.
+  - **A VIEW IS NOT A VIEW, AND YOUTUBE'S CHANGED UNIT ON 24 AUGUST 2026.** YouTube's own Help
+    Centre: from that date a view counts *the moment playback begins*, on every format — long-form
+    previously needed real watch time (Shorts had already moved in March 2025). **So YouTube view
+    counts either side of 24 Aug are not the same unit, and any trend crossing it is comparing two
+    things.** TikTok counts one on autoplay. Checked our own data for a step change on the date and
+    there is none visible yet — the volume is too low to see it.
+  - **On Instagram and Threads, `views` and `impressions` are literally the same number** — measured,
+    not assumed: 990 against 990 and 53 against 53 across the whole window. Two names, one reading.
+  - **THE SITE-WIDE ENGAGEMENT RATE WAS OVERSTATING US BY HALF AND IS GONE.** It summed
+    `reach || impressions || views` for a denominator, and only three of seven channels report
+    reach — so the numerator counted actions from **seven** channels and the denominator covered
+    **three**. 348 actions over 6,356 reach read as **5.5%**; the same-set figure is **3.8%**, and
+    even that mixes unique-accounts with plays. Replaced by **actions per post**, which divides two
+    numbers meaning the same thing everywhere. It immediately said something the old one hid:
+    **per-post engagement is DOWN 34% week on week** (2.4 against 3.6) while reach is up 144% —
+    we posted far more and each post earned less. The old rate called that "about the same".
+  - **Comparable across channels: posts, actions, actions per post, and our own tracked clicks.**
+    A post is a post everywhere and a click is one redirect hit with crawlers filtered, measured
+    identically on all seven. Those two columns are shaded on the page and a test pins the label.
+    **Not comparable: seen, and the rate built on it** — kept, because they are what we have, but
+    never ranked.
 - **THE STATS PAGE HAS TRENDS NOW, AND EVERY WAY A TREND CAN LIE HERE LIES IN THE FLATTERING
   DIRECTION** (2026-08-25, his ask: "not only show the current values"). Last seven COMPLETE days
   against the seven before. The three guards, each with a positive control in the suite — break it
