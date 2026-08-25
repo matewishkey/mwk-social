@@ -31,6 +31,17 @@ const STATE = {
  */
 export function boilerplateOnly(p) {
   if (p.kind === 'swap') return true;
+  /*
+   * 'append' keeps every word of his and puts the show blurb underneath — the
+   * video had no route to the sign-up page because YouTube never captioned it,
+   * so there was no summary to write. Nothing of his is replaced, which is the
+   * question this function asks, so it belongs with 'swap'.
+   *
+   * The diff fallback would say the opposite: an append adds lines, and
+   * tailOnly() counts any added line as a rewrite. That is the right default
+   * for an unlabelled row and the wrong answer for this one.
+   */
+  if (p.kind === 'append') return true;
   if (p.kind === 'rebuild') return false;
   return tailOnly(p);
 }

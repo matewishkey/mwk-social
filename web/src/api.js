@@ -355,6 +355,19 @@ async function fileAction(body, env) {
  * would publish exactly what was just fixed. A REJECTED row is left alone: he
  * said no, and asking again is not what "no" means.
  */
+/*
+ * The kinds of proposal the box may file. An allow-list, because `kind` drives
+ * the dashboard's bulk approve and an unrecognised value must never be trusted
+ * into that path — but it is a NAMED one now, in one place.
+ *
+ * It was inline, spelling out two kinds, and it silently rewrote anything else
+ * to null: 'append' was added to yt-description.js and landed as NULL on both
+ * proposals, so the label the box had worked out was thrown away at the door
+ * and the dashboard fell back to guessing from the diff. Adding a kind is two
+ * files; the failure was that the second one gave no sign it had dropped it.
+ */
+const PROPOSAL_KINDS = ['swap', 'rebuild', 'append'];
+
 async function propose(body, env) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) return json({ ok: true, filed: 0 });
@@ -370,7 +383,7 @@ async function propose(body, env) {
         OR (yt_proposal.state IN ('approved', 'applied')
             AND yt_proposal.proposed <> excluded.proposed)`,
   ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now,
-    i.kind === 'swap' || i.kind === 'rebuild' ? i.kind : null)));
+    PROPOSAL_KINDS.includes(i.kind) ? i.kind : null)));
   // What actually landed, not what was sent — "filed: 22" when nineteen were
   // dropped is the kind of number somebody believes.
   const filed = res.reduce((n, r) => n + ((r.meta && r.meta.changes) || 0), 0);

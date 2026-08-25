@@ -69,6 +69,39 @@ const yt = (args) => execFileSync('yt-dlp', args, { encoding: 'utf8', stdio: ['i
 const currentDescription = (id) => yt(['-q', '--no-warnings', '--print', '%(description)s', '--', `https://www.youtube.com/watch?v=${id}`]);
 const currentTitle = (id) => yt(['-q', '--no-warnings', '--print', '%(title)s', '--', `https://www.youtube.com/watch?v=${id}`]);
 
+/*
+ * How long to wait for YouTube's auto-captions before writing a description
+ * without them. Same name and same default as the first-comment watcher, which
+ * had this and this file did not.
+ *
+ * The gap that made it necessary: build() needs a transcript for the opening
+ * paragraph, so a video YouTube never captions threw on every single run — for
+ * ever, once a day, with nobody told. Three videos were in that state on
+ * 2026-08-25, two of them for four and six days: a 19-second Short and a
+ * 35-minute stream, both carrying his own words and NO route to the sign-up
+ * page, because the one thing standing between them and a show blurb was a
+ * summary they did not need.
+ *
+ * Waiting first is still right — a long stream takes hours to caption, and a
+ * description written from a transcript is better than one without. What was
+ * missing is what happens when the wait does not end.
+ */
+const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
+
+/** How old this video is, in hours, or null if YouTube will not say. */
+function ageHours(id) {
+  try {
+    const raw = yt(['-q', '--no-warnings', '--print', '%(timestamp)s',
+      '--', `https://www.youtube.com/watch?v=${id}`]).split('\n')[0].trim();
+    const ts = Number(raw);
+    // yt-dlp prints the literal string "NA" when a field is absent, and
+    // Number('NA') is NaN — which would compare false against the grace and
+    // silently take the impatient branch on every video that lacks a timestamp.
+    if (!Number.isFinite(ts) || ts <= 0) return null;
+    return (Date.now() - ts * 1000) / 3600_000;
+  } catch { return null; }
+}
+
 function backup(id, description, title) {
   fs.mkdirSync(BACKUP, { recursive: true });
   const f = path.join(BACKUP, `${id}.txt`);
@@ -270,15 +303,67 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
 
         // Not recognisably ours, or changed underneath us. Draft, file, touch nothing.
         if (alreadyWritten.get(id) === existing.trim()) continue;
-        const { title, description } = await build(id);
-        if (description.trim() === existing.trim()) continue;
-        proposals.push({ videoId: id, title, currentText: existing, proposed: description,
-          kind: 'rebuild' });
+
+        let built;
+        try {
+          built = await build(id);
+        } catch (err) {
+          /*
+           * Only ONE failure is recoverable here, and it is named rather than
+           * caught wholesale: a missing transcript. A model error, a failed
+           * mint or a broken yt-dlp must still surface — swallowing those would
+           * turn every real fault into a silently degraded description.
+           */
+          if (!/no transcript available/.test(err.message)) throw err;
+
+          const hours = ageHours(id);
+          if (hours == null || hours < CAPTION_GRACE_HOURS) {
+            console.log(`defer ${id} — no captions yet${hours == null ? '' : ` (${Math.round(hours)}h old)`}, retrying`);
+            continue;
+          }
+          /*
+           * Past the grace, so stop waiting for a summary that is not coming and
+           * give the video the one thing it is actually missing: a way to reach
+           * the show. His own words are kept whole and the tail goes underneath
+           * — no topic tags, because those come from the transcript too, and
+           * "fewer good tags beat more weak ones" applies hardest when the
+           * alternative is inventing them.
+           *
+           * A PROPOSAL, not a write. Adding to words someone chose is not a
+           * thing to do quietly, however small the addition.
+           */
+          proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
+            proposed: `${existing.trim()}\n\n${tail}`, kind: 'append' });
+          console.log(`append ${id} — no captions after ${Math.round(hours)}h; proposing the show blurb alone`);
+          continue;
+        }
+
+        if (built.description.trim() === existing.trim()) continue;
+        proposals.push({ videoId: id, title: built.title, currentText: existing,
+          proposed: built.description, kind: 'rebuild' });
         continue;
       }
 
       if (!blurbChosen()) { console.log(`hold  ${id} — empty, but the show blurb is still PENDING`); continue; }
-      const { title, description } = await build(id);
+
+      let empty;
+      try {
+        empty = await build(id);
+      } catch (err) {
+        // The same wait, for a video with nothing there at all. An empty
+        // description is worse than a boilerplate one, so once the grace is up
+        // the tail goes in on its own — and this path stays an auto-write
+        // because there are still no words of his to touch.
+        if (!/no transcript available/.test(err.message)) throw err;
+        const hours = ageHours(id);
+        if (hours == null || hours < CAPTION_GRACE_HOURS) {
+          console.log(`defer ${id} — empty and not captioned yet${hours == null ? '' : ` (${Math.round(hours)}h old)`}`);
+          continue;
+        }
+        empty = { title: currentTitle(id), description: await tailFor(id) };
+        console.log(`note  ${id} — no captions after ${Math.round(hours)}h; filling with the show blurb alone`);
+      }
+      const { title, description } = empty;
       if (dryRun) { console.log(`DRY   ${id} — empty, would fill it in`); continue; }
       backup(id, existing, title);
       await setDescription(id, description);
