@@ -10,6 +10,7 @@
  *   scripts/yt-description.js <videoId>...            # print, change nothing
  *   scripts/yt-description.js --apply <videoId>...
  *   scripts/yt-description.js --empty-only --apply    # only videos with no description
+ *   scripts/yt-description.js --repropose <id…>      # force a fresh opening, filed for approval
  *   scripts/yt-description.js --restore <videoId>     # put the backed-up one back
  *   scripts/yt-description.js --sync                  # the dashboard loop, below
  *
@@ -113,11 +114,14 @@ async function summarise(transcript, title) {
   const prompt = `Write the opening of a YouTube description for this video: 2-3 plain sentences saying what actually happens in it.
 
 Voice rules, these matter more than anything:
+- FIRST PERSON, always. "I set up", "we looked at". NEVER "the host", "Host Mate", "Mate does" or any other third-person narration — this is me writing about my own show, not a press release about somebody else.
+- Name the guest and say what THEY wanted: "Peter wanted a script that collects the odds". Never "a beginner", "his friend" or "the guest" as a label. No name in the transcript? Then say what they were working on and leave the person out.
 - Write like telling a friend what the video is. No marketing, no hooks, no hype, no "dive in", no exclamation marks.
-- Never open with "In this video", "In this short", "Join me" or any other throat-clearing. Start with the thing itself.
-- Say plainly what happened and what was worked on or discussed.
-- The host teaches rather than doing it for the guest — never claim the host built it for them.
+- Never open with "In this video", "In this short", "This walkthrough covers", "Join me" or any other throat-clearing. Start with the thing itself.
+- Say plainly what happened. Concrete beats general: the actual tool, the actual bug, the actual thing that got fixed.
+- I guide, I do not build it for them — never claim I built the guest's thing for them.
 - Do not invent names, companies or facts that are not in the transcript.
+- THE TRANSCRIPT WINS OVER THE TITLE. A stream title is often left over from another session, so if the title names someone the transcript never mentions, write what the transcript actually contains and do not use that name at all.
 - No hashtags, no links, no sign-off. Those get added separately.
 
 TITLE: ${title}
@@ -394,6 +398,47 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
   console.log(`${filled} filled, ${proposals.length} proposed, ${written.length} approved and written`);
 }
 
+/*
+ * Force a fresh opening for videos that already carry one, and FILE it rather
+ * than write it.
+ *
+ * sync() cannot do this, by design: once a description is recognisably ours it
+ * takes the swap path, which replaces the stale tail and leaves the words he
+ * approved alone. That is right for a tail change and wrong for a VOICE change
+ * — the opening is the part that was wrong on 2026-08-25, and no amount of
+ * running --sync could ever have reached it. Five of fourteen openings narrated
+ * his own show in the third person ("The host walks his sister through…")
+ * because the prompt's own rule said "the host", and one attributed his
+ * projects to a guest who is not in the video at all.
+ *
+ * Same disease as RULES_VERSION in topic-tags.js and the `alreadyWritten` skip
+ * this file already carries: a change to the RULES cannot reach what the old
+ * rules produced. This is the manual lever rather than a stored version,
+ * because a voice change is rare, deliberate, and something he should see the
+ * whole of before it lands.
+ *
+ * It proposes. It never writes — these are words he already said yes to, and
+ * replacing them is his call, on the dashboard, like everything else.
+ */
+async function repropose(ids) {
+  const call = dashboard();
+  const proposals = [];
+  for (const id of ids) {
+    try {
+      const existing = currentDescription(id);
+      const built = await build(id);
+      if (built.description.trim() === existing.trim()) { console.log(`same  ${id} — nothing changed`); continue; }
+      proposals.push({ videoId: id, title: built.title, currentText: existing,
+        proposed: built.description, kind: 'rebuild' });
+      console.log(`draft ${id} — ${built.title}`);
+    } catch (err) {
+      console.error(`FAIL  ${id} — ${err.message}`);
+    }
+  }
+  if (proposals.length) await call('/youtube/propose', { items: proposals });
+  console.log(`${proposals.length} re-proposed for approval`);
+}
+
 async function main() {
   const argv = process.argv.slice(2);
   const apply = argv.includes('--apply');
@@ -401,6 +446,10 @@ async function main() {
   const restore = argv.includes('--restore');
   if (argv.includes('--sync')) return sync({ dryRun: argv.includes('--dry-run') });
   let ids = argv.filter((a) => !a.startsWith('--'));
+  if (argv.includes('--repropose')) {
+    if (!ids.length) throw new Error('--repropose needs at least one video id');
+    return repropose(ids);
+  }
 
   if (restore) {
     for (const id of ids) {

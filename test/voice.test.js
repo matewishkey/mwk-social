@@ -648,3 +648,59 @@ test('a url counts as 23 on X, so a short code does not cost us a tag', async ()
   assert.ok(caption.length > 280 || /#\w/.test(caption),
     'either the raw string exceeds 280 (proving urls are discounted) or a tag survived');
 });
+
+/*
+ * THE SHOW NOTES NARRATED HIS OWN SHOW IN THE THIRD PERSON, AND THE PROMPT IS
+ * WHY (found 2026-08-25, by reading what was actually live rather than by a
+ * test). Five of the fourteen long-form openings said "The host walks his
+ * sister through…", "Host Mate helps his friend Peter…", "The host guides a
+ * beginner…" — press-release voice on a show whose brand page says first
+ * person. The cause was in the prompt's own rule list: "The host teaches rather
+ * than doing it for the guest" put the phrase in front of the model, and the
+ * model used it. Nothing asked for first person at all, so it came out
+ * whichever way the transcript leaned.
+ *
+ * A sixth was worse than voice: "Istvan walks through his plans for finishing a
+ * custom timer application for his Stream Deck" — those are HIS projects, and
+ * Istvan is not in that video. The stream title was left over from another
+ * session and the model trusted it over the transcript.
+ */
+test('the show-notes prompt asks for first person and never seeds "the host"', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');
+  const prompt = src.slice(src.indexOf('Voice rules'), src.indexOf('TITLE:'));
+  assert.ok(prompt, 'the voice rules block has to still be findable');
+
+  assert.match(prompt, /FIRST PERSON/, 'the rule that was missing has to be stated');
+  assert.match(prompt, /NEVER "the host"/,
+    'banning the phrase is the fix — the old rule handed the model "the host" to copy');
+  assert.match(prompt, /THE TRANSCRIPT WINS OVER THE TITLE/,
+    'a left-over stream title is what put a guest in a video he is not in');
+  assert.match(prompt, /This walkthrough covers/,
+    'the throat-clearing list has to name the one that actually got through');
+
+  /*
+   * The positive control for the ban: the old seeding rule must be gone.
+   * Restoring it ("The host teaches rather than doing it for the guest") fails
+   * this line, which is the whole point — the rule read as guidance and worked
+   * as an example.
+   */
+  assert.ok(!/- The host teaches/.test(prompt),
+    'the third-person seed must not come back as a rule');
+});
+
+/*
+ * --repropose exists because sync() cannot reach an opening it already wrote:
+ * a recognisably-ours description takes the swap path, which is right for a
+ * stale tail and useless for a wrong voice. It must never take the shortcut of
+ * writing directly — these are words he approved once.
+ */
+test('--repropose files a proposal and never writes a description itself', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');
+  const fn = src.slice(src.indexOf('async function repropose'), src.indexOf('async function main'));
+  assert.ok(fn, 'repropose() has to exist for a voice change to reach what is already written');
+  assert.match(fn, /\/youtube\/propose/, 'it files for approval');
+  assert.ok(!/setDescription|update-metadata/.test(fn),
+    'it must not write to YouTube — replacing words he approved is his call, on the dashboard');
+});
