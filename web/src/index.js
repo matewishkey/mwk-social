@@ -158,7 +158,8 @@ async function overview(request, env, tz, snapshots, email, url) {
 
 async function stats(env, tz, snapshots, email) {
   const from = new Date(Date.now() - STATS_DAYS * 86400_000).toISOString().slice(0, 10);
-  const [daily, followers, clicks, targets, split, links] = await Promise.all([
+  const [daily, followers, clicks, targets, split, links,
+    followerHistory, clicksByDay, platformSince, accountSince] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -180,6 +181,36 @@ async function stats(env, tz, snapshots, email) {
     env.DB.prepare(
       `SELECT bot, COUNT(*) n FROM click WHERE at >= ? GROUP BY bot`).bind(from).all(),
     env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
+
+    /*
+     * The three queries below exist only for the trends, and each one answers a
+     * question the snapshot queries above cannot.
+     *
+     * followerHistory is the SERIES, not the latest point: a follower count is
+     * a level, so the only way to say whether it moved is to hold two of them.
+     */
+    env.DB.prepare(
+      `SELECT day, account_id, platform, username, followers FROM follower_point
+        WHERE day >= ? ORDER BY day`).bind(from).all(),
+    // Clicks per day, so the scoreboard has a shape and not only a total.
+    env.DB.prepare(
+      `SELECT substr(at, 1, 10) day, COUNT(*) n FROM click
+        WHERE at >= ? AND bot = 0 GROUP BY day ORDER BY day`).bind(from).all(),
+    /*
+     * When each platform and each account was FIRST seen — over the whole table,
+     * not the rendered window, which is the point of a separate query.
+     *
+     * Without it every trend lies in the same direction. TikTok's first row is
+     * 17 Aug: compare its last seven days against the seven before and the
+     * denominator is one day of data, so a channel that did nothing new reads as
+     * several hundred percent up. Same shape on the follower side and worse —
+     * a third LinkedIn account was connected on 22 Aug carrying 5,040 followers,
+     * so a summed total jumps +5,043 overnight and calls an integration growth.
+     * A platform with no history behind the comparison window gets its start
+     * date shown instead of a percentage.
+     */
+    env.DB.prepare('SELECT platform, MIN(date) first FROM daily_metric GROUP BY platform').all(),
+    env.DB.prepare('SELECT account_id, MIN(day) first FROM follower_point GROUP BY account_id').all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -193,7 +224,10 @@ async function stats(env, tz, snapshots, email) {
 
   return statsPage({ email, tz, snapshots, days: STATS_DAYS,
     daily: daily.results || [], followers: followers.results || [], clicks: folded,
-    targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0 });
+    targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0,
+    followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
+    platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
+    accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])) });
 }
 
 // What is still waiting is never paged — it is short, and it is the half he
