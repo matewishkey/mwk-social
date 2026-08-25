@@ -158,7 +158,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   on every Instagram post for ever.
 - **`commentWatched()` is not `linkPlacement === 'comment'`.** Instagram's link lives in the bio and
   its CTA still lives in a comment saying so. What excludes a platform from the watcher is carrying
-  its CTA **inside the post** — X, in its thread reply.
+  its CTA **inside the post** — X, in its caption since 2026-08-24 and in a thread reply before that.
 - **`clip_id` was declared and never written — 0 of 55 links carried one** (found 2026-08-22 when
   mate asked whether the linking actually worked). The only route from a click back to a VIDEO was
   a `LIKE` on the `post_key` prefix: it resolved for 14 links and for none of the 25 minted outside
@@ -256,7 +256,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   `posts:list` carrying a `firstComment` — Mate Visky's published, Zsuzsanna's pending on its
   four-hour stagger. The same read confirms the rest of the table in one picture: facebook,
   linkedin and instagram carry a native comment, **threads carries none** (no such field — the
-  hourly watcher is what covers it) and **twitter carries none** (its CTA ships as a thread reply).
+  hourly watcher is what covers it) and **twitter carries none** (its CTA ships inside the post itself).
   `posts:list --limit 5` and reading `platforms[].platformSpecificData.firstComment` is the check.
 - **`--no-first-comment` used to hold for about an hour.** post.js correctly sent none, then the
   watcher read `posts:list`, found a published post with no CTA in its caption and none in its
@@ -353,6 +353,13 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **Tags go in the caption OR the comment, never both.** `voice.firstComment(..., { noTags: true })`
   suppresses them for a platform whose caption already carries them. On Instagram both would spend
   the 5-cap twice, since it counts caption and comments together.
+- **A STILL PICTURE IS A DIFFERENT SET OF RULES, and `imageOk` says who can take one at all** —
+  Facebook, Instagram, LinkedIn, Threads and X; **not YouTube** (nothing a picture can be posted
+  *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and we have never built
+  one, so it is "not built", not "impossible"). `probe()` sets `isImage` off ffprobe's container
+  name and `check()` branches on it: duration, audio and h264 mean nothing for a picture, and
+  `imageAspectRange` is not `aspectRange` — Instagram's video tops out at square while its images
+  run to 1.91:1. The whole procedure is in the **`mwk-image`** skill; this is the invariant.
 - **One video per post, on every platform** (Facebook's docs are explicit; images and videos cannot
   be mixed either). So a vertical and a landscape cut are two posts, never one. `landscapeOk` on the
   platform table routes them: instagram/threads/tiktok are vertical-only, the rest take the wide
@@ -425,11 +432,15 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   caption), so publish() sends one request for the comment group and one per platform that mints
   its own short code — they need different captions anyway, since X's tag cap is 1 against TikTok's
   none. His words stay first and untouched; link and tags are appended. X was in this group until
-  2026-08-21 and now takes its link in a thread reply instead — see below.
+  2026-08-21, took it in a thread reply until 2026-08-24, and carries it in the tweet again now — see below.
 - **`platforms.commentWatched(name)` is the ONE definition of "the hourly watcher covers this",
-  and it is two conditions, not one:** a comments API *and* `linkPlacement === 'comment'`. X has
-  a comments API now and is still not watched, because its CTA ships with the post as a thread
-  reply. post.js has printed "the watcher adds it" about a platform it cannot reach **twice** —
+  and it is two conditions:** a comments API, *and* a CTA that does not ship inside the post —
+  `commentsApi === true && !['caption', 'reply'].includes(linkPlacement)`. **NOT
+  `linkPlacement === 'comment'`**, which this entry claimed for a while and which contradicts the
+  other statement of the same rule further up: Instagram is `'profile'` and IS watched, because its
+  CTA is still a comment, one that names the bio instead of carrying a url. X has a comments API and
+  is still not watched, because its CTA ships with the post — in its caption since 2026-08-24, in a
+  thread reply before that. post.js has printed "the watcher adds it" about a platform it cannot reach **twice** —
   first keyed off `!linkInCaption`, then off `commentsApi` alone — so it is now derived from one
   function, and a test pins `first-comment.js`'s hand-written `ALL_PLATFORMS` to exactly that set.
   **Verified with a positive control both times:** adding `twitter` to that list fails the suite.
@@ -749,7 +760,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   following a designer is a designer, where a keyword search returns whoever typed the word.
   Followerwonk/Circleboom/Fedica do bio search free in a browser. **Not started, deliberately.**
 - **Keep the room in mind before spending anything more here**: 0 usable posts out of 168 measured,
-  Facebook has 91 followers to X's 8, and LinkedIn 7,190 across the two accounts.
+  Facebook has 91 followers to X's 8, and LinkedIn 7,192 across the two accounts.
 
 ## Skills
 

@@ -120,8 +120,9 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 - The pace releases it: six a day, ninety minutes apart, **no time-of-day window**.
 - The CTA lands as a first comment on Facebook, Instagram, LinkedIn, YouTube (natively at publish)
   and Threads (the hourly watcher).
-- **X takes the link in a THREAD REPLY** — `platformSpecificData.threadItems`, published with the
-  post. Its root tweet stays clean because X buries whichever tweet holds an external link.
+- **X takes the link IN THE TWEET** (changed 2026-08-24). It rode in a thread reply for three days;
+  an out-of-network reply never reaches the For You feed, so that CTA only reached existing
+  followers, and the demotion it was dodging is not in X's open-sourced ranker. One tweet is 20c.
 - **Instagram and TikTok get NO LINK AT ALL** — a url is plain text on both, in a caption and in a
   comment alike. Their CTA says "link in my bio" and mints nothing. The bio link is the tracked one.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the

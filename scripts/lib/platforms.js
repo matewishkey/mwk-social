@@ -92,12 +92,6 @@ const PLATFORMS = {
     captionMax: 280,               // Premium raises this, but 280 keeps it portable
     hashtagsInCaption: 1,
     linkClickable: { caption: true, comment: true, profile: true },
-    // X deprioritises a post carrying an external link to keep people on
-    // platform, and Premium REDUCES that rather than removing it. Every X post
-    // this pipeline made before 2026-08-21 put the link in the caption and was
-    // therefore in the penalised class. threadItems publishes the root tweet
-    // and its replies in one call, so his words go out clean and the link
-    // lands underneath, where the penalty costs nothing.
     /*
      * The link goes in the TWEET, not in a thread reply (changed 2026-08-24,
      * mate's call, after reading xai-org/x-algorithm rather than the reporting).
@@ -287,7 +281,8 @@ const commentWatched = (name) => {
     // Not `linkPlacement === 'comment'`: Instagram's CTA is still a comment, it
     // just names the bio instead of carrying a url, because no url on Instagram
     // is clickable. What excludes a platform is carrying its CTA in the POST —
-    // TikTok used to, in its caption; X still does, in its thread reply.
+    // X does, in its caption since 2026-08-24; TikTok did, before it moved to
+    // the profile. 'reply' stays in the list because reversing X is one word.
     return p.commentsApi === true && !['caption', 'reply'].includes(p.linkPlacement);
   } catch { return false; }
 };

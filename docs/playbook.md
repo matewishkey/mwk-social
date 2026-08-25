@@ -25,8 +25,7 @@ Two ways the call-to-action gets under a post:
 |---|---|---|
 | **At publish time** | `platformSpecificData.firstComment`, posted by Zernio seconds after the post | Facebook, Instagram, LinkedIn, YouTube |
 | **Afterwards** | `scripts/first-comment.js`, hourly — Threads has no native field, and it also catches a native comment that silently failed | + Threads |
-| **In the caption** | no comment API exists, so the link rides in the post itself | TikTok |
-| **In a thread reply** | `platformSpecificData.threadItems`, published with the post — X has a comments API, but a watcher comment would be the same link twice under one tweet, and the root tweet has to stay clean | X |
+| **In the caption** | the link rides in the post itself — X has a comments API, but a comment would be the same link twice under one tweet, and an out-of-network REPLY never reaches the For You feed at all | X |
 | **Nowhere — the bio instead** | a url is dead text in a caption AND a comment on both, so the CTA names the bio and mints no code | Instagram, TikTok |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
@@ -77,9 +76,10 @@ in the wrong place.
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
 | **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, then repost from personal — plainly, no commentary, which is the default. A thought on top is optional and always his |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
+| **A still picture** | — | — | Five take one: Facebook, Instagram, LinkedIn, Threads, X. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026 and this pipeline has never sent one. `imageOk` on the platform table decides it, and the image aspect range is not the video one |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
-| **TikTok** | **none at all** | **no** | Link goes in the caption. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
-| **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. Link still goes in a **thread reply**, never the root tweet (`platformSpecificData.threadItems`): X deprioritises whichever tweet holds an external link and Premium only softens that, and a watcher comment would be the same link twice |
+| **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there anyway — the CTA names the bio. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
+| **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
 
 ### The two that cost money or reach if you get them wrong
 
@@ -93,10 +93,16 @@ than adding to it.** Measured against real billing, not the price list: `content
 `content_create_with_url: 5` came to `xSpendCents: 103`, and 2 × 1.5 + 5 × 20 = 103 exactly.
 
 So the two shapes cost **20c for a single tweet carrying the link** and **21.5c for a clean root
-tweet plus a link reply**. We pay the 1.5c. X deprioritises a post with an external link to keep
-people on-platform — Premium reduces that, it does not remove it — and until 2026-08-21 every X
-post this pipeline made put the link in the caption, so every one of them was in the penalised
-class. The root tweet is the one that has to travel; the reply is where the link is free.
+tweet plus a link reply**. **We pay the 20c** — one tweet, since 2026-08-24.
+
+The thread was the shape from 21 to 24 August, on the understanding that X demotes a post carrying
+an external link. Two things closed that: the demotion is not in `xai-org/x-algorithm` (the only
+link terms are user features measuring dwell time on one), and the reply had a cost that was
+certain — `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate
+set, so the CTA was only ever surfaced to existing followers. It stayed readable to anyone who
+opened the root tweet, and to nobody else. **Reversing it is one word in the platform table**, and
+`threadWithLink()` is still there for that: the evidence is an absence in a code release, which is
+weaker than a presence.
 
 **`threadItems` replaces the top-level `content` for that platform.** The caption is published as
 `threadItems[0]` and the media has to ride there with it; a top-level `content` is kept for
@@ -229,7 +235,7 @@ correct, DST included.
    on one profile; Facebook, Instagram, LinkedIn-Ltd, Threads, X and YouTube on the other. A
    routine post crosses both, and no single queue can schedule it as one unit.
 3. **One of our posts is up to four Zernio posts.** `publish()` splits by the caption a platform
-   gets, and TikTok and X each carry their own tracked short code (X's in a thread reply). Four requests would take four
+   gets, and TikTok and X each carry their own tracked short code. Four requests would take four
    slots and land at four different times.
 4. **A queue schedules a post you have already built.** It does not probe the clip and drop
    platforms that would reject it, mint a short link per platform, derive topic tags from the

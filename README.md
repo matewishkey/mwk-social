@@ -35,8 +35,8 @@ at once, straight from a shell — these are the actual live posts:
 - `scripts/first-comment.js` — makes sure everything published has its comment.
   Facebook, Instagram, LinkedIn and YouTube get it natively at publish time;
   Threads has no such field, so this picks it up. TikTok has no usable comments
-  API at all; X has one, but its link ships with the post as a thread reply, so a
-  watcher comment would be the same link twice under one tweet. The wording rotates, and some comments quote a real guest
+  API at all; X has one, but its link ships in the tweet itself, so a watcher
+  comment would be the same link twice under one post. The wording rotates, and some comments quote a real guest
   wish from the show's feed.
 - `docs/playbook.md` — the rules this pipeline runs on, and what each platform
   will and won't allow.
@@ -167,11 +167,12 @@ which is exactly why the CTA has its own short domain.
 - **Hashtags go in the caption or the first comment, never both.** Facebook,
   YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and Threads
   keep the caption clean and spend them in the comment.
-- **X gets a thread, not a post.** X deprioritises whichever tweet holds an
-  external link, and Premium softens that rather than removing it — so the root
-  tweet carries his words, the clip and one hashtag, and a reply carries the
-  link. `platformSpecificData.threadItems` publishes both in one call, for 1.5c
-  more than a single tweet would have cost.
+- **X's link is in the tweet.** It rode in a thread reply from 21 to 24 August,
+  to keep an external link out of the tweet that has to travel. Two things ended
+  that: the demotion it was dodging is not in the open-sourced ranker, and an
+  out-of-network reply is dropped before the For You feed — so the CTA only ever
+  reached people already following us. One tweet is also 20c against the
+  thread's 21.5c, because the URL fee replaces the base charge.
 - **Instagram's 5-hashtag cap counts the caption and the comments together.** That
   is why its caption carries none — the comment spends all five, two always-on
   tags and three describing the clip. Tags in both places would spend the budget
@@ -179,6 +180,10 @@ which is exactly why the CTA has its own short domain.
 - **One video per post, on every platform.** So a vertical cut and a landscape cut
   are two separate posts: the reel goes to Instagram, TikTok and Threads, the wide
   one to Facebook, YouTube, LinkedIn and X.
+- **A still picture reaches five of the seven.** Facebook, Instagram, LinkedIn,
+  Threads and X take one; YouTube has nothing a picture can be posted *as*, and
+  TikTok's photo posts exist in its API but have never been built here. `imageOk`
+  decides it, and a picture is judged on image rules — not on audio and H.264.
 - **TikTok's settings go in `tiktokSettings` at the top level** of the request,
   not in `platformSpecificData` — which would look accepted and silently apply
   none of them, because that field stores and echoes any key you send it.
