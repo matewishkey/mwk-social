@@ -75,7 +75,8 @@ at once, straight from a shell — these are the actual live posts:
   the escaping is the part that matters and the part that is tested.
 - `.claude/skills/` — the procedures an agent working here follows: `mwk-status`
   for where everything stands, `mwk-post` for turning his words into a queued
-  post. They load when the work calls for them rather than every session.
+  post, and `mwk-image` for putting out a still rather than a clip. They load
+  when the work calls for them rather than every session.
 - `scripts/lib/shortlink.js` — mints the `mwkshow.com/<code>` link that every
   call to action carries, one code per platform and post, so a click says which
   channel and which clip earned it. Every link we post gets one, not just the
@@ -173,7 +174,10 @@ which is exactly why the CTA has its own short domain.
   out-of-network reply is dropped before the For You feed — so the CTA only ever
   reached people already following us. One tweet is also 20c against the
   thread's 21.5c, because the URL fee replaces the base charge.
-- **Instagram's 5-hashtag cap counts the caption and the comments together.** That
+- **Instagram caps hashtags at 5. We never spend that budget twice.** The cap is real;
+  "caption and comments count together" is NOT something Instagram states — it traces to
+  marketing blogs and was retracted on 2026-08-24. We kept the behaviour and dropped the
+  certainty, because never spending it twice is free if the stricter reading is wrong. That
   is why its caption carries none — the comment spends all five, two always-on
   tags and three describing the clip. Tags in both places would spend the budget
   twice for nothing.

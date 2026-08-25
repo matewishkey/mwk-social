@@ -41,7 +41,8 @@ in the wrong place.
   A cap tighter than the pair truncates it, so X's one tag is `#MWKShow`.
 - **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
   table decides: Facebook, YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and
-  Threads keep the caption clean, because Instagram's cap of 5 counts caption and comments together
+  Threads keep the caption clean, because we never spend Instagram's cap of 5 twice (a defensive
+  choice — the combined-counting claim is not Instagram's, see CLAUDE.md)
   and putting them in both would spend the budget twice.
   "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
   is just `#PIY`.
@@ -83,7 +84,10 @@ in the wrong place.
 
 ### The two that cost money or reach if you get them wrong
 
-**Instagram caps hashtags at 5, counting the caption and the comments together.** Enforced since
+**Instagram caps hashtags at 5, and we never spend that budget twice.** The cap is Instagram's;
+the "caption and comments count together" part is NOT, and was retracted on 2026-08-24 — it
+traces to marketing blogs. The behaviour stayed because it costs nothing if the stricter reading
+is wrong. Enforced since
 18 Dec 2025; over the cap and the post loses Explore, hashtag pages and Reels recommendations.
 So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
 always-on tags and three describing the clip.

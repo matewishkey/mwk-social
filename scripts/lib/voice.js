@@ -209,7 +209,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
 
   // noTags is for a platform whose CAPTION already carries them — repeating the
   // list under the post shows it twice, and on Instagram would spend the cap
-  // twice, since its 5 counts caption and comments together.
+  // twice. Defensive, not a stated Instagram rule — see CLAUDE.md, corrected 2026-08-24.
   const tags = noTags ? '' : tagLine(platform, topicTags);
   if (tags) text += `\n\n${tags}`;
 

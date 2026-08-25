@@ -17,7 +17,7 @@ const PLATFORMS = {
                shares:'rare', saves:'partial', clicks:'no', watchTime:'yes' },
     captionMax: 2200,
     foldAt: 125,
-    hashtagsInCaption: 0,          // the cap counts caption AND comments together
+    hashtagsInCaption: 0,          // never spend the 5-cap twice (defensive, not a stated rule)
     // NOTHING is clickable on Instagram — not the caption, not a comment, not a
     // Reel. The link-in-bio industry exists because of this. Caption links are
     // in a Meta Verified test as of 2026; a Reel has no link surface at all.

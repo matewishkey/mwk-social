@@ -292,7 +292,7 @@ async function main() {
             linkLive: live,
             // A caption that already carries the tags must not get them again
             // underneath. On Instagram both would spend the 5-cap twice, since
-            // it counts caption and comments together.
+            // we never spend its 5 twice (defensive; not a stated Instagram rule).
             noTags: platformTable.get(target.platform).hashtagsInCaption !== 0,
             avoidIndex: state.__lastVariant?.[target.platform] ?? -1,
           });

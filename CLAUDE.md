@@ -174,7 +174,8 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   field on that table to ship declared-but-never-read** — after `linkPlacement`, `landscapeOk` and
   `hashtagsInCaption`. Wire it or do not add it.
 - **HALF THE YOUTUBE DESCRIPTIONS CARRIED A LINK NOBODY COULD CLICK** (2026-08-24, found by an
-  audit he asked for, not by a test). **12 of the 24 videos on the channel are Shorts** — verified
+  audit he asked for, not by a test). **12 of the 24 videos on the channel were Shorts on
+  2026-08-24** — 14 of 28 as of 2026-08-25, and the half-and-half split has held — verified
   with a positive control, `/shorts/<id>` answers 200 for those twelve and 303s to `/watch` for the
   other twelve — and YouTube renders every url in a Short's description as plain text, deliberately.
   `yt-description.js` minted an `episode` code for all 24 regardless: `linkDeadFor()` governed the
@@ -352,7 +353,7 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
   add it: the config page renders them, which makes an unread field look implemented.
 - **Tags go in the caption OR the comment, never both.** `voice.firstComment(..., { noTags: true })`
   suppresses them for a platform whose caption already carries them. On Instagram both would spend
-  the 5-cap twice, since it counts caption and comments together.
+  the 5-cap twice — a defensive choice, not a rule Instagram states (see the correction above).
 - **A STILL PICTURE IS A DIFFERENT SET OF RULES, and `imageOk` says who can take one at all** —
   Facebook, Instagram, LinkedIn, Threads and X; **not YouTube** (nothing a picture can be posted
   *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and we have never built

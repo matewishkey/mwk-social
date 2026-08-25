@@ -301,7 +301,8 @@ const tagsInCaption = (platform) => {
  *     linkInReply — so its caption stays as clean as anyone else's
  *   - the hashtags, when the platform takes them in the body (FB, YT, LI and
  *     the two above). Instagram and Threads must NOT have them in the caption:
- *     Instagram's cap of 5 counts caption and comments together, so tags there
+ *     we never spend Instagram's cap of 5 twice — defensive, not a rule Instagram
+ *     states (retracted 2026-08-24, see CLAUDE.md) — so tags there
  *     would spend the budget twice over
  *   - his words, which never vary
  */
