@@ -663,6 +663,43 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **X's $0.20 URL fee, confirmed a third time**: `xSpendCents` went 23 → 43 across one post
   carrying a link.
 
+- **NO SECOND ADDRESS IN A YOUTUBE DESCRIPTION, AND NEVER ANOTHER PLATFORM** (mate's call,
+  2026-08-25: *"why we are promoting twitch on the youtube 'live' at all, they are already on
+  youtube, we should give them only the link to come to the show"*). The blurb ended with
+  `Live on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey` — half of it aimed
+  at the platform the reader is already on, the other half sending them to a competitor. **On a
+  Short it was worse than redundant**: it printed two urls directly beneath a CTA that had been
+  DENIED a url on the grounds that urls do not work there. He found that on the dashboard, not a
+  test. One address now, and it is the sign-up page. A test walks every tail shape and fails on a
+  second url or the word twitch.
+- **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwkshow.com/s5`** (his idea, same day: *"for shorts we
+  can create some unique super short links which is easy to type"*). The old behaviour named the
+  channel instead of minting, which was right about the mechanism — a url under a Short is plain
+  text, not a link — and wrong about the cost: it left the video with **no address at all**. Nobody
+  can click it either way, so the only route is a person reading it off their screen and typing it,
+  and `mwkshow.com/8x2kq` is not a thing anyone types. `mint({ codePrefix: 's' })` allocates `s1`,
+  `s2`, … in base 10 (base32 mixes confusable characters, and the point is being typed back).
+  **A low number on one of these is neither indifference nor unreachability — it is how many people
+  cared enough to type it**, which is worth measuring.
+  - **`codePrefix` NARROWS the attribute dedupe, it does not sit under it.** Every Short already
+    owned an `episode/description` code from before 2026-08-24, so a plain attribute match handed
+    all thirteen straight back and exactly ONE typeable code was ever allocated. The prefix means
+    "this placement needs a typeable code", and a five-character one does not answer that however
+    well it matches. The old code is untouched — never reused, never deleted, still resolving, same
+    `clip_id` — so only the PUBLISHED address changes and a report grouped by video still sums both.
+  - **A clip can now legitimately own two codes, so the lookup is `ORDER BY created_at`.**
+    `.first()` over an unordered pair lets the rendered description flip between them every sync and
+    re-propose itself for ever. **Verified by fingerprinting all 26 proposals across two runs.**
+- **A BLURB THAT ENDS WITH `{show}` BROKE `findBlurb()` IN TWO WAYS, AND BOTH WERE SILENT.** With
+  the Live line gone there is no constant text after the slot, and `indexOf('')` answers with the
+  slot's own start — so the match stopped immediately before the address and the swap would have
+  stranded the old url on the line. The slot now runs to the end of ITS LINE (a url has no
+  whitespace; the profile phrasings have spaces but never a newline). **Then the worse one:**
+  today's blurb and the one it retired share every word before the slot, so both match an old
+  description and the newer matches a strict PREFIX of the older. First-match-wins returned the
+  short one and left `Live on … twitch.tv/…` sitting underneath, orphaned — **the exact line the
+  change existed to delete, surviving the change.** LONGEST WINS. Both have a test and a positive
+  control.
 - **The YouTube description tail is written from `matewishkey.com/brand`**, which is the authority
   on how the show describes itself — not a paraphrase of it. Its rules are load-bearing and are
   recorded beside the text in `config/voice.json`: first person, the viewer as the subject, plain

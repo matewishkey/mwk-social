@@ -37,10 +37,13 @@ const voice = require('./voice');
  *   sign-up page, but ANY url we post can be tracked — a repo, an episode —
  *   and the far end keys on (target, platform, clip, post) so each gets its own
  *   code without colliding with the CTA's.
+ * @param {string} [opts.codePrefix] ask for a SHORT sequential code (s1, s2 ...)
+ *   rather than five random characters. For a place where the link cannot be
+ *   clicked and can only be typed — under a YouTube Short, chiefly.
  * @returns {Promise<string|null>} the short URL, or null to use the plain one.
  */
 async function mint({ platform = null, clipId = null, postKey = null, label = null,
-  campaign = null, medium = null, target: wanted = null } = {}) {
+  campaign = null, medium = null, target: wanted = null, codePrefix = null } = {}) {
   const cfg = voice.shortLink();
   if (!cfg.enabled) return null;
 
@@ -54,7 +57,7 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, platform, clipId, postKey, label, campaign, medium,
-        createdBy: 'pipeline' }),
+        codePrefix, createdBy: 'pipeline' }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;

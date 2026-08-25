@@ -453,6 +453,35 @@ test('a description carrying a retired blurb is still recognised as ours', () =>
   }
 });
 
+/*
+ * The 2026-08-25 blurb ends with its link slot, and the one it retired shares
+ * every word before that slot — they differ only by the trailing "Live on ..."
+ * line. So BOTH patterns match a description still carrying that line, and the
+ * newer one matches a strict PREFIX of the older.
+ *
+ * First-match-wins returned the shorter one, and the swap then replaced the
+ * prose and left the Live line sitting underneath, orphaned — the exact line
+ * the change exists to delete, surviving the change. Longest wins instead.
+ */
+test('swapping an old description swallows its Live line rather than orphaning it', () => {
+  const past = voice.config().youtubeDescription.showBlurbPast || [];
+  const retired = past.find((b) => /twitch/i.test(b));
+  assert.ok(retired, 'the blurb carrying the Live line must stay in showBlurbPast');
+
+  const old = retired.split('{show}').join('https://mwkshow.com/abcde');
+  const doc = `The video's own summary.\n\n${old}\n\n#MWKShow #PIY`;
+
+  const found = voice.findBlurb(doc);
+  assert.ok(/twitch/i.test(found),
+    'findBlurb stopped short of the Live line — the swap would leave it behind');
+
+  const swapped = doc.replace(found, voice.showBlurb('https://mwkshow.com/s3'));
+  assert.ok(!/twitch/i.test(swapped), 'Twitch survived the swap');
+  assert.ok(!/youtube\.com\/@/i.test(swapped), 'the channel line survived the swap');
+  assert.ok(swapped.startsWith("The video's own summary."), 'his words were disturbed');
+  assert.ok(swapped.endsWith('#MWKShow #PIY'), 'the tags were disturbed');
+});
+
 test('a retired blurb swaps out without touching the video\'s own words', () => {
   const past = voice.config().youtubeDescription.showBlurbPast || [];
   const link = 'https://mwkshow.com/abcde';

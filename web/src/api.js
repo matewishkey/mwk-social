@@ -251,9 +251,38 @@ export function normaliseCode(raw) {
   return c;
 }
 
+/*
+ * The next free code in a typeable sequence: s1, s2, s3 ...
+ *
+ * Five characters of base32 is fine for a link someone CLICKS. Under a YouTube
+ * Short nobody can click it — YouTube renders every url there as plain text —
+ * so the only way anyone follows it is by typing it off their own screen, and
+ * `mwkshow.com/8x2kq` is not a thing a person types. `mwkshow.com/s3` is.
+ * (Same reasoning that got him `mmm` for his personal share, one audience out.)
+ *
+ * Base 10, not base 32: the point is a string that survives being read off a
+ * phone and typed back, and base32 mixes characters that are easy to confuse.
+ *
+ * Recomputed on each attempt rather than incremented, so two mints racing for
+ * the same number resolve on the primary key and the loser simply takes the
+ * next one.
+ */
+async function nextInSequence(env, prefix) {
+  const rows = await env.DB.prepare(
+    "SELECT code FROM link WHERE code LIKE ?1 || '%'").bind(prefix).all();
+  const re = new RegExp(`^${prefix}(\\d+)$`);
+  let highest = 0;
+  for (const row of rows.results || []) {
+    const m = re.exec(row.code);
+    if (m) highest = Math.max(highest, Number(m[1]));
+  }
+  return highest + 1;
+}
+
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
+  codePrefix = null,
 }) {
   /*
    * A named code is its own identity and does NOT go through the attribute
@@ -278,19 +307,42 @@ export async function mint(env, {
     return { code, url: linkUrl(env, code), reused: false };
   }
 
-  // Campaign and medium are part of the KEY, not decoration. The same sign-up
-  // page linked from the bio and from a reply has to be two codes or the
-  // question "which one earned this" has no answer — which is exactly the state
-  // every link minted before 2026-08-22 was in.
-  const existing = await env.DB.prepare(
+  const seq = /^[a-z]{1,4}$/.test(String(codePrefix || '')) ? codePrefix : null;
+
+  /*
+   * Campaign and medium are part of the KEY, not decoration. The same sign-up
+   * page linked from the bio and from a reply has to be two codes or the
+   * question "which one earned this" has no answer — which is exactly the state
+   * every link minted before 2026-08-22 was in.
+   *
+   * A sequence prefix narrows the reuse rather than sitting under it. Every
+   * Short already HAD an episode/description code — minted before 2026-08-24,
+   * when Shorts still printed one — so a plain attribute match handed all of
+   * them straight back and exactly one typeable code was ever allocated. What
+   * the prefix says is "this placement needs a code somebody can type", and a
+   * five-character one does not answer that however well it matches.
+   *
+   * The old code is not touched. Codes are never reused or deleted, it still
+   * resolves, and it carries the same clip_id — so a report grouped by video
+   * still sums both, and only the PUBLISHED address changes.
+   *
+   * ORDER BY created_at, and the filter, are what keep this idempotent: a clip
+   * can now legitimately own two codes, and `.first()` over an unordered pair
+   * would let the rendered description flip between them on every sync and
+   * re-propose itself for ever.
+   */
+  const seqOnly = seq ? new RegExp(`^${seq}\\d+$`) : null;
+  const owned = await env.DB.prepare(
     `SELECT code FROM link
       WHERE target = ? AND platform IS ? AND clip_id IS ? AND post_key IS ?
-        AND campaign IS ? AND medium IS ?`,
-  ).bind(target, platform, clipId, postKey, campaign, medium).first();
+        AND campaign IS ? AND medium IS ?
+      ORDER BY created_at`,
+  ).bind(target, platform, clipId, postKey, campaign, medium).all();
+  const existing = (owned.results || []).find((r) => !seqOnly || seqOnly.test(r.code));
   if (existing) return { code: existing.code, url: linkUrl(env, existing.code), reused: true };
 
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = shortCode(5);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const code = seq ? `${seq}${await nextInSequence(env, seq)}` : shortCode(5);
     try {
       await env.DB.prepare(
         `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,

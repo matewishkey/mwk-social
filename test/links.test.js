@@ -215,29 +215,54 @@ test('the queue works out which platforms have a dead link for the clip', () => 
  * declared-but-not-read shape as the four platform fields before it, in the one
  * file the fix never reached.
  */
-test('the YouTube description asks whether the video is a Short before minting', () => {
+test('a Short is minted a typeable code, not five random characters', () => {
   const src = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');
   assert.match(src, /platforms\.linkDeadFor\('youtube'/,
-    'yt-description must decide with linkDeadFor, or a Short gets a code nobody can click');
+    'the Shorts rule still has to be decided by linkDeadFor, not guessed from the id');
   assert.match(src, /youtubeProbe\(/, 'the Shorts rule needs the video shape, not the platform alone');
-  // The dead branch must not reach the minter at all. Both positions are
-  // asserted present first: indexOf returns -1 for a line that is GONE, and
-  // -1 < anything is true, so the ordering check alone passed the revert.
+
+  /*
+   * A Short no longer skips the mint — it asks for a SHORT code. Nobody can
+   * click a url under a Short, so the only way anyone follows it is by typing
+   * it, and `mwkshow.com/8x2kq` is not a thing a person types.
+   */
   const tail = src.slice(src.indexOf('async function tailFor'), src.indexOf('async function build'));
-  const guard = tail.indexOf('isShort(id)');
-  const mint = tail.indexOf('shortlink.mint');
-  assert.ok(guard >= 0, 'tailFor no longer asks whether the video is a Short');
-  assert.ok(mint >= 0, 'tailFor no longer mints at all — has this moved?');
-  assert.ok(guard < mint, 'the Short check has to come BEFORE the mint, or the code is spent either way');
+  assert.ok(tail.includes('shortlink.mint'), 'tailFor no longer mints at all — has this moved?');
+  assert.match(tail, /codePrefix:\s*isShort\(id\)/,
+    'the Short check has to feed the code prefix, or a Short gets an untypeable code');
 });
 
-test('a Short gets the channel phrasing and no url at all', () => {
-  const dead = voice.showBlurb(null, { linkLive: false });
-  assert.ok(!/mwkshow\.com|matewishkey\.com\/show/.test(dead),
-    `a followable-looking link survived into a Short's description: ${dead}`);
-  assert.ok(dead.includes(voice.profileCta('youtube')));
-  assert.ok(voice.carriesCta(dead), 'the guard must still recognise it as ours');
+test("a Short's address is short enough to type off a screen", () => {
+  const short = voice.showBlurb('https://mwkshow.com/s3');
+  assert.ok(short.includes('mwkshow.com/s3'), 'the typeable code must survive into the tail');
+  assert.ok(voice.carriesCta(short), 'the guard must still recognise it as ours');
+  // The point of the sequence is length. Five characters of base32 was the
+  // thing being replaced, so a code that long is a regression.
+  const code = short.match(/mwkshow\.com\/(\S+)/)[1];
+  assert.ok(code.length <= 4, `a Short's code must stay typeable, got ${code}`);
+});
+
+/*
+ * Mate, 2026-08-25: "why we are promoting twitch on the youtube live at all,
+ * they are already on youtube". The blurb ended with
+ * "Live on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey"
+ * — half of it pointing at the platform the reader is already on, the other
+ * half sending them to a competitor. Worse, on a Short it printed two urls
+ * directly under a CTA that had been DENIED a url on the grounds that urls do
+ * not work there.
+ *
+ * One address in a description, and it is the one we want them to use.
+ */
+test('a YouTube description carries one address, and never another platform', () => {
+  for (const tail of [voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'),
+    voice.showBlurb('https://mwkshow.com/s3')]) {
+    assert.ok(!/twitch/i.test(tail), `the tail still sends YouTube viewers to Twitch: ${tail}`);
+    assert.ok(!/youtube\.com/i.test(tail),
+      'the tail points a YouTube viewer back at YouTube');
+    const urls = tail.match(/https?:\/\/\S+|\bmwkshow\.com\/\S+/g) || [];
+    assert.equal(urls.length, 1, `exactly one address, found ${urls.length}: ${urls.join(', ')}`);
+  }
 });
 
 test("the channel phrasing is YouTube's, not Instagram's", () => {
@@ -253,7 +278,7 @@ test("the channel phrasing is YouTube's, not Instagram's", () => {
  */
 test('every shape of the tail differs from the others on exactly one line', () => {
   const shapes = [voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'),
-    voice.showBlurb(null, { linkLive: false })];
+    voice.showBlurb('https://mwkshow.com/s3')];
   for (const a of shapes) {
     for (const b of shapes) {
       if (a === b) continue;
@@ -273,7 +298,7 @@ test('every shape of the tail differs from the others on exactly one line', () =
 test('our tail is recognised whatever went into its link slot', () => {
   const doc = (tail) => `something happened in this video.\n\n${tail}\n\n#MWKShow #PIY`;
   for (const tail of [voice.showBlurb(), voice.showBlurb('https://mwkshow.com/abcde'),
-    voice.showBlurb('https://mwkshow.com/zzzzz'), voice.showBlurb(null, { linkLive: false })]) {
+    voice.showBlurb('https://mwkshow.com/zzzzz'), voice.showBlurb('https://mwkshow.com/s3')]) {
     assert.equal(voice.findBlurb(doc(tail)), tail);
   }
 });
@@ -283,9 +308,9 @@ test('findBlurb says no to a description that is not ours', () => {
   assert.equal(voice.findBlurb(''), null);
 });
 
-test('swapping a Short off its dead code touches nothing else', () => {
+test('swapping a Short onto its typeable code touches nothing else', () => {
   const doc = `we looked at the invoice thing.\n\n${voice.showBlurb('https://mwkshow.com/abcde')}\n\n#MWKShow #PIY #Invoicing`;
-  const swapped = doc.replace(voice.findBlurb(doc), voice.showBlurb(null, { linkLive: false }));
+  const swapped = doc.replace(voice.findBlurb(doc), voice.showBlurb('https://mwkshow.com/s3'));
   const changed = doc.split('\n').filter((l, i) => l !== swapped.split('\n')[i]);
   assert.equal(changed.length, 1, `a swap changed ${changed.length} lines: ${changed.join(' / ')}`);
   assert.ok(swapped.startsWith('we looked at the invoice thing.'));

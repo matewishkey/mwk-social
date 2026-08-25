@@ -251,14 +251,22 @@ function tagLine(platform, topicTags = []) {
  * YouTube's own analytics will not tell us. With no argument it renders the
  * plain sign-up url, which is what every description carried before 2026-08-23.
  */
-const showBlurb = (link = null, { linkLive = true } = {}) => {
-  const raw = config().youtubeDescription.showBlurb;
-  // A Short's description renders every url as plain text, so a code printed
-  // there is one nobody can follow — twelve of the twenty-four videos on the
-  // channel were in exactly that state. Where the link is dead the slot names
-  // the channel instead, which is YouTube's own route out of a Short.
-  return raw.split('{show}').join(linkLive ? (link || config().links.show) : profileCta('youtube'));
-};
+/*
+ * The tail of a YouTube description, with its link slot filled in.
+ *
+ * There is no longer a "the link is dead here" branch. A Short's description
+ * does render every url as plain text, so the address cannot be CLICKED — but
+ * naming the channel instead left the video with no address at all, and mate
+ * found exactly that on the dashboard on 2026-08-25. A Short now gets a short,
+ * typeable code (mwkshow.com/s3) which a person can read off the screen and
+ * type; yt-description.js asks for the `s` sequence, and that is the only
+ * difference between a Short's tail and any other.
+ *
+ * `link` being null is the never-fatal path: a mint we could not make falls
+ * back to the plain address rather than costing the description.
+ */
+const showBlurb = (link = null) =>
+  config().youtubeDescription.showBlurb.split('{show}').join(link || config().links.show);
 
 /*
  * Find OUR blurb inside a description, whatever went into its {show} slot.
@@ -289,6 +297,7 @@ function findBlurb(text) {
    * link that went into the slot; this teaches it to see past the prose around
    * it, which is the same lesson one layer out.
    */
+  let best = null;
   for (const raw of [yd.showBlurb, ...(yd.showBlurbPast || [])]) {
     const at = raw.indexOf('{show}');
     if (at < 0) continue;
@@ -296,11 +305,41 @@ function findBlurb(text) {
     const after = raw.slice(at + '{show}'.length);
     const start = body.indexOf(before);
     if (start < 0) continue;
-    const end = body.indexOf(after, start + before.length);
-    if (end < 0) continue;
-    return body.slice(start, end + after.length);
+    const slotAt = start + before.length;
+
+    let found;
+    if (after) {
+      const end = body.indexOf(after, slotAt);
+      if (end < 0) continue;
+      found = body.slice(start, end + after.length);
+    } else {
+      /*
+       * The blurb ENDS with its link slot — true since the "Live on ..." line
+       * was dropped on 2026-08-25 — so there is no constant text after it to
+       * anchor on, and indexOf('') answers with the slot's own start. That
+       * returned a blurb cut off immediately before its address, and the swap
+       * would then have left the old url stranded on the line.
+       *
+       * The slot runs to the end of ITS LINE: a url has no whitespace in it,
+       * and the profile phrasings ("link in my bio") have spaces but never a
+       * newline.
+       */
+      const nl = body.indexOf('\n', slotAt);
+      found = body.slice(start, nl < 0 ? body.length : nl);
+    }
+    /*
+     * LONGEST WINS, rather than first match, and this is load-bearing.
+     *
+     * Today's blurb and the one retired on 2026-08-25 share every word before
+     * the slot — the only difference is the trailing "Live on ..." line. So on
+     * a description still carrying that line BOTH patterns match, and the newer
+     * (shorter) one matches a strict prefix of the older. Returning it would
+     * swap the prose and leave the Live line sitting underneath, orphaned:
+     * precisely the line the change exists to remove, surviving the change.
+     */
+    if (!best || found.length > best.length) best = found;
   }
-  return null;
+  return best;
 }
 
 module.exports = {
