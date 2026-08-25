@@ -309,8 +309,17 @@ IDs, billing details, and internal URLs; that state lives outside the repo.)
 - **A PERSONAL SHARE IS A NAME ON THE END OF ANY LINK — `mwkshow.com/<code>/<name>`** (his idea,
   2026-08-24: he is messaging friends the sign-up link and wants to know who opened it). One code
   serves everybody: the name is a word HE types as he sends it, stored on the CLICK as `tag`, so
-  there is nothing to mint per person. `6kc0k` is the code minted for this (`campaign = personal`,
-  `medium = message`).
+  there is nothing to mint per person. **His code is `mmm`** — `mwkshow.com/mmm/natalie`
+  (`campaign = personal`, `medium = message`). A generated `6kc0k` was minted for this first and
+  deleted the same hour: **a code he has to copy from somewhere is a code he will not use from a
+  phone**, which is the whole reason `mint()` takes a chosen one now. Codes are never reused, but
+  that one was twenty minutes old with no clicks and had never been sent.
+  - **A chosen code SKIPS the attribute dedupe.** That check answers "have I already got a code for
+    this exact combination", which is right for a generated one and wrong here — he asked for `mmm`,
+    so he gets `mmm` or he is told why not. A taken code pointing elsewhere is an error, never a
+    silent hand-over of somebody else's. `normaliseCode()`: lowercase, `[a-z0-9-]`, 2–24, no bare
+    number, no leading or trailing dash, and `favicon.ico`/`robots.txt`/`l` reserved. A test pins
+    the branch order.
   - **Nothing about the visitor is read to produce it** — still no IP, no user agent, no cookie.
     It is his own label, which is what keeps this the same shape of promise as the rest of the
     shortener.

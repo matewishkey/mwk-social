@@ -229,10 +229,55 @@ async function result(body, env) {
  * already has. Idempotent on purpose: the comment watcher re-composes a comment
  * on a re-run and must render the identical URL, or the dedupe guard breaks.
  */
+/*
+ * A code he chose himself, rather than five random characters.
+ *
+ * `mwkshow.com/mmm/natalie` is a link he can type into a message from memory;
+ * `mwkshow.com/6kc0k/natalie` is one he has to copy from somewhere. That is the
+ * whole difference and it decides whether the personal-share habit survives
+ * contact with a phone.
+ *
+ * Lowercase, [a-z0-9-], 2 to 24 characters. It cannot collide with a generated
+ * code by accident — those are always exactly 5 characters of Crockford base32
+ * — but a hand-picked one can still be 5, so the insert is what decides, never
+ * a length check. `favicon.ico` is reserved because the redirect special-cases
+ * it, and a bare number is refused because it reads as a mistake in a message.
+ */
+const RESERVED = new Set(['favicon.ico', 'robots.txt', 'l']);
+export function normaliseCode(raw) {
+  const c = String(raw || '').trim().toLowerCase().replace(/^\/+|\/+$/g, '');
+  if (!/^[a-z0-9-]{2,24}$/.test(c)) return null;
+  if (RESERVED.has(c) || /^-|-$/.test(c) || /^\d+$/.test(c)) return null;
+  return c;
+}
+
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
-  campaign = null, medium = null, createdBy = null, note = null,
+  campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
 }) {
+  /*
+   * A named code is its own identity and does NOT go through the attribute
+   * dedupe below. That check answers "have I already got a code for this exact
+   * combination" — the right question for a minted one, and the wrong one here:
+   * he asked for `mmm`, so `mmm` is what he gets or he is told why not.
+   */
+  if (wanted) {
+    const code = normaliseCode(wanted);
+    if (!code) throw new Error(`"${wanted}" will not do as a code — letters, numbers and dashes, 2 to 24 of them`);
+    const already = await env.DB.prepare('SELECT code, target FROM link WHERE code = ?').bind(code).first();
+    if (already) {
+      if (already.target === target) return { code, url: linkUrl(env, code), reused: true };
+      throw new Error(`${code} is already taken, and it points somewhere else`);
+    }
+    await env.DB.prepare(
+      `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,
+         campaign, medium, created_by, note)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(code, target, platform, clipId, postKey, label, new Date().toISOString(),
+      campaign, medium, createdBy, note).run();
+    return { code, url: linkUrl(env, code), reused: false };
+  }
+
   // Campaign and medium are part of the KEY, not decoration. The same sign-up
   // page linked from the bio and from a reply has to be two codes or the
   // question "which one earned this" has no answer — which is exactly the state

@@ -487,3 +487,39 @@ test('the redirect splits the code from the name instead of swallowing both', as
   assert.match(fn, /INSERT INTO click \(code, at, referer_host, bot, tag\)/,
     'the name is parsed and then not stored');
 });
+
+/*
+ * A code he chose, not five random characters.
+ *
+ * mwkshow.com/mmm/natalie is a link he can type into a message from memory;
+ * mwkshow.com/6kc0k/natalie is one he has to copy from somewhere, and that
+ * difference decides whether the habit survives contact with a phone.
+ */
+test('a chosen code is normalised, and nonsense is refused', async () => {
+  const { normaliseCode } = await import('../web/src/api.js');
+  assert.equal(normaliseCode('mmm'), 'mmm');
+  assert.equal(normaliseCode('MMM'), 'mmm', 'typed with caps in a message');
+  assert.equal(normaliseCode(' /mmm/ '), 'mmm', 'pasted with the slashes still on');
+  assert.equal(normaliseCode('my-talk'), 'my-talk');
+
+  assert.equal(normaliseCode('a'), null, 'one character is a typo, not a code');
+  assert.equal(normaliseCode('favicon.ico'), null, 'the redirect special-cases this one');
+  assert.equal(normaliseCode('123'), null, 'a bare number reads as a mistake in a message');
+  assert.equal(normaliseCode('-x'), null);
+  assert.equal(normaliseCode('x-'), null);
+  assert.equal(normaliseCode('Ödön'), null, 'a url path is not the place for an accent');
+  assert.equal(normaliseCode('a'.repeat(30)), null);
+});
+
+test('a chosen code skips the attribute dedupe, or he would not get the one he asked for', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'api.js'), 'utf8');
+  const fn = src.slice(src.indexOf('export async function mint(env,'));
+  const named = fn.indexOf('if (wanted)');
+  const dedupe = fn.indexOf('SELECT code FROM link\n      WHERE target = ?');
+  assert.ok(named > -1 && dedupe > -1, 'one of the two branches has moved — recheck this test');
+  assert.ok(named < dedupe,
+    'the attribute dedupe runs first, so asking for "mmm" would hand back an existing random code');
+  assert.match(fn, /is already taken, and it points somewhere else/,
+    'a taken code must say so rather than silently hand over somebody else\'s');
+});

@@ -81,6 +81,7 @@ export async function linksAction(request, env, email) {
     try {
       const r = await mint(env, {
         target,
+        code: val('code'),
         platform: val('platform'),
         medium: val('medium'),
         campaign: val('campaign'),
@@ -181,9 +182,9 @@ ${card('What the links are for', campaigns.length ? `<div class="wrap"><table>
 ${card('Sharing it with someone yourself', `
 <p class="ctx">Put their name on the end of any link and it counts separately. Nothing to mint,
   nothing to set up — type it as you send it.</p>
-<pre class="egs">https://${esc(host)}/&lt;code&gt;/<b>natalie</b>
-https://${esc(host)}/&lt;code&gt;/<b>tom</b>
-https://${esc(host)}/&lt;code&gt;/<b>book-club</b></pre>
+<pre class="egs">https://${esc(host)}/<b>mmm</b>/natalie
+https://${esc(host)}/<b>mmm</b>/tom
+https://${esc(host)}/<b>mmm</b>/book-club</pre>
 <p class="ctx">Accents and spaces are fine — <code>Ödön</code> becomes <code>odon</code>,
   <code>Book Club</code> becomes <code>book-club</code>. A name it cannot read is simply not
   recorded and the link still works.</p>
@@ -207,6 +208,8 @@ ${card('Mint one', `
   <datalist id="campaigns">${campaigns.map((c) => `<option>${esc(c.campaign)}</option>`).join('')}</datalist>
   <label>Where it lives <select name="platform">${opts(SOURCES, '-')}</select></label>
   <label>The spot <select name="medium">${opts(MEDIUMS, '-')}</select></label>
+  <label>Your own code <input name="code" placeholder="leave empty for a random one"
+    pattern="[A-Za-z0-9-]{2,24}" title="letters, numbers and dashes, 2 to 24"></label>
   <label class="wide">Note to self <input name="note" placeholder="X bio, from 22 Aug"></label>
   <div><button class="primary">Mint it</button></div>
 </form>`)}
