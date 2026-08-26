@@ -314,10 +314,11 @@ had already published were jargon the rule rejects.
 
 ## The platform table — wire it or do not add it
 
-**Seven fields have shipped declared-and-never-read**: `linkPlacement`, `landscapeOk`,
-`hashtagsInCaption`, `shortsAreDead`, `captionMax`, `verifiable`, `mediaUrlAvailable`. The config
-page renders every field, which makes an unread one look implemented. This is the single most
-repeated failure in this repo.
+**Five fields have shipped declared-and-never-read**: `linkPlacement`, `landscapeOk`,
+`hashtagsInCaption`, `shortsAreDead`, `captionMax` — all wired now. (`verifiable` and
+`mediaUrlAvailable` were on this list too and no longer exist at all; they went with the mirror.)
+The config page renders every field, which makes an unread one look implemented. This is the single
+most repeated failure in this repo.
 
 - **`hashtagsInCaption`** was decorative from the beginning, so LinkedIn, Facebook and YouTube
   posted with no hashtags at all until 2026-08-21.
@@ -336,10 +337,12 @@ repeated failure in this repo.
   a landscape cut are two posts, never one. `queue_item.media_wide_key` carries the second.
 - **A CAPTION IS COMPOSED PER PLATFORM, and `publish()` groups by the caption a platform gets** —
   not by any fixed split. His words never vary; the link and the hashtags do.
-- **`linkPlacement: 'caption'` is used by no platform today** (TikTok's CTA moved to the profile),
-  so `linkInCaption()` always returns false and its branch is unreachable. The code stays — it
-  handles a legitimate value of a config field, which is not the same as a field nothing reads —
-  but do not believe a claim that it runs.
+- **`linkPlacement: 'caption'` IS live, on X, and this line said the opposite for two days.** It
+  was true while TikTok's CTA sat in the caption and TikTok moved to the profile; then X's link
+  joined his words on 2026-08-24 (`platforms.js`, the `twitter` entry) and nobody came back here.
+  `linkInCaption()` runs on every X post — `post.js` composes the caption link and groups the
+  accounts by it. **Read the table, never this file, for which slot a platform uses**: the note is
+  a copy and the copy is what drifted.
 
 ## Publishing and the queue
 

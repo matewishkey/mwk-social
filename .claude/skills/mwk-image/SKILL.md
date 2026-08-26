@@ -17,8 +17,12 @@ For a **still**. A clip is `mwk-post`; everything there about his voice, the has
 | Facebook, Instagram, LinkedIn, Threads, X | **YouTube**, **TikTok** |
 
 **YouTube** has nothing a still can be posted *as*. **TikTok** photo posts need
-`contentType: photo` and have never been exercised here — false rather than optimistic, on
-purpose. Expect both to be skipped in the run output and say so before he asks.
+`contentType: photo` and are **declined, not merely unbuilt** (mate, 2026-08-26, closing #27) —
+do not propose building them. Expect both to be skipped in the run output and say so before he asks.
+
+**And the pipeline never CHOOSES a still.** Sending one where a clip would go was declined the same
+day. This skill is for a picture he hands over, or one the post is genuinely about — never for
+swapping a clip out.
 
 So a picture reaches five surfaces, not seven. If the point of the post needs TikTok or YouTube,
 it needs a clip.
@@ -70,7 +74,8 @@ scripts/with-secrets.sh scripts/queue-add.js \
 ```
 
 `--dry-run` first prints the SQL and uploads nothing. **Name the file something meaningful** —
-the R2 key is derived from it (`queue/<date>-<name>.png`), and `final.png` tells nobody anything
+the R2 key is derived from it (`queue/<day>-<slug>-<ulid><ext>` — the ULID is deliberate, two
+posts named the same must not overwrite each other), and `final.png` tells nobody anything
 in six months.
 
 **Draft the words and queue them; do not wait for his dictation** (mate, 2026-08-24: *"The

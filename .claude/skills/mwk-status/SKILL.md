@@ -46,8 +46,9 @@ Five units, all `Type=oneshot`. What each says when it is healthy:
 **One `mwk-yt-notes` failure is normal, not a fault:** a live event that has not aired
 (`This live event will begin in N days`). An uncaptioned video is no longer a FAIL at all — it
 logs `defer <id> — no captions yet`, and past `MWK_CAPTION_GRACE_HOURS` it files an `append`
-proposal rather than failing for ever. Both are
-deferred and retried under `MWK_CAPTION_GRACE_HOURS`. Read them; do not chase them.
+proposal rather than failing for ever. **Only the missing transcript is grace-handled** — an
+unaired live event still prints `FAIL` every run and always will until it airs. Read them; do not
+chase them.
 
 ## 3. The queue and the pace
 

@@ -274,7 +274,7 @@ overview, stats, the queue, YouTube show notes, the links database and the workf
 | Dashboard | `social.matewishkey.com`, Access (OTP), 720h session |
 | Ingest | `ingest.matewishkey.com`, bearer token |
 | Short links | `mwkshow.com` — **public, no Access application, ever** |
-| Storage | D1 `mwk-social` (10 tables) + R2 `mwk-social-media` for queued uploads |
+| Storage | D1 `mwk-social` (11 tables) + R2 `mwk-social-media` for queued uploads |
 | Uploader | `scripts/ship-events.js` every two minutes, `scripts/ship-stats.js` hourly |
 
 **`workers_dev = false` is the line that keeps it closed.** Access binds to a hostname, not to a
