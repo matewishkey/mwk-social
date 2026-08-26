@@ -1,6 +1,6 @@
 ---
 name: mwk-image
-description: Put a still picture out as an MWK post — the brand band across the bottom, the format traps that bite silently, the platforms that cannot take a picture at all, and into the queue. Use whenever the thing to post is a photo, screenshot, poster, thumbnail or generated image rather than a clip.
+description: Put a still picture out as an MWK post — the format traps that bite silently, the platforms that cannot take a picture at all, and into the queue. The picture arrives made; we do not make it. Use whenever the thing to post is a photo, screenshot, poster, thumbnail or generated image rather than a clip.
 ---
 
 # mwk-image — a picture, branded, queued
@@ -48,36 +48,19 @@ The aspect rules for **images** are not the video ones. Instagram takes **0.75�
 `scripts/lib/media.js` `check(platform, probe)` answers it for real — probe the file and read
 the array, do not eyeball the numbers.
 
-## 4. The brand band
+## 4. The branding is not ours to draw
 
-`mwk-og-image-generator` draws it in code: RedBlock, Fraunces headline, JetBrains kicker,
-pixel-identical every time, no API call and no cost.
+**We do not make pictures here** (mate, 2026-08-26). Image work for the show moved to the CMS,
+and the two requests this repo had open against `mwk-og-image-generator` — pad-instead-of-crop
+and the 4:5 / 9:16 shapes — were withdrawn on the same day. There is no requester behind them
+any more.
 
-```
-cd ~/projects/mwk-og-image-generator          # REQUIRED — see the trap below
-node src/cli.ts brand <file>.png --title "..." --kicker "Mate Wish Key"
-```
+So a picture reaches this pipeline **already branded**. If one arrives without the band, that is
+a question for the CMS, not a job to do here: **never redraw the band by hand and never
+regenerate one**, because a band drawn twice is a band that drifts.
 
-**Two traps, both verified:**
-
-- **It only runs with that repo as the working directory.** `brand/brand.json` is read relative
-  to cwd, so calling it from anywhere else exits `ENOENT: brand/brand.json`.
-- **It crops to 1200×630** (`fit: 'cover'`), so any picture not authored at 1.9:1 loses its
-  edges — on the genie picture that was the laptop and the "Enter your wish…" prompt box, which
-  was the subject. Filed as
-  [issue #8](https://github.com/matewishkey/mwk-og-image-generator/issues/8); until it lands,
-  **pad by hand and composite the real band below the picture**:
-
-```
-convert branded.og.png -crop 1200x150+0+480 +repage band.png        # the real band, drawn by the tool
-convert <src>.png -resize 1200x -background '#12100f' -gravity north -extent 1200x825 full.png
-convert full.png band.png -geometry +0+675 -composite out.png       # 1200x825, nothing lost
-```
-
-Never redraw the band by hand. Lift the strip the tool produced, so the branding cannot drift.
-
-**The band's `--title` is the post's own first line**, not a generic strapline. It is what makes
-the picture read as belonging to the words under it.
+What is still ours is everything either side of it — the aspect and format checks above, and
+the queueing below.
 
 ## 5. Queue it
 
