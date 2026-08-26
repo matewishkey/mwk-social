@@ -29,7 +29,7 @@ this file loads every session whether it is relevant or not.
 - **`mwk-post`** — his words or a clip to a queued post: the voice, the hashtag rule, the media
   checks, `scripts/queue-add.js`, and what will actually happen once it is in.
 - **`mwk-image`** — a STILL rather than a clip: the two platforms that cannot take one, the file
-  whose extension lies, padding instead of cropping, and the brand band.
+  whose extension lies, padding instead of cropping, and why the brand band is not ours to draw.
 
 ## How this works at all
 
@@ -98,6 +98,12 @@ this file loads every session whether it is relevant or not.
   must not move the rotation on. Roughly `episodeMixRatio` of comments quote a real guest wish from
   the RSS feed. **Freshness must never block a comment** — an unreachable feed falls back to a
   plain variant.
+- **AN EPISODE IS A GUEST SHOW; A LIVE STREAM IS NOT ONE, AND THE `/episodes/` FILTER IS WHAT KEEPS
+  THAT TRUE IN CODE.** `latestEpisodes()` drops any feed item whose link does not match
+  `/\/episodes\//` (`voice.js`), which is the whole reason the `firstComment.episode` variants can
+  say *"that's what someone brought to the show"* without checking anything else. Widen that filter
+  and a solo stream starts being quoted as a guest's wish. Mate, 2026-08-21: *"there are no episodes
+  about this, it was live on youtube, uncut version is visible."*
 
 ## Hashtags
 
@@ -331,7 +337,8 @@ most repeated failure in this repo.
   requests, so one over-long post would otherwise take every platform with it.
 - **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X; **not YouTube**
   (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
-  we have never built one, so it is "not built", not "impossible"). `imageAspectRange` is not
+  we have never built one, so it is "not built", not "impossible" — **and mate declined building
+  them, 2026-08-26 closing #27**, so "not built" is the decision, not a gap). `imageAspectRange` is not
   `aspectRange` — IG video tops out at square while its images run to 1.91:1. Procedure: `mwk-image`.
 - **`landscapeOk`** routes the two cuts. **One video per post, on every platform** — a vertical and
   a landscape cut are two posts, never one. `queue_item.media_wide_key` carries the second.
@@ -350,9 +357,8 @@ most repeated failure in this repo.
   timetable per profile; ours is a rate limit across accounts spanning two profiles. The full
   reasoning, and why the publisher cannot move into the Worker (ffprobe, ffmpeg and Whisper are
   binaries), is in `docs/playbook.md` — read it before proposing either again.
-- **"Post it" means QUEUE it. Only publish when he says publish** (mate, 2026-08-21). He reviews on
-  the dashboard and releases it himself. `run-queue.js --now` or a direct `post.js` run needs him to
-  have asked in those words.
+- **"Post it" means QUEUE it. Only publish when he says publish** (mate, 2026-08-21). The procedure
+  is the `mwk-post` skill's opening section — read it there, this is the decision only.
 - **There is no time-of-day posting window** (mate, 2026-08-21) — the audience spans timezones, so
   holding for a "good hour" only delays. `lib/pace.js` caps the day and spaces posts ninety minutes
   apart; the day boundary is the audience's timezone, or the cap resets twelve hours early.
@@ -498,10 +504,12 @@ The invariants:
 
 - **Webhooks** would replace the hourly poll, but need a public HTTPS endpoint and detection still
   waits on the same ~90 min sync — the only gain is fewer API calls.
-- **Comment-to-DM on Instagram** is verified working and **declined** (mate, 2026-08-26: *"i do not
-  want to start spamming instagram, i added my bio link profile i am fine with that"*). It would DM
-  everyone who comments. The bio route he chose is out-performing the caption/comment path anyway.
-  Do not re-propose without a change on Instagram's side.
+- **Comment-to-DM on Instagram** is verified working (`zernio automations:*`; `GET
+  /v1/comment-automations` answered on this account) and is the only clickable route out of
+  Instagram — but it is **per post**, so `automations:create` needs `--platformPostId`,
+  `--accountId`, `--profileId`, `--name` and `--dmMessage` after every IG publish, not one setup.
+  **Declined by mate on 2026-08-26**; his reasoning is in memory, and the mechanics above are the
+  only part that belongs here. Do not re-propose without a change on Instagram's side.
 - **Sending a STILL where a clip would go is declined** (mate, 2026-08-26, closing #27: *"no
   posting photos is fine, so do not do it"*). Two separate proposals died with it: swapping the
   LinkedIn clip for the branded still, and building TikTok photo posts. The finding underneath the

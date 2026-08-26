@@ -69,7 +69,7 @@ the queueing below.
 ## 5. Queue it
 
 ```
-scripts/with-secrets.sh scripts/queue-add.js \
+./scripts/with-secrets.sh node scripts/queue-add.js \
   --body-file words.txt --media out.png --topics AIFail,BusinessPlan,SmallBusinessOwner
 ```
 

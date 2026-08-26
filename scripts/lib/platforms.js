@@ -55,7 +55,9 @@ const PLATFORMS = {
   tiktok: {
     // TikTok's API DID gain photo posts (4 Aug 2026). This stays false because
     // nothing here has ever sent one — contentType photo is a different request
-    // shape with its own consent flags. False is "not built", not "impossible".
+    // shape with its own consent flags. False is "not built", not "impossible" —
+    // and mate declined building them (2026-08-26, closing #27), so do not read
+    // this as an open to-do.
     imageOk: false,
     landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
