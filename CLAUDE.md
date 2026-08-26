@@ -452,6 +452,13 @@ The invariants:
   immediately said what the old one hid.
 - **Comparable across channels: posts, actions, actions per post, tracked clicks.** Not comparable:
   seen, and any rate built on it. Kept because they are what we have, never ranked.
+- **The settle curve is being RECORDED and read by nothing, on purpose, from 2026-08-26.**
+  `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
+  "is the last complete day settled?" had no answer and the trend excluded today on instinct. A
+  `BEFORE UPDATE` trigger now keeps the superseded value in `daily_metric_revision`, with both
+  timestamps — the gap between them is the lag. **This is the one deliberate exception to "wire it
+  or do not add it": it is evidence being gathered, not a field somebody forgot.** Around
+  2026-09-09 there is enough to set the exclusion from data, or to drop a trend that cannot stand up.
 - **Trend guards, each with a positive control**: today is in neither window; a channel younger than
   the older window gets its start date (`platformSince` is queried over the WHOLE table, not the
   rendered thirty days); **connecting an account is not growth** — the follower total counts only

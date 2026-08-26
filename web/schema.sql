@@ -268,3 +268,50 @@ ALTER TABLE queue_item ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;
 -- the moment it is sent. The bot flag is what keeps the second one honest.
 ALTER TABLE click ADD COLUMN tag TEXT;
 CREATE INDEX IF NOT EXISTS click_tag ON click (tag, at DESC);
+
+-- The settle curve (2026-08-26, issue #31). daily_metric is upserted because a
+-- day's numbers keep moving after the day ends — but the upsert overwrote all
+-- nine metrics AND updated_at unconditionally, so nothing recorded the movement.
+-- That left "is the last complete day settled?" unanswerable, and the trend
+-- excludes today on instinct rather than on a measurement.
+--
+-- This keeps the superseded value instead of dropping it. Two timestamps,
+-- because the gap between them IS the lag: written_at is when the value we are
+-- replacing was recorded, superseded_at is when a platform changed its mind.
+-- Nothing reads this yet — it is a fortnight of evidence first, then the
+-- exclusion gets set from data or the trend loses the day it cannot stand up.
+CREATE TABLE IF NOT EXISTS daily_metric_revision (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  date          TEXT NOT NULL,
+  platform      TEXT NOT NULL,
+  post_count    INTEGER, impressions INTEGER, reach INTEGER, views INTEGER,
+  likes         INTEGER, comments INTEGER, shares INTEGER, saves INTEGER, clicks INTEGER,
+  written_at    TEXT NOT NULL,
+  superseded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS dmr_date ON daily_metric_revision (date, platform, superseded_at);
+
+-- IS NOT, not <>: a metric going NULL -> 0 is a real change and <> answers NULL
+-- to it, which would silently record nothing. A ship that re-writes identical
+-- numbers must leave no row, or the lag is measured against our own cadence
+-- instead of the platform's.
+CREATE TRIGGER IF NOT EXISTS daily_metric_settle
+BEFORE UPDATE ON daily_metric
+WHEN OLD.post_count  IS NOT NEW.post_count
+  OR OLD.impressions IS NOT NEW.impressions
+  OR OLD.reach       IS NOT NEW.reach
+  OR OLD.views       IS NOT NEW.views
+  OR OLD.likes       IS NOT NEW.likes
+  OR OLD.comments    IS NOT NEW.comments
+  OR OLD.shares      IS NOT NEW.shares
+  OR OLD.saves       IS NOT NEW.saves
+  OR OLD.clicks      IS NOT NEW.clicks
+BEGIN
+  INSERT INTO daily_metric_revision
+    (date, platform, post_count, impressions, reach, views, likes, comments,
+     shares, saves, clicks, written_at, superseded_at)
+  VALUES
+    (OLD.date, OLD.platform, OLD.post_count, OLD.impressions, OLD.reach,
+     OLD.views, OLD.likes, OLD.comments, OLD.shares, OLD.saves, OLD.clicks,
+     OLD.updated_at, NEW.updated_at);
+END;
