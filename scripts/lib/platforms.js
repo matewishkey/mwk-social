@@ -29,6 +29,7 @@ const PLATFORMS = {
     videoMaxSec: 900,
     aspectRange: [0.5, 1.0],
     imageOk: true,
+    imageMax: 10,            // carousel; Zernio's Instagram page, 2026-08-27
     // The IMAGE range, which is not the video one above. Exactly 1.91:1 is
     // rejected (float edge, bitten live) — pad a wide screenshot to about 1.78
     // with its own background colour rather than cropping it.
@@ -36,6 +37,7 @@ const PLATFORMS = {
   },
   threads: {
     imageOk: true,           // same Meta surface as Instagram; a still posts fine
+    imageMax: 10,            // carousel; Zernio's Threads page, 2026-08-27
     landscapeOk: false,           // an IG-shaped surface; vertical is what performs
     commentsApi: true,             // readable and repliable, same Meta auth as IG
     reshare: 'none',
@@ -59,6 +61,7 @@ const PLATFORMS = {
     // and mate declined building them (2026-08-26, closing #27), so do not read
     // this as an open to-do.
     imageOk: false,
+    imageMax: 0,             // imageOk is false — no still at all, so no gallery either
     landscapeOk: false,           // a vertical surface by definition
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
@@ -81,6 +84,7 @@ const PLATFORMS = {
   },
   twitter: {
     imageOk: true,
+    imageMax: 4,             // X's own cap; Zernio's X page, 2026-08-27
     landscapeOk: true,
     // Read and reply both 403'd until 2026-08-22, and we had that written down
     // as a limit of the plan. It was not: `xCapabilities.inbox` is a per-account
@@ -136,6 +140,7 @@ const PLATFORMS = {
   },
   facebook: {
     imageOk: true,
+    imageMax: 10,            // Zernio's Facebook page, 2026-08-27
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
     commentsApi: true,
     reshare: 'manual',             // personal timelines are impossible via any API (Meta rule)
@@ -152,6 +157,7 @@ const PLATFORMS = {
   },
   youtube: {
     imageOk: false,          // a video platform; there is nothing a still picture can be posted AS
+    imageMax: 0,
     landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
@@ -172,6 +178,7 @@ const PLATFORMS = {
   },
   linkedin: {
     imageOk: true,
+    imageMax: 20,            // the highest of the lot; Zernio's LinkedIn page, 2026-08-27
     landscapeOk: true,
     commentsApi: true,
     reshare: 'api',                // platformSpecificData.reshareUrl — company post, personal quote
@@ -332,6 +339,55 @@ function linkDeadFor(name, probe) {
 }
 
 /*
+ * How many of a gallery a platform will actually take.
+ *
+ * A still is the only thing that can ride in a set: ONE VIDEO PER POST is a hard
+ * limit everywhere (Facebook's docs are explicit, and images and videos cannot
+ * be mixed either), so a list of clips is never a gallery — it is separate
+ * posts, which is what landscapeOk already routes.
+ *
+ * `imageMax` is read HERE and nowhere else. It went onto the table on
+ * 2026-08-27 with a gallery to feed, deliberately: this repo has shipped
+ * linkPlacement, landscapeOk, hashtagsInCaption and shortsAreDead as fields
+ * declared and read by nothing, and a config page that renders an unread field
+ * makes it look implemented. Wire it or do not add it.
+ *
+ * Caps are Zernio's own platform pages, read 2026-08-27: LinkedIn 20,
+ * Facebook 10, Instagram 10, Threads 10, X 4.
+ *
+ * @param {string} name
+ * @param {Array<{probe?: {isImage?: boolean}}>} items - the gallery, in order
+ * @returns {Array} what this platform gets: capped, or just the first when it
+ *   takes no gallery, or everything when the caller gave us no probes to judge.
+ */
+function galleryFor(name, items) {
+  const list = items || [];
+  if (list.length <= 1) return list;
+  const p = get(name);
+  // A set of stills only. One non-image in the list and the whole thing
+  // collapses to the first item rather than half-publishing a mixed post.
+  if (!list.every((m) => m && m.probe && m.probe.isImage)) return list.slice(0, 1);
+  const max = Number.isFinite(p.imageMax) ? p.imageMax : 1;
+  if (max <= 0) return [];
+  return list.slice(0, max);
+}
+
+/*
+ * Every way the table can contradict itself about galleries. Empty means
+ * consistent, and a test asserts it — the same guard linkProblems() is.
+ */
+function galleryProblems() {
+  const out = [];
+  for (const name of Object.keys(PLATFORMS)) {
+    const p = PLATFORMS[name];
+    if (!Number.isFinite(p.imageMax)) { out.push(`${name}: no imageMax — say how many stills it takes`); continue; }
+    if (p.imageOk && p.imageMax < 1) out.push(`${name}: takes a still but imageMax is ${p.imageMax}`);
+    if (!p.imageOk && p.imageMax > 0) out.push(`${name}: takes no still at all but imageMax is ${p.imageMax}`);
+  }
+  return out;
+}
+
+/*
  * Every way the table can contradict itself about links, as a list of problems.
  * Empty means consistent, and a test asserts that — so `linkClickable` cannot
  * become the fourth decorative field here after linkPlacement, landscapeOk and
@@ -355,4 +411,4 @@ function linkProblems() {
 }
 
 module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
-  linkDeadFor, linkProblems, SLOT };
+  linkDeadFor, linkProblems, galleryFor, galleryProblems, SLOT };

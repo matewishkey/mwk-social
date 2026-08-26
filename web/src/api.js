@@ -153,10 +153,20 @@ async function claim(body, env) {
       // box fetches the object back through this Worker with the same token.
       mediaUrl = `https://${env.INGEST_HOST}/media/${encodeURIComponent(row.media_key)}`;
     }
+    // The rest of a gallery, in the order it was queued. Same fetch-back route
+    // as mediaUrl: an R2 binding hands out no readable URL, so the box pulls
+    // each object through this Worker with the same token.
+    let mediaExtraUrls = [];
+    if (row.media_extra && env.MEDIA) {
+      try {
+        mediaExtraUrls = JSON.parse(row.media_extra).map(
+          (k) => `https://${env.INGEST_HOST}/media/${encodeURIComponent(k)}`);
+      } catch { mediaExtraUrls = []; }
+    }
     return json({
       ok: true,
       item: {
-        id: row.id, body: row.body, platforms: want, mediaUrl,
+        id: row.id, body: row.body, platforms: want, mediaUrl, mediaExtraUrls,
         mediaType: row.media_type, firstComment: !!row.first_comment,
         reshareText: row.reshare_text || null,
         reshare: row.reshare !== 0,

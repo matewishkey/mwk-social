@@ -184,6 +184,10 @@ async function main() {
     };
     const tall = load(item.mediaUrl, item.mediaType);
     const wide = load(item.mediaWideUrl, item.mediaType);
+    // The rest of a GALLERY, which rides with `tall` in one post. Stills only:
+    // platforms.galleryFor() collapses a set with a video in it back to one
+    // item rather than half-publishing a mixed post.
+    const extra = (item.mediaExtraUrls || []).map((u) => load(u, item.mediaType)).filter(Boolean);
 
     const want = item.platforms || [];
     // Which cut a platform should get. With only one available, everyone gets it.
@@ -192,19 +196,37 @@ async function main() {
       if (!tall) return wide;
       return platforms.get(platform).landscapeOk ? wide : tall;
     };
+    /*
+     * What a platform actually publishes: its cut, plus as much of the gallery
+     * as it will take. A gallery only ever rides with `tall` — the wide cut is
+     * the OTHER video, not another page of the same post.
+     */
+    const setFor = (platform) => {
+      const cut = cutFor(platform);
+      if (!cut) return [];
+      if (!extra.length || cut !== tall) return [cut];
+      return platforms.galleryFor(platform, [cut, ...extra]);
+    };
 
     const usable = accountsFor(want).filter((a) => {
       const cut = cutFor(a.platform);
       // Instagram will not take a post without media, and a text-only item aimed
       // at "wherever it fits" should quietly skip it rather than fail the lot.
       if (a.platform === 'instagram' && !cut) return false;
-      if (cut && cut.probe) {
+      // EVERY image in the set, not just the first. Checking the cut alone was
+      // right while a post carried one file and became a hole the moment a
+      // gallery could ride with it: a second image outside the platform's
+      // aspect range would have reached Zernio unchecked, with the item already
+      // claimed. A platform is dropped whole and told why, never quietly sent a
+      // shortened gallery — a silent 5-of-6 is worse than a named skip.
+      for (const m of setFor(a.platform)) {
+        if (!m.probe) continue;
         // Check before Zernio does: a duration or aspect a platform will not
-        // take costs the post otherwise, and the item is already claimed by
-        // then. check() returns the reasons, empty when it is fine.
-        const problems = mediaLib.check(a.platform, cut.probe);
+        // take costs the post otherwise. check() returns the reasons, empty
+        // when it is fine.
+        const problems = mediaLib.check(a.platform, m.probe);
         if (problems.length) {
-          console.log(`skip  ${a.platform} — ${problems.join('; ')}`);
+          console.log(`skip  ${a.platform} — ${path.basename(m.file)}: ${problems.join('; ')}`);
           return false;
         }
       }
@@ -212,19 +234,23 @@ async function main() {
     });
     if (!usable.length) throw new Error('no account can take this post');
 
-    // Group by the cut each platform gets: one publish per distinct video.
+    // Group by the MEDIA SET each platform gets: one publish per distinct set.
+    // Keyed on every file in order, not just the first, or X's four-image cap
+    // would silently share LinkedIn's request and publish twenty.
     const groups = new Map();
+    const setOf = new Map();
     for (const a of usable) {
-      const cut = cutFor(a.platform);
-      const key = cut ? cut.file : '';
-      if (!groups.has(key)) groups.set(key, []);
+      const set = setFor(a.platform);
+      const key = set.map((m) => m.file).join('\u0000');
+      if (!groups.has(key)) { groups.set(key, []); setOf.set(key, set); }
       groups.get(key).push(a);
     }
 
     if (dryRun) {
-      for (const [file, accts] of groups) {
+      for (const [key, accts] of groups) {
+        const set = setOf.get(key);
         console.log(`would post to ${accts.map((a) => a.platform).join(', ')}`
-          + (file ? ` with ${path.basename(file)}` : ' with no media'));
+          + (set.length ? ` with ${set.map((m) => path.basename(m.file)).join(', ')}` : ' with no media'));
       }
       await call('/queue/result', { id: item.id, status: 'queued', note: 'dry run' }, api);
       return;
@@ -235,7 +261,8 @@ async function main() {
     // so a failure is a recorded outcome rather than an exception that reaches
     // the requeue below.
     const outcome = [];
-    for (const [file, accts] of groups) {
+    for (const [key, accts] of groups) {
+      const set = setOf.get(key);
       try {
         const result = await publish({
           text: item.body,
@@ -257,7 +284,7 @@ async function main() {
             .filter((pl) => platforms.linkDeadFor(pl, (cutFor(pl) || {}).probe)),
           accounts: accts.map((a) => a.id),
           all: false,
-          media: file ? [file] : [],
+          media: set.map((m) => m.file),
           title: null,
           firstComment: item.firstComment,
           comment: item.commentText || null,

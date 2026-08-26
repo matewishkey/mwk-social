@@ -64,6 +64,10 @@ CREATE TABLE IF NOT EXISTS queue_item (
   media_key     TEXT,                 -- R2 object key, when a file was uploaded
   media_url     TEXT,                 -- or a URL, when one was pasted
   media_type    TEXT,
+  -- A GALLERY: JSON array of extra R2 keys that ride WITH media_key in one post.
+  -- Stills only. One video per post is a hard limit everywhere, so a list of
+  -- clips is separate posts (media_wide_key) and never this.
+  media_extra   TEXT,
   first_comment INTEGER NOT NULL DEFAULT 1,
   priority      INTEGER NOT NULL DEFAULT 0,      -- higher jumps the line
   claimed_at    TEXT,

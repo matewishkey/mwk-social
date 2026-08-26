@@ -20,7 +20,10 @@
  *   scripts/queue-add.js --body "..." --dry-run      # print the SQL, write nothing
  *
  *   --body TEXT | --body-file PATH   his words. One or the other, never both.
- *   --media PATH|URL                 a local file goes to R2; a URL is stored as-is
+ *   --media PATH[,PATH...]|URL       a local file goes to R2; a URL is stored as-is.
+ *                                    Several comma-separated paths make a GALLERY:
+ *                                    stills only, one post, capped per platform
+ *                                    (LinkedIn 20, FB/IG/Threads 10, X 4)
  *   --media-wide PATH|URL            the landscape cut, for the platforms that take one
  *   --platforms a,b,c                default: empty, meaning "wherever it fits"
  *   --topics a,b,c                   topic tags, no # needed. Omit to let the
@@ -90,7 +93,7 @@ function toR2(file, dryRun) {
 }
 
 function parse(argv) {
-  const opt = { platforms: [], topics: [], firstComment: 1, reshare: 1, dryRun: false };
+  const opt = { platforms: [], topics: [], mediaList: [], firstComment: 1, reshare: 1, dryRun: false };
   const take = (i) => {
     if (i + 1 >= argv.length) throw new Error(`${argv[i]} wants a value`);
     return argv[i + 1];
@@ -100,7 +103,10 @@ function parse(argv) {
       case '-h': case '--help': opt.help = true; break;
       case '--body': opt.body = take(i); i++; break;
       case '--body-file': opt.bodyFile = take(i); i++; break;
-      case '--media': opt.media = take(i); i++; break;
+      // Comma-separated: the first is the post's media, the rest are a GALLERY
+      // riding with it. Stills only — run-queue collapses a mixed set to the
+      // first item rather than half-publishing one.
+      case '--media': opt.mediaList = splitList(take(i)); i++; break;
       case '--media-wide': opt.mediaWide = take(i); i++; break;
       case '--platforms': opt.platforms = take(i).split(',').map((s) => s.trim()).filter(Boolean); i++; break;
       case '--topics': opt.topics = take(i).split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean); i++; break;
@@ -125,15 +131,27 @@ function parse(argv) {
   return opt;
 }
 
+/*
+ * Split --media on commas. A comma inside a FILENAME would break this, which is
+ * why the split is here and not inlined: if that ever bites, one function moves
+ * to an explicit repeat-the-flag form and every caller keeps working.
+ */
+function splitList(v) {
+  return String(v).split(',').map((x) => x.trim()).filter(Boolean);
+}
+
 /** The INSERT, as text. Separated out so a test can read it without a network. */
-function sqlFor(opt, id, media, mediaWide, now) {
+function sqlFor(opt, id, media, mediaWide, now, extraKeys) {
   const [mediaKey, mediaType] = media;
+  // NULL rather than '[]' when there is no gallery: the Worker tests the column
+  // for truthiness, and an empty array is truthy once it is a string.
+  const extra = (extraKeys && extraKeys.length) ? JSON.stringify(extraKeys) : null;
   return `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
-  media_key, media_url, media_type, first_comment, priority,
+  media_key, media_url, media_type, media_extra, first_comment, priority,
   reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url)
 VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
   ${lit(JSON.stringify(opt.platforms))},
-  ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${opt.firstComment}, 0,
+  ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${lit(extra)}, ${opt.firstComment}, 0,
   ${opt.reshare}, NULL, ${lit(opt.comment)},
   ${lit(JSON.stringify(opt.topics))}, ${lit(mediaWide[0])}, ${lit(opt.mediaWideUrl)});
 `;
@@ -150,12 +168,22 @@ function main() {
   const opt = parse(process.argv.slice(2));
   if (opt.help) { console.log(usage()); return; }
 
+  const [first, ...rest] = opt.mediaList || [];
   let media = [null, null];
-  if (opt.media && isUrl(opt.media)) {
-    opt.mediaUrl = opt.media;
-    media = [null, TYPE[path.extname(new URL(opt.media).pathname).toLowerCase()] || null];
-  } else if (opt.media) {
-    media = toR2(opt.media, opt.dryRun);
+  if (first && isUrl(first)) {
+    opt.mediaUrl = first;
+    media = [null, TYPE[path.extname(new URL(first).pathname).toLowerCase()] || null];
+  } else if (first) {
+    media = toR2(first, opt.dryRun);
+  }
+
+  // The gallery. A pasted URL cannot ride here — media_extra holds R2 KEYS, and
+  // the Worker turns each one into a fetch-back url. Fail loudly rather than
+  // silently dropping images the caller asked for.
+  const extraKeys = [];
+  for (const m of rest) {
+    if (isUrl(m)) throw new Error(`--media takes local files for a gallery; ${m} is a URL`);
+    extraKeys.push(toR2(m, opt.dryRun)[0]);
   }
 
   let mediaWide = [null, null];
@@ -163,7 +191,7 @@ function main() {
   else if (opt.mediaWide) mediaWide = toR2(opt.mediaWide, opt.dryRun);
 
   const id = ulid();
-  const sql = sqlFor(opt, id, media, mediaWide, new Date().toISOString());
+  const sql = sqlFor(opt, id, media, mediaWide, new Date().toISOString(), extraKeys);
 
   if (opt.dryRun) {
     console.log(sql);
