@@ -127,8 +127,9 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   comment alike. Their CTA says "link in my bio" and mints nothing. The bio link is the tracked one.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
-- Tags go in the caption **or** the comment, never both — Instagram counts the two together
-  against one cap of five.
+- Tags go in the caption **or** the comment, never both. **The 5-cap is Instagram's; "caption and
+  comments count together" is NOT** — that claim traces to marketing blogs and was retracted
+  2026-08-24. The behaviour stays because never spending the budget twice is free.
 - **Every code minted carries the queue item id**, so a click answers "which platform, which
   placement, which video" on `/links`. Nothing to do by hand; `run-queue.js` passes it down.
 - **A LinkedIn post is three posts and three codes**: the company page publishes it, then every

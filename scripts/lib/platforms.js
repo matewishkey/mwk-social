@@ -224,7 +224,8 @@ function flowFor(name) {
     /*
      * commentWatched(), not commentsApi. This keyed off the API alone and said
      * "the hourly watcher posts it" about X — which the watcher has never
-     * touched, because X's CTA ships with the post as a thread reply. That is
+     * touched, because X's CTA ships INSIDE the post: in its caption since
+     * 2026-08-24, in a thread reply before that. Either way, not a comment. That is
      * the THIRD time this exact claim has been made about a platform the
      * watcher cannot reach: post.js printed it wrongly twice, once keyed off
      * !linkInCaption and once off commentsApi, which is why commentWatched()

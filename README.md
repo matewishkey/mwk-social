@@ -16,8 +16,8 @@ timezone and a minimum gap, with no time-of-day window because the audience is i
 Queue five things at once and you get five posts across the day, not five in a minute.
 
 **Every post carries a route back to the show.** A first comment with a tracked
-`mwkshow.com/<code>` link, one code per platform and post, so a click says which channel and which
-clip earned it. Where a url is not clickable at all — Instagram, TikTok, a YouTube Short — the
+`mwkshow.com/<code>` link, minted per platform and placement, so a click says which channel and
+which clip earned it. Where a url is not clickable at all — Instagram, TikTok, a YouTube Short — the
 comment names where the link *is* instead of spending a code on a click that cannot happen.
 
 **It knows what each platform will actually accept**, and checks before sending rather than
