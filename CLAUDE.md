@@ -214,6 +214,17 @@ had already published were jargon the rule rejects.
 - **The redirect hands NOTHING to the destination — no `utm_`, no cookie, no banner** (mate,
   2026-08-22: keep it slim). The code already carries platform, placement and campaign, so a utm
   would count the same click twice in somebody else's system. A test fails if one is added back.
+- **A BIO LINK CAN BE VERIFIED ON EXACTLY TWO PROFILES, and the check found a real miss**
+  (2026-08-26). YouTube's channel page carries the website field in
+  `channelExternalLinkViewModel` and LinkedIn's company page renders it behind `trk=about_website`
+  — both readable from this box with plain curl. X reads out of the fxtwitter user object. The
+  other seven profiles render no website field to a logged-out fetch at all, so a miss there is
+  unknowable, never "not done".
+  - **The positive control is the FIELD, not the code**: if the selector finds no field, the read
+    proved nothing. `linkedin.com/company/<slug>/about/` renders no field while
+    `linkedin.com/company/<slug>/` does — the more specific URL is the one that answers nothing.
+  - He updates these by hand, so **when he says a bio is done, read it** rather than believing it.
+    Two of the ten were still on the plain url after he said they were updated.
 - **`/links` on the dashboard can mint by hand.** Anything he pastes himself — a bio, a newsletter,
   a talk — was a raw url and invisible before that. The `campaign = bio` codes are the whole
   conversion path on Instagram and TikTok.
@@ -488,6 +499,12 @@ The invariants:
   want to start spamming instagram, i added my bio link profile i am fine with that"*). It would DM
   everyone who comments. The bio route he chose is out-performing the caption/comment path anyway.
   Do not re-propose without a change on Instagram's side.
+- **Sending a STILL where a clip would go is declined** (mate, 2026-08-26, closing #27: *"no
+  posting photos is fine, so do not do it"*). Two separate proposals died with it: swapping the
+  LinkedIn clip for the branded still, and building TikTok photo posts. The finding underneath the
+  first is still true and is not a reason to re-propose — LinkedIn video came last on impressions in
+  both large 2026 studies and it is the only format we send there. **`imageOk` and the aspect checks
+  stay wired** for a still HE hands us; what is declined is the pipeline choosing one.
 - **Stories**: postable via API but they get no stickers/links/music (Meta limit) — post manually.
   An Instagram story shared onward to Facebook has no API analytics on the Facebook side.
 - **Native/past posts**: `analytics:posts --source external` picks up app-made posts on a ~90 min
