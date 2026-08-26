@@ -342,6 +342,28 @@ most repeated failure in this repo.
   `aspectRange` — IG video tops out at square while its images run to 1.91:1. Procedure: `mwk-image`.
 - **`landscapeOk`** routes the two cuts. **One video per post, on every platform** — a vertical and
   a landscape cut are two posts, never one. `queue_item.media_wide_key` carries the second.
+- **A GALLERY IS SEVERAL STILLS IN ONE POST, AND IT IS THE OPPOSITE OF THE TWO CUTS** (2026-08-27).
+  `media_wide_key` is *the other video*; `queue_item.media_extra` (JSON array of R2 keys) rides
+  **with** `media_key` in a single post. `queue-add.js --media` takes a comma-separated list, the
+  first being the post's media. **Stills only** — one video per post is the hard limit above, so
+  `platforms.galleryFor()` collapses a set with any non-image in it back to one item rather than
+  half-publishing a mixed post. Verified live on the first use: 3 `mediaItems` on facebook+linkedin,
+  instagram+threads and twitter alike.
+  - **`imageMax` is the cap and `galleryFor()` is its ONLY reader** — the field and its reader
+    landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
+    **X 4** (Zernio's own platform pages, 2026-08-27). `galleryProblems()` asserts the table agrees
+    with itself, the way `linkProblems()` does.
+  - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is the
+    natural way to write it and is wrong: X and LinkedIn share a first image and have caps of 4 and
+    20, so X would be handed twenty. A test fails if the key stops covering every file.
+  - **CHECK EVERY IMAGE, NOT JUST THE CUT.** `check()` ran on the cut alone, which was right while a
+    post carried one file and became a hole the moment a second could ride along — an image outside
+    a platform's aspect range would reach Zernio unchecked with the item already claimed. A platform
+    is dropped whole and told which file; **never quietly sent a shortened gallery**, because a
+    silent 5-of-6 reads as success.
+  - **Instagram forces ONE aspect across a carousel**, so a set of mixed shapes gets cropped by
+    Instagram itself. Pad them all to a common ratio before queueing — the padding rule in
+    `mwk-image` applies to the SET, not just to each file passing on its own.
 - **A CAPTION IS COMPOSED PER PLATFORM, and `publish()` groups by the caption a platform gets** —
   not by any fixed split. His words never vary; the link and the hashtags do.
 - **`linkPlacement: 'caption'` IS live, on X, and this line said the opposite for two days.** It

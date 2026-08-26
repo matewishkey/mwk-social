@@ -66,12 +66,43 @@ regenerate one**, because a band drawn twice is a band that drifts.
 What is still ours is everything either side of it — the aspect and format checks above, and
 the queueing below.
 
-## 5. Queue it
+## 5. Several pictures are ONE post, and the set is padded together
+
+`--media` takes a comma-separated list. The first is the post's media, the rest ride with it in
+the same post — a LinkedIn/Facebook/Threads gallery, an Instagram carousel, an X multi-image
+tweet. **Stills only**: one video per post is a hard limit everywhere, so a set with a clip in
+it silently collapses to the first item.
+
+Caps are per platform and `platforms.galleryFor()` applies them: **LinkedIn 20, Facebook 10,
+Instagram 10, Threads 10, X 4**. Over the cap it truncates; a platform that takes no still gets
+nothing.
+
+**Pad the SET to a common ratio, not each file to whatever passes.** Instagram forces one aspect
+across a carousel, so mixed shapes get cropped by Instagram itself — the thing §3 exists to
+prevent. Pick one ratio for all of them (4:5 is the tall end and usually right for screenshots)
+and pad each with its own background colour:
+
+```
+bg=$(convert in.png -format "%[pixel:p{5,5}]" info:)     # its own corner, not white-by-guess
+convert in.png -background "$bg" -gravity center -extent 1084x1354 out.png
+```
+
+Then probe every file, not just the first — `run-queue.js` drops the whole platform and names the
+offending file, so one stray image costs the platform rather than being quietly left out.
+
+## 6. Queue it
 
 ```
 ./scripts/with-secrets.sh node scripts/queue-add.js \
   --body-file words.txt --media out.png --topics AIFail,BusinessPlan,SmallBusinessOwner
+
+./scripts/with-secrets.sh node scripts/queue-add.js \
+  --body-file words.txt --media one.png,two.png,three.png --platforms linkedin,facebook
 ```
+
+**One `body` per queue item, so two platforms wanting different words are two items.** Threads
+caps at 500 characters and LinkedIn at 3,000: a long post aimed at both silently loses Threads.
+Split them and aim each with `--platforms`.
 
 `--dry-run` first prints the SQL and uploads nothing. **Name the file something meaningful** —
 the R2 key is derived from it (`queue/<day>-<slug>-<ulid><ext>` — the ULID is deliberate, two
@@ -83,7 +114,7 @@ accountability is still on your side"*). The queue **is** the review gate — he
 dashboard and releases it — so an unqueued post is a stall, not caution. Say plainly that the
 words are yours and easy to replace. If he dictates, his words win untouched.
 
-## 6. Then say what happened
+## 7. Then say what happened
 
 Read the run output, not your expectations. Five platforms publish, two skip, and the skip lines
 name the reason. Instagram mints **no** short code — nothing there is clickable, so its CTA
@@ -91,7 +122,8 @@ points at the bio.
 
 ## Where the knowledge lives
 
-- Platform rules: `scripts/lib/platforms.js` — `imageOk`, `imageAspectRange`.
+- Platform rules: `scripts/lib/platforms.js` — `imageOk`, `imageAspectRange`, `imageMax`
+  (the gallery cap; `galleryFor()` is its only reader).
 - What a file actually is: `scripts/lib/media.js` — `probe()` sets `isImage` off ffprobe's
   container name; `check()` branches on it.
 - Everything we say out loud: `config/voice.json`.
