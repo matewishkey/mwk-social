@@ -704,3 +704,47 @@ test('--repropose files a proposal and never writes a description itself', () =>
   assert.ok(!/setDescription|update-metadata/.test(fn),
     'it must not write to YouTube — replacing words he approved is his call, on the dashboard');
 });
+
+/*
+ * THE ROTATION'S BELT-AND-BRACES WAS WIRED ON ONE PATH ONLY. `avoidIndex` was
+ * passed by first-comment.js and by nothing else, so a queued post never
+ * consulted it and two consecutive posts on one platform could land the same
+ * variant. Deterministic rotation off the post key means they usually differ
+ * anyway — which is exactly why nobody noticed.
+ *
+ * Both writers must use the same state file and the same key, or "what went out
+ * last on this platform" means two different things depending on who published.
+ */
+test('the publish path consults and records the last variant, like the watcher does', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const read = (...p) => fs.readFileSync(path.join(__dirname, '..', ...p), 'utf8');
+  const post = read('scripts', 'post.js');
+  const watcher = read('scripts', 'first-comment.js');
+
+  assert.match(post, /require\('\.\/lib\/comment-state'\)/,
+    'post.js must read the same state file the watcher writes');
+  assert.match(post, /avoidIndex: state\.__lastVariant/,
+    'it has to pass the last index, or the pool is chosen blind');
+  assert.match(post, /__lastVariant = \{ \.\.\.\(state\.__lastVariant \|\| \{\}\), \[platform\]: composed\.index \}/,
+    'and record what it chose, or the next post is blind again');
+  assert.match(watcher, /__lastVariant/, 'the watcher is the other writer of that key');
+
+  /*
+   * A dry run prints a body and publishes nothing. Recording there would make
+   * the next REAL post avoid a variant that never went out — a rotation skipping
+   * over a comment nobody ever saw.
+   */
+  assert.match(post, /if \(!opts\.dryRun\)[\s\S]{0,160}__lastVariant/,
+    'a dry run must not move the rotation on');
+});
+
+/*
+ * An explicitly pinned variant is a decision, and the nudge must not overrule
+ * it — otherwise `--comment-variant 2` could silently publish variant 3.
+ */
+test('a pinned variant ignores avoidIndex', async () => {
+  const voice = require('../scripts/lib/voice');
+  const pinned = await voice.firstComment('rotation:pin', { platform: 'facebook', variantIndex: 1, avoidIndex: 1 });
+  assert.strictEqual(pinned.index, 1, 'the pinned index must survive a colliding avoidIndex');
+});

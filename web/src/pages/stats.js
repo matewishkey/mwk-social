@@ -52,6 +52,35 @@ import { esc, card, layout, num } from '../lib/html.js';
 const WINDOW_DAYS = 30;
 const TREND_DAYS = 7;
 
+/*
+ * THE DAY YOUTUBE CHANGED WHAT A VIEW IS.
+ *
+ * Per YouTube's own Help Centre, from 24 August 2026 a view is counted the
+ * moment playback begins, on every format — long-form previously needed real
+ * watch time (Shorts had already moved in March 2025). So a views trend whose
+ * older window opens before that date compares old-unit days against new-unit
+ * days, and the newer side is inflated by definition.
+ *
+ * No step change is visible in our own data, but the volume is far too low for
+ * one to show — that is an absence of evidence, not evidence of absence, and
+ * it is exactly the reasoning this page exists to refuse.
+ *
+ * Handled the way a channel younger than the window already is: the trend is
+ * REFUSED and given a reason, never rendered as a percentage. The number itself
+ * still shows; it is only the comparison that is withheld.
+ */
+export const YT_VIEW_UNIT_CHANGED = '2026-08-24';
+
+/*
+ * Exported so it can be tested against fixed dates. Testing it through the
+ * rendered page cannot work: the windows are computed from today's clock, so
+ * an assertion that the trend is refused would start failing on its own the
+ * day the older window clears the boundary. A pure function and two dates is
+ * stable for ever.
+ */
+export const viewsUnitBlocked = (from) =>
+  (from < YT_VIEW_UNIT_CHANGED ? 'unit changed 24 Aug' : null);
+
 /** The ISO day n days from the given one. Negative goes back. */
 const shift = (iso, n) => new Date(Date.parse(`${iso}T00:00:00Z`) + n * 86400_000).toISOString().slice(0, 10);
 
@@ -148,6 +177,15 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   const priorTo = shift(recentFrom, -1);
   const priorFrom = shift(priorTo, -(TREND_DAYS - 1));
   const within = (d, a, b) => d >= a && d <= b;
+
+  /*
+   * The site-wide views total sums YouTube and TikTok, so it carries YouTube's
+   * unit change whether or not the tile says YouTube. Blocked only when YouTube
+   * actually contributed views to the older window — otherwise the caveat would
+   * sit on a number YouTube had no part in.
+   */
+  const ytViewsBlocked = daily.some((r) => r.platform === 'youtube' && r.views
+    && within(r.date, priorFrom, priorTo)) ? viewsUnitBlocked(priorFrom) : null;
 
   const recentRows = daily.filter((r) => within(r.date, recentFrom, recentTo));
   const priorRows = daily.filter((r) => within(r.date, priorFrom, priorTo));
@@ -342,7 +380,10 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
         seenKey,
         rate: seen ? (actions / seen) * 100 : null,
         tracked: trackedFor[p.platform] || 0,
-        blocked: fairFor(p.platform),
+        // fairFor first: "this channel is too new" beats "the unit moved",
+        // because a channel with no older window has nothing to compare either way.
+        blocked: fairFor(p.platform)
+          || (p.platform === 'youtube' && seenKey === 'views' ? viewsUnitBlocked(priorFrom) : null),
         now: mine(recentRows),
         before: mine(priorRows),
         series: allDays.map((d) => ({
@@ -499,7 +540,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <th class="num">change</th></tr></thead>
     <tbody>
       ${wowRow('people reached', recent.reach || recent.impressions, prior.reach || prior.impressions)}
-      ${wowRow('video views', recent.views, prior.views)}
+      ${wowRow('video views', recent.views, prior.views, num, ytViewsBlocked)}
       ${wowRow('likes, comments, shares, saves',
         recent.likes + recent.comments + recent.shares + recent.saves,
         prior.likes + prior.comments + prior.shares + prior.saves)}
@@ -520,7 +561,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
 <div class="tiles">
   ${trendTile(num(tot.reach || tot.impressions || 0), 'people reached', 'plain', 'did anyone see it',
     change(recent.reach || recent.impressions, prior.reach || prior.impressions))}
-  ${trendTile(num(tot.views || 0), 'video views', 'plain', '', change(recent.views, prior.views))}
+  ${trendTile(num(tot.views || 0), 'video views', 'plain', '', change(recent.views, prior.views, ytViewsBlocked))}
   ${trendTile(perPostAll.toFixed(1), 'actions per post',
     perPostAll >= 4 ? 'ok' : perPostAll >= 2 ? 'warn' : 'bad', 'did anyone care',
     change(perPostNow, perPostBefore))}

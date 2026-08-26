@@ -28,6 +28,7 @@ const { api } = require('./lib/api');
 const voice = require('./lib/voice');
 const platformTable = require('./lib/platforms');
 const shortlink = require('./lib/shortlink');
+const commentState = require('./lib/comment-state');
 const fs = require('fs');
 const path = require('path');
 
@@ -193,14 +194,37 @@ async function commentFor(platform, text, opts) {
   // No mint at all where the url would be plain text: that is a code spent on a
   // click that cannot happen, and it reads in the numbers as indifference.
   const showUrl = live ? await shortlink.mint({ ...where, label: opts.title || null }) : null;
-  return voice.firstComment(postKey, {
+
+  /*
+   * `avoidIndex` was wired on the watcher's path and nowhere else, so a queued
+   * post never consulted it and two consecutive posts on one platform could
+   * land the same variant. Rotation is deterministic off the post key, so they
+   * usually differ anyway — this is the belt-and-braces that was missing, not a
+   * bug being fixed.
+   *
+   * Same state file and same key the watcher uses, because "what went out last
+   * on this platform" has to mean one thing whichever path published it.
+   * An explicitly pinned --comment-variant is unaffected: voice.js applies the
+   * nudge only when it is choosing for itself.
+   */
+  const state = commentState.load();
+  const composed = voice.firstComment(postKey, {
     platform,
     topicTags: opts.topics,
     noTags: tagsInCaption(platform),
     variantIndex: opts.commentVariant,
     showUrl,
     linkLive: live,
-  }).text;
+    avoidIndex: state.__lastVariant?.[platform] ?? -1,
+  });
+
+  // Never on a dry run: it prints the body and publishes nothing, so recording
+  // the variant would make the next real post avoid one that never went out.
+  if (!opts.dryRun) {
+    state.__lastVariant = { ...(state.__lastVariant || {}), [platform]: composed.index };
+    commentState.save(state);
+  }
+  return composed.text;
 }
 
 async function waitForResults(postId) {

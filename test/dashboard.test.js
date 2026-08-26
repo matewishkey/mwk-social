@@ -919,3 +919,47 @@ test('the sharing card counts real opens and says what it cannot tell him', asyn
   assert.match(html, /not that Natalie opened it/);
   assert.match(html, /forwarded/);
 });
+
+/*
+ * YOUTUBE CHANGED WHAT A VIEW IS ON 24 AUGUST 2026, so a views trend whose
+ * older window opens before that date compares two different units — and the
+ * newer side is inflated by definition, which is the flattering direction.
+ *
+ * The page already knows how to refuse a comparison rather than draw a
+ * misleading one: a channel younger than the older window gets its start date
+ * instead of a percentage. This is the same mechanism, for the same reason.
+ */
+test('a views trend that crosses the 24 Aug unit change is refused, not drawn', async () => {
+  const { viewsUnitBlocked, YT_VIEW_UNIT_CHANGED } = await src('pages/stats.js');
+  assert.strictEqual(YT_VIEW_UNIT_CHANGED, '2026-08-24', 'the boundary is the date YouTube states');
+
+  // An older window opening before the change: two units, no percentage.
+  assert.match(viewsUnitBlocked('2026-08-12') || '', /unit changed/,
+    'a window that straddles the change must give a reason instead of a number');
+  assert.match(viewsUnitBlocked('2026-08-23') || '', /unit changed/, 'the day before still straddles it');
+
+  /*
+   * Positive control, and it is the half that matters: once the whole window
+   * sits after the change, both sides are the same unit and the trend must go
+   * back to being a real percentage. A guard that never lifts is just a
+   * permanently broken tile.
+   */
+  assert.strictEqual(viewsUnitBlocked('2026-08-24'), null, 'the change date itself is clean');
+  assert.strictEqual(viewsUnitBlocked('2026-09-20'), null, 'a window wholly after it must compare normally');
+});
+
+/*
+ * The site-wide "video views" total sums YouTube and TikTok, so it carries
+ * YouTube's unit change even though the tile never says YouTube. It must be
+ * wired to the same guard — and only when YouTube actually contributed to the
+ * older window, or the caveat would sit on a number YouTube had no part in.
+ */
+test('the site-wide views tile is wired to the same guard, and only when youtube is in it', () => {
+  const s = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'), 'utf8');
+  assert.match(s, /ytViewsBlocked/, 'the site-wide total needs its own blocked value');
+  assert.match(s, /r\.platform === 'youtube' && r\.views/,
+    'it must check youtube actually reported views in the older window');
+  assert.match(s, /change\(recent\.views, prior\.views, ytViewsBlocked\)/,
+    'the tile must pass it, or the guard is declared and never read');
+});
