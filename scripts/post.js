@@ -264,10 +264,17 @@ const linkInCaption = (platform) => {
 };
 
 /*
- * Does the link go in a thread reply rather than the post itself? Only X, and
- * only because its comment endpoints 403: threadItems is the one way to get a
- * link out of the root tweet without a comments API. See platforms.js for why
- * that is worth 1.5c a post.
+ * Does the link go in a thread reply rather than the post itself?
+ *
+ * NOTHING today: X moved to linkPlacement 'caption' on 2026-08-24. Kept because
+ * 'reply' is a legitimate value of a config field and reversing the decision is
+ * one word in the platform table — not because this runs. Do not believe a
+ * claim that it does.
+ *
+ * The original reason was never the 403s, which were `xCapabilities.inbox`, an
+ * account toggle defaulting to off and on since 2026-08-22. It was that an
+ * out-of-network reply never enters the For You candidate set, so the CTA only
+ * ever reached existing followers. See platforms.js.
  */
 const linkInReply = (platform) => {
   try { return platformTable.get(platform).linkPlacement === 'reply'; } catch { return false; }
@@ -320,9 +327,10 @@ const tagsInCaption = (platform) => {
  * The caption for one platform. Three things vary, and every one of them is a
  * platform rule rather than a choice:
  *
- *   - the link, when there is no comments API to put it in (TikTok). X has
- *     none either, but takes its link in a thread reply instead — see
- *     linkInReply — so its caption stays as clean as anyone else's
+ *   - the link, when there is no comments API to put it in (TikTok), or when the
+ *     platform carries its own (X, linkPlacement 'caption' since 2026-08-24 —
+ *     it rode in a thread reply for three days before that). X's 280 is what
+ *     makes the give-up order below load-bearing rather than theoretical
  *   - the hashtags, when the platform takes them in the body (FB, YT, LI and
  *     the two above). Instagram and Threads must NOT have them in the caption:
  *     we never spend Instagram's cap of 5 twice — defensive, not a rule Instagram
@@ -458,9 +466,10 @@ async function publish(opts) {
 
   // Only platforms the watcher actually covers. That is not "has a comments
   // API" — X has one since 2026-08-22 and is still not covered, because its CTA
-  // goes out as a thread reply at publish time. platforms.commentWatched() is
-  // the single definition; this filter has now been wrong twice, once keyed off
-  // !linkInCaption and once off commentsApi alone.
+  // ships inside the post itself (its caption, since 2026-08-24).
+  // platforms.commentWatched() is the single definition; this filter has now
+  // been wrong twice, once keyed off !linkInCaption and once off commentsApi
+  // alone, and the REASON printed here has been stale twice more.
   const later = accounts.filter((a) => wantComment
     && !FIRST_COMMENT_PLATFORMS.has(a.platform) && platformTable.commentWatched(a.platform));
   if (later.length) {

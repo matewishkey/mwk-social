@@ -29,7 +29,8 @@ this file loads every session whether it is relevant or not.
 - **`mwk-post`** — his words or a clip to a queued post: the voice, the hashtag rule, the media
   checks, `scripts/queue-add.js`, and what will actually happen once it is in.
 - **`mwk-image`** — a STILL rather than a clip: the two platforms that cannot take one, the file
-  whose extension lies, padding instead of cropping, and why the brand band is not ours to draw.
+  whose extension lies, padding instead of cropping, several stills as one post, and why the
+  brand band is not ours to draw.
 
 ## How this works at all
 

@@ -94,7 +94,8 @@ streams.** Three ways it bites:
 Images: aspect must be 0.75–1.91:1 and **exactly 1.91 is rejected** (float edge, bitten live).
 Pad with the screenshot's own background colour — never crop.
 
-**One video per post on every platform.** A vertical and a landscape cut are two posts, or one
+**One VIDEO per post on every platform** (several STILLS do ride together — `mwk-image` §5).
+A vertical and a landscape cut are two posts, or one
 item with `--media-wide`.
 
 ## 4. Queue it

@@ -260,7 +260,8 @@ function flowFor(name) {
       note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' });
   } else if (p.linkPlacement === 'reply') {
     steps.push({ step: 'the link', how: 'a second tweet in the same call, with its own tracked code',
-      note: 'X penalises whichever tweet holds the link — the root stays clean, for 1.5c' });
+      note: 'an out-of-network reply never enters the For You candidate set, so this CTA '
+        + 'reaches existing followers only. Not in use since 2026-08-24 — the link is in the tweet' });
   } else {
     steps.push({ step: 'the link', how: 'in the first comment, to keep it out of the body' });
   }
@@ -279,8 +280,8 @@ const flows = () => Object.keys(PLATFORMS).map(flowFor);
  *
  * Two conditions, and BOTH matter. A comments API is necessary but not
  * sufficient: X has one now, and the watcher still must not touch it, because
- * X's CTA already goes out as a thread reply at publish time and a second one
- * would be the same link twice under one post. Stated once, here, because
+ * X's CTA ships inside the post itself — its caption since 2026-08-24, a thread
+ * reply before that — and a second one would be the same link twice. Stated once, here, because
  * post.js decides what to print from it and first-comment.js's own list is
  * pinned against it in a test — the promise "the watcher adds it" has been
  * printed wrongly twice already.

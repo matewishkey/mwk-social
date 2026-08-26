@@ -34,6 +34,8 @@ function flowCards(flows) {
       c.foldAt ? `folds at ${c.foldAt}` : null,
       c.hashtagsInCaption === 0 ? 'no tags in the caption' : null,
       c.videoMaxSec ? `video to ${c.videoMaxSec >= 3600 ? `${c.videoMaxSec / 3600}h` : `${Math.round(c.videoMaxSec / 60)} min`}` : null,
+      c.imageOk === false ? 'takes no still picture' : null,
+      c.imageOk && c.imageMax > 1 ? `${c.imageMax} images per post` : null,
       c.deletable === false ? 'cannot be deleted or edited' : null,
       c.estCostCents ? `${c.estCostCents}c per post with a link` : null,
     ].filter(Boolean);

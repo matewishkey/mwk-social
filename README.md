@@ -33,6 +33,7 @@ length, and which platforms take a still at all.
 | `scripts/post.js` | The publisher: composes a caption per platform, mints the links, attaches the native first comment |
 | `scripts/first-comment.js` | The net under it — Threads has no native first-comment field, and any platform's can silently fail |
 | `scripts/yt-description.js` | Writes YouTube descriptions from each video's own transcript, and files a proposal rather than overwriting words already approved |
+| `scripts/lib/platforms.js` | The table every routing decision reads — what each platform accepts, where its link goes, how many stills it takes. Add a field here and wire it in the same commit: four have shipped read by nothing |
 | `scripts/lib/media.js` | Probes a clip and says which platforms will take it |
 | `scripts/lib/topic-tags.js` | Works out what a video was about, so the comment can say so in ordinary words |
 | `scripts/lib/pace.js` | The one thing that decides *when* |
@@ -84,7 +85,9 @@ covering three, and read half again as high as the truth. It was deleted rather 
   TikTok, and not from the CLI, so `post.js` calls the REST API directly.
 - **X's endpoints are opt-in per account and default to off.** While they are off they 403 with a
   message that reads exactly like a plan limit. It is not one.
-- **One video per post, on every platform** — so a vertical cut and a landscape cut are two posts.
+- **One VIDEO per post, on every platform** — so a vertical cut and a landscape cut are two posts.
+  Stills are the exception: several ride together as one gallery, capped per platform by
+  `imageMax` (LinkedIn 20, Facebook/Instagram/Threads 10, X 4).
 - **TikTok settings go in `tiktokSettings` at the top level**, not `platformSpecificData`, which
   would look accepted and apply none of them because that field echoes any key you send it.
 

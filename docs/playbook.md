@@ -19,7 +19,7 @@ clips on Facebook and a mirror copied them onward — which is why this file onc
 chapter on deciding whether a copy already existed somewhere. One origin means nothing to
 reconcile, and that chapter, `mirror.js` and `lib/matcher.js` are all gone.
 
-Two ways the call-to-action gets under a post:
+Four ways the call-to-action gets under a post:
 
 | | How | Where |
 |---|---|---|
@@ -75,7 +75,7 @@ in the wrong place.
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
 | **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, then repost from personal — plainly, no commentary, which is the default. A thought on top is optional and always his |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
-| **A still picture** | — | — | Five take one: Facebook, Instagram, LinkedIn, Threads, X. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one |
+| **A still picture** | — | — | Five take one: Facebook, Instagram, LinkedIn, Threads, X. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (LinkedIn 20, Facebook/Instagram/Threads 10, X 4) and `platforms.galleryFor()` is its only reader; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there anyway — the CTA names the bio. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
