@@ -212,9 +212,17 @@ had already published were jargon the rule rejects.
     `c3-96d-c3-b6n`. Found by curling the live redirect with a real name; an ASCII test passes.
   - **It says the link labelled natalie was opened, NOT that Natalie opened it.** Links get
     forwarded. Do not let a summary quietly upgrade it.
-- **`click.bot`: 0 counted, 1 crawler, 2 unknown.** A platform fetches a url to build its preview
-  card — the first live post logged 18 "clicks" in three minutes. The User-Agent is read to DECIDE
-  and then discarded. **Only `bot = 0` is ever shown.**
+- **`bot = 0` WAS NOT ENOUGH, AND IT OVERSTATED EVERY CLICK NUMBER BY ABOUT FOUR TIMES**
+  (2026-08-27). The User-Agent regex catches the fetchers that announce themselves and misses the
+  ones that present as a browser — 182 "human" clicks, ~49 that stand up. **A click counts only if
+  it arrived ALONE**: no other hit on that code within 60s either side (`web/src/lib/clicks.js`,
+  which holds the measured distribution and the reasoning). **The referer is NOT a positive
+  control** — Facebook's scraper sends `Referer: www.facebook.com`, so a facebook referer proves
+  the hit came from Facebook's infrastructure, never that a person was holding the phone.
+  - **Symmetric, not backward-looking.** Collapsing a wave to its first hit still counts the wave:
+    on the real table that is 30 YouTube-description clicks against 2. A test pins the `ABS(`.
+  - `click.bot` stays `0 counted, 1 crawler, 2 unknown`; the UA is still read to DECIDE and
+    discarded. It is now the first of two filters, never the only one.
 - **A click is attributed platform-first, referer-second, then unattributed.** Referer matching is
   **anchored**, so `notfacebook.com` maps to nothing: naming the wrong channel is worse than
   admitting we cannot tell.
@@ -235,9 +243,10 @@ had already published were jargon the rule rejects.
 - **`/links` on the dashboard can mint by hand.** Anything he pastes himself — a bio, a newsletter,
   a talk — was a raw url and invisible before that. The `campaign = bio` codes are the whole
   conversion path on Instagram and TikTok.
-  - **Measured 2026-08-26: 3 of 10 bio codes have a click** (his personal Facebook 3, Instagram 2,
-    X 1). A click proves the link is live; **a zero proves nothing** — not pasted and pasted-but-
-    unclicked look identical.
+  - **Measured 2026-08-27, on counted clicks: 3 of 10 bio codes have one** — his personal Facebook
+    3, X 2, Instagram 1; the other seven zero, YouTube's among them. A click proves the link is
+    live; **a zero proves nothing** — not pasted and pasted-but-unclicked look identical. (Same
+    3-of-10 as the 2026-08-26 reading, different codes: that one predates the click fix above.)
 
 ## YouTube descriptions
 
@@ -292,9 +301,14 @@ had already published were jargon the rule rejects.
   twitch on the youtube 'live' at all"*). Half the line aimed at the platform the reader is already
   on, the other half at a competitor — and on a Short it printed two urls beneath a CTA that had
   been DENIED a url. A test walks every tail shape and fails on a second url or the word twitch.
-- **THE YOUTUBE DESCRIPTION IS THE BIGGEST CLICK SOURCE WE HAVE — 37 of 90 human clicks**
-  (measured 2026-08-25). Nothing else is close. A video sitting without the blurb is the best
-  channel we have, switched off for that episode.
+- **"THE YOUTUBE DESCRIPTION IS THE BIGGEST CLICK SOURCE WE HAVE" WAS A MEASUREMENT ARTEFACT**
+  (retracted 2026-08-27). It read 37 of 90 human clicks, and by 27 Aug 87 of 182 — all of it
+  crawlers the UA test missed. The bursts land at the minute we WRITE the description
+  (`yt_proposal.applied_at` 2026-08-26T05:41:48 against hits at 05:40:45–05:46:01), and code `s8`
+  took four "human" clicks inside 5.5 seconds. Under the rule above the YouTube description has
+  **2** clicks, and exactly **one** counted hit in the whole table carries a `www.youtube.com`
+  referer. **The description is still worth writing — it is what a viewer reads — but it is not a
+  click channel, and no decision may rest on that number again.**
 - **The show-notes loop did not converge** until `/youtube/pending` returned what was last WRITTEN
   as well as what is approved: `build()` regenerates the opening every run, so an applied
   description never matches byte for byte and re-proposed itself.

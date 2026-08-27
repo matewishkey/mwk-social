@@ -21,6 +21,7 @@
 
 import { accessIdentity, tokenOk } from './lib/access.js';
 import { pageOf } from './lib/html.js';
+import { counted, automated } from './lib/clicks.js';
 import { api } from './api.js';
 import { redirect, platformFromReferer } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
@@ -167,19 +168,28 @@ async function stats(env, tz, snapshots, email) {
         JOIN (SELECT account_id, MAX(day) d FROM follower_point GROUP BY account_id) m
           ON m.account_id = f.account_id AND m.d = f.day`).all(),
     env.DB.prepare(
-      // bot = 0 only: a link-preview fetch is not a click. The referer is kept
-      // so a click on a code minted before codes were per-platform can still be
-      // attributed by where it came from.
+      // Counted clicks only: a link-preview fetch is not a click, and half of
+      // them do not admit to being one (lib/clicks.js). The referer is kept so
+      // a click on a code minted before codes were per-platform can still be
+      // attributed by where it came from — it is NOT evidence of a person.
       `SELECT l.platform, c.referer_host, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.platform, c.referer_host`).bind(from).all(),
+        WHERE c.at >= ? AND ${counted('c')} GROUP BY l.platform, c.referer_host`).bind(from).all(),
     // What people actually clicked, rather than only where from.
     env.DB.prepare(
       `SELECT l.target, COUNT(*) n, COUNT(DISTINCT l.code) codes
          FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND c.bot = 0 GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
-    // The honest denominator: how much of the traffic was not a person.
+        WHERE c.at >= ? AND ${counted('c')} GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
+    /*
+     * The honest denominator: how much of the traffic was not a person.
+     *
+     * A hit that was flagged human but arrived inside a fetch wave is folded
+     * into the crawler bucket, where it belongs — otherwise this tile would say
+     * one thing about how much of the traffic is real and every other number on
+     * the page would say another.
+     */
     env.DB.prepare(
-      `SELECT bot, COUNT(*) n FROM click WHERE at >= ? GROUP BY bot`).bind(from).all(),
+      `SELECT CASE WHEN c.bot <> 0 THEN c.bot WHEN ${counted('c')} THEN 0 ELSE 1 END bot,
+              COUNT(*) n FROM click c WHERE c.at >= ? GROUP BY 1`).bind(from).all(),
     env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
 
     /*
@@ -194,8 +204,8 @@ async function stats(env, tz, snapshots, email) {
         WHERE day >= ? ORDER BY day`).bind(from).all(),
     // Clicks per day, so the scoreboard has a shape and not only a total.
     env.DB.prepare(
-      `SELECT substr(at, 1, 10) day, COUNT(*) n FROM click
-        WHERE at >= ? AND bot = 0 GROUP BY day ORDER BY day`).bind(from).all(),
+      `SELECT substr(c.at, 1, 10) day, COUNT(*) n FROM click c
+        WHERE c.at >= ? AND ${counted('c')} GROUP BY day ORDER BY day`).bind(from).all(),
     /*
      * When each platform and each account was FIRST seen — over the whole table,
      * not the rendered window, which is the point of a separate query.
@@ -256,9 +266,9 @@ async function queue(env, tz, snapshots, email, url) {
 }
 
 /*
- * The link database. Clicks are counted with bot = 0 only — a preview fetcher
- * hits the redirect exactly like a person, so counting both would make every
- * link look like a success.
+ * The link database. Clicks are counted through lib/clicks.js — a preview
+ * fetcher hits the redirect exactly like a person and half of them do not admit
+ * to it, so counting every hit made every link look like a success.
  */
 const LINK_PAGE = 50;
 
@@ -268,8 +278,11 @@ async function links(env, tz, email, url) {
   const bind = campaign ? [campaign] : [];
 
   const clicks = `LEFT JOIN click c ON c.code = l.code`;
-  const counts = `SUM(CASE WHEN c.bot = 0 THEN 1 ELSE 0 END) AS human,
-                  SUM(CASE WHEN c.bot = 1 THEN 1 ELSE 0 END) AS crawler`;
+  // c is LEFT JOINed, so a link with no clicks has c.code NULL: `counted`
+  // evaluates NULL, the CASE falls through to 0 and the link reads zero rather
+  // than dropping out of the table.
+  const counts = `SUM(CASE WHEN ${counted('c')} THEN 1 ELSE 0 END) AS human,
+                  SUM(CASE WHEN c.code IS NOT NULL AND ${automated('c')} THEN 1 ELSE 0 END) AS crawler`;
 
   const totalRow = await env.DB.prepare(
     `SELECT COUNT(*) n FROM link l ${where}`).bind(...bind).first();
@@ -301,14 +314,15 @@ async function links(env, tz, email, url) {
      * the url (mwkshow.com/<code>/natalie), so this is the whole answer to
      * "did the people I messaged actually open it".
      *
-     * bot = 0 only. A messenger fetches the url to build its preview the moment
-     * he sends it, so counting every hit would show a click on every name the
-     * second it left his phone.
+     * Counted clicks only, and this is the place it matters most. A messenger
+     * fetches the url to build its preview the moment he sends it — and the
+     * preview arrives in a wave, seconds after the send — so counting every hit
+     * would show a click on every name the second it left his phone.
      */
     env.DB.prepare(
-      `SELECT tag, COUNT(*) AS clicks, MAX(at) AS last_at
-         FROM click WHERE tag IS NOT NULL AND bot = 0
-        GROUP BY tag ORDER BY last_at DESC LIMIT 60`).all(),
+      `SELECT c.tag, COUNT(*) AS clicks, MAX(c.at) AS last_at
+         FROM click c WHERE c.tag IS NOT NULL AND ${counted('c')}
+        GROUP BY c.tag ORDER BY last_at DESC LIMIT 60`).all(),
   ]);
 
   return linksPage({

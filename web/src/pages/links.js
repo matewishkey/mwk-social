@@ -22,11 +22,13 @@
  * out of a terminal, and that is exactly why the share pages exist. The same
  * reasoning applies here: the dashboard is where he already is.
  *
- * Only `bot = 0` clicks are ever shown. A platform fetching a url to build its
- * preview card hits the redirect exactly like a person does — the first live
- * post logged 18 of them on one link in three minutes — so the crawler column
- * is kept visible rather than hidden, because a link with 40 crawler hits and
- * no human ones is a link that was seen and ignored, which is worth knowing.
+ * Only COUNTED clicks are ever shown, and what counts is decided in one place:
+ * lib/clicks.js. A platform fetching a url to build its preview card hits the
+ * redirect exactly like a person does — the first live post logged 18 of them
+ * on one link in three minutes — and the User-Agent test catches only the ones
+ * that admit it, so a hit must also have arrived ALONE. The crawler column is
+ * kept visible rather than hidden, because a link with 40 crawler hits and no
+ * human ones is a link that was seen and ignored, which is worth knowing.
  */
 import { esc, card, tile, layout, ago, pager } from '../lib/html.js';
 import { mint } from '../api.js';
