@@ -29,7 +29,10 @@
  *   --topics a,b,c                   topic tags, no # needed. Omit to let the
  *                                    watcher derive them from the transcript
  *   --comment TEXT                   a custom first comment instead of the rotation
- *   --no-first-comment               post it with no CTA comment at all
+ *   --at YYYY-MM-DD                  hold it until that day. The pace still
+                                   applies on the day; without this it goes as
+                                   soon as the pace allows
+  --no-first-comment               post it with no CTA comment at all
  *   --no-reshare                     do not repost it from the personal LinkedIn
  *
  * Needs CLOUDFLARE_API_TOKEN, so run it through scripts/with-secrets.sh.
@@ -111,6 +114,7 @@ function parse(argv) {
       case '--platforms': opt.platforms = take(i).split(',').map((s) => s.trim()).filter(Boolean); i++; break;
       case '--topics': opt.topics = take(i).split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean); i++; break;
       case '--comment': opt.comment = take(i); i++; break;
+      case '--at': opt.at = take(i); i++; break;
       case '--no-first-comment': opt.firstComment = 0; break;
       case '--no-reshare': opt.reshare = 0; break;
       case '--dry-run': opt.dryRun = true; break;
@@ -122,6 +126,14 @@ function parse(argv) {
   if (opt.bodyFile) opt.body = fs.readFileSync(opt.bodyFile, 'utf8');
   opt.body = (opt.body || '').trim();
   if (!opt.body) throw new Error('nothing to post — pass --body or --body-file');
+
+  // A bare YYYY-MM-DD, so it unlocks at midnight UTC (10am Brisbane) on that
+  // day. A typo here would hold a post for ever with nothing to show for it, so
+  // the shape is checked rather than trusted.
+  if (opt.at !== undefined) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(opt.at)) throw new Error(`--at wants YYYY-MM-DD, got ${opt.at}`);
+    if (Number.isNaN(Date.parse(opt.at))) throw new Error(`--at is not a real date: ${opt.at}`);
+  }
 
   // A platform typo would silently post nowhere, since an unknown name simply
   // never matches. Fail here instead, where it is one word to fix.
@@ -148,12 +160,14 @@ function sqlFor(opt, id, media, mediaWide, now, extraKeys) {
   const extra = (extraKeys && extraKeys.length) ? JSON.stringify(extraKeys) : null;
   return `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
   media_key, media_url, media_type, media_extra, first_comment, priority,
-  reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url)
+  reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url,
+  not_before)
 VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
   ${lit(JSON.stringify(opt.platforms))},
   ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${lit(extra)}, ${opt.firstComment}, 0,
   ${opt.reshare}, NULL, ${lit(opt.comment)},
-  ${lit(JSON.stringify(opt.topics))}, ${lit(mediaWide[0])}, ${lit(opt.mediaWideUrl)});
+  ${lit(JSON.stringify(opt.topics))}, ${lit(mediaWide[0])}, ${lit(opt.mediaWideUrl)},
+  ${lit(opt.at)});
 `;
 }
 

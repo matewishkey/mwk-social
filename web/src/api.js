@@ -126,10 +126,14 @@ async function claim(body, env) {
   const now = new Date().toISOString();
   const platforms = Array.isArray(body.platforms) ? body.platforms : null;
 
+  // `not_before` holds an item until its day. A bare date compares correctly
+  // against an ISO timestamp ('2026-08-31' <= '2026-08-31T00:00:00.000Z'), so
+  // the row unlocks at midnight UTC — 10am Brisbane. NULL means no hold.
   const rows = await env.DB.prepare(
     `SELECT * FROM queue_item WHERE status = 'queued'
+       AND (not_before IS NULL OR not_before <= ?1)
       ORDER BY priority DESC, created_at LIMIT 20`,
-  ).all();
+  ).bind(now).all();
 
   for (const row of rows.results || []) {
     // A queue item may name platforms; the caller may also restrict what it is

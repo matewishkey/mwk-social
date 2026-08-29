@@ -164,6 +164,7 @@ export function queuePage({ email, tz, waiting, done, pace,
             ? ' · reposted from your personal account, with your words'
             : ' · reposted from your personal account'}
           ${i.comment_text ? ' · custom first comment' : ''}
+          ${i.not_before ? ` · <b>held until ${esc(i.not_before)}</b>` : ''}
           ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}
           ${i.retry_of ? ' · retry, same short code' : ''}
           ${failedPlatforms(i).length ? ` · <b>${esc(failedPlatforms(i).join(', '))} did not go</b>` : ''}</div>

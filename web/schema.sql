@@ -319,3 +319,17 @@ BEGIN
      OLD.views, OLD.likes, OLD.comments, OLD.shares, OLD.saves, OLD.clicks,
      OLD.updated_at, NEW.updated_at);
 END;
+
+-- A queue item that must not go out before a given day (2026-08-29). The queue
+-- was purely a rate limit — six a day, ninety minutes apart — which can express
+-- "not too fast" and cannot express "not until Monday". A twelve-post run laid
+-- out over three weeks would have emptied itself in two days.
+--
+-- A bare date, not a timestamp, and compared against an ISO `now`: '2026-08-31'
+-- sorts before '2026-08-31T00:00:00.000Z', so the item unlocks at midnight UTC,
+-- which is 10am in Brisbane. That is the right end of the day to release on, and
+-- it falls out of the string compare rather than needing a timezone here.
+--
+-- NULL means "as soon as the pace allows", which is every item written before
+-- this column existed and every one queued without --at.
+ALTER TABLE queue_item ADD COLUMN not_before TEXT;

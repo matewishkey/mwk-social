@@ -60,3 +60,38 @@ test('the defaults are a first comment and a personal repost', () => {
   assert.equal(off.firstComment, 0);
   assert.equal(off.reshare, 0);
 });
+
+/*
+ * A held item. The queue could express "not too fast" and not "not until
+ * Monday", so a run laid out over three weeks emptied itself in two days. The
+ * hold is a bare date on purpose — see the schema note — and the claim compares
+ * it against an ISO now, which only works because the date sorts before every
+ * timestamp inside its own day.
+ */
+test('--at rides into the insert, and no --at is NULL rather than a date', () => {
+  const held = parse(['--body', 'x', '--at', '2026-08-31']);
+  assert.match(sqlFor(held, '01ABC', [null, null], [null, null], 'now'), /'2026-08-31'\)/);
+  const free = parse(['--body', 'x']);
+  assert.equal(free.at, undefined);
+  assert.match(sqlFor(free, '01ABC', [null, null], [null, null], 'now'), /NULL\);/);
+});
+
+test('a hold that is not a date is refused, not held for ever', () => {
+  for (const bad of ['monday', '31-08-2026', '2026-8-31', '2026-13-99']) {
+    assert.throws(() => parse(['--body', 'x', '--at', bad]), /--at/);
+  }
+});
+
+test('a bare hold date sorts before every moment of its own day', () => {
+  // This is the whole reason the claim can compare a date against a timestamp.
+  assert.ok('2026-08-31' <= '2026-08-31T00:00:00.000Z');
+  assert.ok('2026-08-31' <= '2026-08-31T23:59:59.999Z');
+  assert.ok(!('2026-08-31' <= '2026-08-30T23:59:59.999Z'));
+});
+
+test('the claim query actually reads not_before, or the column is decoration', () => {
+  const fs = require('node:fs');
+  const api = fs.readFileSync(require.resolve('../web/src/api.js'), 'utf8');
+  const claim = api.slice(api.indexOf('async function claim'));
+  assert.match(claim, /not_before IS NULL OR not_before <= \?1/);
+});
