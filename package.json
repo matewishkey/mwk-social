@@ -10,6 +10,7 @@
   "license": "UNLICENSED",
   "type": "commonjs",
   "devDependencies": {
-    "@zernio/cli": "^0.4.0"
+    "@zernio/cli": "^0.4.0",
+    "playwright": "^1.62.1"
   }
 }

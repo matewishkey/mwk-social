@@ -1,0 +1,152 @@
+{
+  "title": "THE CLAIM, IN SIX WORDS OR SO",
+  "sub": "What each option actually costs, after fees, interest and tax",
+  "title2": "WHERE EACH NUMBER COMES FROM",
+  "sub2": "The same options, with the working. 2 of 3.",
+  "title3": "WHAT THE ADS LEAVE OUT",
+  "sub3": "How generous we were, and the catch. 3 of 3.",
+  "chartNote": "Every bar on the same scale. The period is on each one.",
+  "charts": [
+    {
+      "head": "What it costs you",
+      "note": "one scale, so the bars are comparable",
+      "bars": [
+        {
+          "label": "The boring option",
+          "period": "today",
+          "value": 0,
+          "show": "$0",
+          "tone": "good",
+          "rank": "best"
+        },
+        {
+          "label": "The one in the ad",
+          "period": "50 days",
+          "value": 126,
+          "show": "$126",
+          "tone": "warn"
+        },
+        {
+          "label": "The one nobody mentions",
+          "period": "2 years",
+          "value": 8063,
+          "show": "$8,063",
+          "tone": "bad",
+          "rank": "worst"
+        }
+      ]
+    }
+  ],
+  "columns": [
+    {
+      "n": 1,
+      "icon": "bank",
+      "name": "The boring option",
+      "lead": "$0",
+      "leadNote": "extra cost",
+      "mark": "good",
+      "rows": [
+        [
+          "Fee",
+          "$0"
+        ],
+        [
+          "Interest",
+          "$0"
+        ],
+        [
+          "Costs you",
+          "$0"
+        ]
+      ],
+      "verdict": "Cheapest, and it is usually not close."
+    },
+    {
+      "n": 2,
+      "icon": "card",
+      "name": "The one in the ad",
+      "lead": "$126",
+      "leadNote": "over 50 days",
+      "mark": "warn",
+      "rows": [
+        [
+          "Fee",
+          "\u2212$418"
+        ],
+        [
+          "What you get back",
+          "+$292"
+        ],
+        [
+          "Costs you",
+          "$126"
+        ]
+      ],
+      "verdict": "Marginal at best, and only if everything goes to plan."
+    },
+    {
+      "n": 3,
+      "icon": "rise",
+      "name": "The one nobody mentions",
+      "lead": "$8,063",
+      "leadNote": "over 2 years",
+      "mark": "bad",
+      "rows": [
+        [
+          "Rate",
+          "23.99%"
+        ],
+        [
+          "After 2 years",
+          "\u2212$8,063"
+        ],
+        [
+          "Costs you, 2 years",
+          "$8,063"
+        ]
+      ],
+      "verdict": "Compounding daily. This is what the ad is quietly hoping for."
+    }
+  ],
+  "lodge": {
+    "title": "The thing that matters more than any figure here",
+    "text": "Every episode gets one of these: the practical step that is worth more than the arithmetic. Keep it short and keep it true."
+  },
+  "generous": {
+    "title": "And we counted it in their favour",
+    "points": [
+      "Name each assumption you made in their favour",
+      "One line each",
+      "Three or four, never more"
+    ],
+    "close": "Stack them all in the ad's favour and it still costs $126."
+  },
+  "box": {
+    "title": "The headline number, and why it is a trap",
+    "rows": [
+      [
+        "If the flattering case does not apply to you",
+        "$1,500",
+        "warn"
+      ],
+      [
+        "you saved what you would actually have spent",
+        "",
+        ""
+      ],
+      [
+        "If it genuinely does apply",
+        "$6,000",
+        "good"
+      ],
+      [
+        "you saved a real amount, after tax",
+        "",
+        ""
+      ]
+    ],
+    "note": "Either way the headline number is not the saving. It only counts for somebody who was going to spend it, and that person is not doing this for $126."
+  },
+  "stamp": "Generated 1 September 2026. Rates as published August 2026: name every rate the numbers rest on, here.",
+  "fine": "Simulation from public sources and stated assumptions. Rates, fees and tax treatment change and tax depends on your circumstances. General information, not financial, legal or tax advice. No endorsement by anyone named."
+}

@@ -388,6 +388,35 @@ most repeated failure in this repo.
   accounts by it. **Read the table, never this file, for which slot a platform uses**: the note is
   a copy and the copy is what drifted.
 
+## Reality check cards
+
+- **`scripts/reality-check/` renders the cards; the episode is a json and lives on the
+  SHARE, not here.** This repo is public and does not need to carry a specific claim to
+  carry the format. `example.json` is the shape, and it renders.
+- **The brand is vendored from `matewishkey/mwk-og-image-generator`, not approximated.**
+  Reading that repo's `brand/` corrected three things at once: the red is `#e2342b` (not
+  the #DE2725 that had been guessed), `redDeep #f0524a` is the only red allowed at BODY
+  size, and the type is Fraunces 700 / JetBrains Mono 700 uppercase / Manrope, not Anton
+  and Inter. **The RedBlock is the only logo and is never a bare mark.** Fonts are OFL
+  with their licences beside them.
+- **`validate.js` runs before anything renders, because the failure that matters is a card
+  that comes out WRONG and looks fine.** Two of four icons once rendered as empty squares
+  after a rename and nothing said so. It refuses an unknown icon, a tone that is not a
+  tone, a bar with no period, a last row that is not the answer, and a stamp with no year.
+  A test walks the icon list against the renderer's own, because the two lists living
+  apart is how the squares happened.
+- **The renderer measures its own overflow and says `OVERFLOW`** rather than cropping. A
+  card that quietly loses its bottom row is the one that gets published.
+- **Portrait is THREE cards, not a cut-down.** Instagram takes nothing taller than 4:3, and
+  the landscape card does not fit inside that — so 1080x1350 x3 as a carousel, verified as
+  a gallery on all five image platforms. **Do not sit on exactly 0.75 or 1.91**; the same
+  float edge that rejects a 1.91 image rejects these.
+- **One scale across every bar, and every bar names its window.** Two scales let $126 and
+  $3,600 draw the same length, which is the opposite of what a chart is for.
+- **Say where the numbers were counted generously.** Admitting the overestimate is what
+  makes the conclusion hard to argue with; a card that only accuses reads as an axe being
+  ground. Same reason the one case where the thing being checked WINS stays on the card.
+
 ## Publishing and the queue
 
 - **The queue is OURS, not Zernio's** (reviewed 2026-08-21). Zernio's `/v1/queue/*` is a recurring
