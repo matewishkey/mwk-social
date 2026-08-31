@@ -5,11 +5,12 @@
  * Two paths put the comment out, both composing it from config/voice.json:
  *   - posts published through the pipeline carry it natively (scripts/post.js
  *     sends platformSpecificData.firstComment, Zernio posts it within seconds);
- *   - everything else — phone-app posts, live-event videos, anything created
- *     straight on the platform — is caught here, once Zernio's external-post
- *     sync notices it (~90 min).
+ *   - YouTube LIVE STREAMS, which are started straight on the platform and so
+ *     never reach posts:list, are caught here once Zernio's external sync
+ *     notices them (~90 min). See sources() for why that is YouTube alone.
  * The duplicate guard is what lets the two coexist: a post that already carries
- * the CTA link is left alone whichever path put it there.
+ * the CTA link is left alone whichever path put it there. A post made by hand
+ * anywhere ELSE is still a one-off, handled by hand.
  *
  * Instagram, Facebook, LinkedIn and YouTube. TikTok has no comments API.
  *
@@ -99,17 +100,30 @@ const isStory = (post, pf) =>
   (post.platformSpecificData && post.platformSpecificData.contentType === 'story');
 
 /*
- * Only what we published. Everything goes out through this pipeline now, so
- * posts:list is the whole universe — and it carries a post the moment it
- * publishes, where analytics:posts lags minutes behind.
+ * Two sources, and the second one is not a leftover.
  *
- * This used to also sweep analytics:posts per platform, which was the only
- * place posts written in the apps ever showed up. That net is gone with the
- * thing it was catching: a post made outside this pipeline is now a one-off,
- * handled by hand rather than by an hourly scan of every platform.
+ * posts:list is the pipeline's own output — it carries a post the moment it
+ * publishes, where analytics:posts lags minutes behind. When the Restream
+ * mirror was retired the per-platform analytics sweep went with it, on the
+ * premise that everything goes out through this pipeline now.
+ *
+ * THAT PREMISE IS FALSE FOR LIVE STREAMS, AND IT COST NINE OF THEM THEIR CTA
+ * (found 2026-08-31). He goes live straight on YouTube — nineteen streams by
+ * 31 August — so a live event never reaches posts:list and this watcher could
+ * not see one at all. Four of the nine had a good description with the link in
+ * it and nothing underneath. A live stream is a recurring shape here, not the
+ * "one-off handled by hand" the removal assumed.
+ *
+ * YOUTUBE ONLY, deliberately. It is where the live events are, and it is the
+ * one platform where a link under a long-form video is actually clickable.
+ * Sweeping every platform is what the mirror removal was right to delete.
  */
 function sources(opts) {
-  return [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
+  const out = [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
+  if (opts.platforms.includes('youtube')) {
+    out.push(zernio(['analytics:posts', '--platform', 'youtube', '--limit', String(opts.limit)]));
+  }
+  return out;
 }
 
 function collectPosts(opts) {

@@ -332,6 +332,32 @@ test('the watcher asks whether a url can be followed before minting', () => {
   assert.match(src, /linkDeadFor\('youtube'/, 'a Short is dead for the comment too, not only the description');
 });
 
+/*
+ * THE WATCHER MUST STILL SEE A LIVE STREAM.
+ *
+ * The per-platform analytics sweep was deleted with the Restream mirror on
+ * 2026-08-20, on the premise that everything goes out through this pipeline
+ * now. Live streams do not: he starts them on YouTube, so they never appear in
+ * posts:list. Nineteen streams existed by 31 August and nine of them carried no
+ * CTA at all — including four whose description was already correct.
+ *
+ * The positive control comes first: posts:list must still be read, or an
+ * assertion that only checks for the analytics sweep would pass on a file that
+ * had lost the pipeline's own posts.
+ */
+test('the watcher still reaches a YouTube live stream, which never enters posts:list', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  const fn = src.slice(src.indexOf('function sources('), src.indexOf('function collectPosts('));
+  assert.match(fn, /posts:list/, 'the pipeline\'s own posts are the first source and must stay');
+  assert.match(fn, /'analytics:posts', '--platform', 'youtube'/,
+    'a live stream reaches us only through the external sweep');
+  // YouTube alone. Widening it back to every platform is what the mirror
+  // removal was right to do, and a loop over opts.platforms is how it returns.
+  assert.ok(!/for \(const platform of opts\.platforms\)/.test(fn),
+    'the sweep is YouTube-only — a per-platform loop is the mirror-era net coming back');
+});
+
 test('every code the watcher mints names its campaign and its placement', () => {
   const src = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');

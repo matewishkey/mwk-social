@@ -313,6 +313,27 @@ had already published were jargon the rule rejects.
   as well as what is approved: `build()` regenerates the opening every run, so an applied
   description never matches byte for byte and re-proposed itself.
 
+## Live streams
+
+- **HE GOES LIVE STRAIGHT ON YOUTUBE, SO A LIVE STREAM NEVER ENTERS `posts:list`** — and for eleven
+  days that meant it could not be seen by the first-comment watcher at all. The per-platform
+  analytics sweep was deleted with the Restream mirror on the premise that *everything goes out
+  through this pipeline now*; live events are the standing exception. Found 2026-08-31: 19 streams
+  on the channel, **9 with no CTA anywhere**, four of them with a perfectly good description.
+  `sources()` sweeps `analytics:posts --platform youtube` again — **YouTube only**, and a test
+  fails if that becomes a loop over every platform.
+- **A stream with the link already in its description is SKIPPED, and that is the right answer to
+  "does a first comment make sense?"** — on long-form YouTube a description url is clickable, so a
+  comment repeating it is noise. The comment is the net for a stream whose description has not been
+  written or approved yet.
+- **`--sync` proposes but cannot act on an UPCOMING stream** — yt-dlp refuses a scheduled live
+  event (`This live event will begin in N hours`), so it fails that video every run until it airs.
+  Its comments are closed too. Both are expected; neither is a fault to chase.
+- **A test stream is still a video on the channel.** Five carried the placeholder title *Watch Me
+  Work* and the description *Testing desktop view*, two of them a duplicate pair of the same
+  5-hour stream. The description sync files a proposal; **nothing here writes a TITLE**, so a
+  placeholder title is his to fix and no automation will notice it.
+
 ## Thumbnails
 
 - **A custom thumbnail CAN be pushed to an already-published video, and Zernio's docs say it
@@ -585,7 +606,8 @@ The invariants:
 - **Stories**: postable via API but they get no stickers/links/music (Meta limit) — post manually.
   An Instagram story shared onward to Facebook has no API analytics on the Facebook side.
 - **Native/past posts**: `analytics:posts --source external` picks up app-made posts on a ~90 min
-  sync. Nothing reads that sweep now — a post made outside the pipeline is handled by hand.
+  sync. **YouTube is the one platform that still reads it** (`first-comment.js`'s `sources()`) —
+  see *Live streams* below. Anywhere else a post made outside the pipeline is handled by hand.
 
 ## X: follows only
 
