@@ -28,6 +28,7 @@ const os = require('os');
 net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const { cli } = require('./lib/api');
+const health = require('./lib/health');
 const platforms = require('./lib/platforms');
 const pace = require('./lib/pace');
 const voice = require('./lib/voice');
@@ -143,6 +144,25 @@ async function main() {
   const s = await post('/events', { source: os.hostname(), events: [], snapshots });
   console.log(`shipped ${rows.length} daily row(s), ${folk.length} follower count(s) — ${m.slice(0, 80)}`);
   console.log(`shipped the platform table, the voice and the pace — ${s.slice(0, 80)}`);
+
+  /*
+   * Every account can still post — read once an hour, since this job already
+   * talks to Zernio. `warning` is routine (tokens refresh lazily); the alert
+   * is `needsReconnect` or `error`, which is a token he has to click through
+   * a reconnect for, and which otherwise shows up as one platform silently
+   * missing from every post until somebody reads the queue table.
+   */
+  try {
+    const { accounts = [] } = cli(['accounts:health']);
+    const broken = accounts.filter((a) => a.needsReconnect || a.status === 'error');
+    const message = broken.length
+      ? `reconnect: ${broken.map((a) => `${a.platform} (${a.displayName || a.username || a.accountId})`).join(', ')}`
+      : `${accounts.length} accounts can post`;
+    health.ping('accounts', { ok: !broken.length, message });
+    if (broken.length) console.error(message);
+  } catch (err) {
+    health.ping('accounts', { ok: false, message: `accounts:health failed: ${err.message}`.slice(0, 200) });
+  }
 }
 
 main().catch((err) => { console.error(err.message); process.exit(1); });

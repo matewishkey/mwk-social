@@ -38,12 +38,15 @@ length, and which platforms take a still at all.
 | `scripts/lib/topic-tags.js` | Works out what a video was about, so the comment can say so in ordinary words |
 | `scripts/lib/pace.js` | The one thing that decides *when* |
 | `scripts/lib/shortlink.js` | Mints the tracked code. Idempotent, and never fatal — no dashboard means a plain url and the comment still goes out |
-| `scripts/lib/reshare.js` | LinkedIn: the company page posts, the personal profiles repost, staggered |
+| `scripts/lib/reshare.js` | LinkedIn: his profile posts; the company page reposts with the CTA, the other profile plain, staggered |
 | `web/` | The dashboard — Cloudflare Workers + D1, behind an email one-time PIN |
 | `.claude/skills/` | The procedures an agent working here follows, loaded when the work calls for them |
 
-Five systemd `--user` timers run it (`scripts/install-timers.sh`): the queue every five minutes,
-the comment watcher hourly, events every two minutes, analytics hourly, show notes daily.
+Six systemd `--user` timers run it (`scripts/install-timers.sh`): the queue every five minutes,
+the comment watcher hourly, events every two minutes, analytics hourly, show notes daily, and a
+nightly copy of the box's state to the backed-up share. Three Healthchecks dead-man checks
+(`scripts/lib/health.js`) email the owner if the heartbeat stops, nothing posts for a day, or an
+account needs reconnecting.
 
 ## Reproduce it
 
@@ -57,6 +60,31 @@ npm install                                     # installs @zernio/cli locally
 scripts/install-timers.sh                       # the timers that publish and watch
 scripts/with-secrets.sh scripts/queue-add.js --body "Your post" --media clip.mp4
 ```
+
+## A new box
+
+Nothing irreplaceable lives on the box: the queue, links, clicks, proposals and metrics are in D1
+and R2. What is local is `~/.local/state/mwk-social/` — the first-comment ledger, cached
+transcripts, description backups — and `scripts/state-copy.sh` puts a copy on the share nightly.
+On another fleet dev box (already converged: `~/.secrets`, the age key, `sops`, `mise`, `yt-dlp`,
+`ffmpeg` present):
+
+```bash
+git clone git@github.com:matewishkey/mwk-social.git ~/projects/mwk-social
+cd ~/projects/mwk-social && mise install && npm install
+git -C ~/projects/td-sops pull
+sops -d ~/projects/td-sops/apps/mwk-social.enc.env >/dev/null   # proves this box is a recipient
+type yt-dlp ffprobe ffmpeg sops                                 # all four must resolve
+rsync -a ~/share/work/mat-mwk-social/state/ ~/.local/state/mwk-social/   # last night's ledger
+scripts/with-secrets.sh ./node_modules/.bin/zernio auth:check
+scripts/with-secrets.sh node scripts/first-comment.js --dry-run  # expect "already there", no "post"
+loginctl enable-linger                                          # timers need it without a login
+scripts/install-timers.sh
+```
+
+Without the state copy the watcher still would not double-comment — it reads each post's
+comments before writing — but the transcripts would have to be paid for again and the description
+backups would be gone.
 
 ## What's worth measuring
 

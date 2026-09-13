@@ -641,6 +641,22 @@ The invariants:
   verbatim is ten hours wrong to him. `TZ=Australia/Brisbane date '+%H:%M %Z'`. The dashboard
   already renders Brisbane. AEST is UTC+10 year round.
 
+## Alerting and the box's state
+
+- **THERE WAS NO ALERT PATH AT ALL UNTIL 2026-09-14.** The product review measured 6,895 timer runs
+  in a week, two self-healed failures, zero errors — and nothing that would tell anybody the box
+  was off, a token had expired, or the queue had stopped. `scripts/lib/health.js` is the one path:
+  three Healthchecks dead-man checks (`heartbeat` from ship-events every 2 min, `posted` from
+  run-queue on a live post, `accounts` from ship-stats hourly on `needsReconnect`/`error`), URLs
+  in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job never fails
+  because the alerting did. A test drives it through a curl shim. The Healthchecks project has to
+  exist first — it is mate's account to create it in.
+- **The box's disk is not backed up, and `~/.local/state/mwk-social/` is what makes the pipeline
+  idempotent** — the first-comment ledger, 47 cached transcripts Zernio's expired URLs can never
+  re-fetch, the only backup of every description overwritten. `scripts/state-copy.sh` copies it to
+  `~/share/work/mat-mwk-social/state/` nightly (the share IS backed up). README → *A new box* is
+  the rebuild; it is ten commands, and the watcher would not double-comment even without the copy.
+
 ## Not used, and why
 
 - **Webhooks** would replace the hourly poll, but need a public HTTPS endpoint and detection still

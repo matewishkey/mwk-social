@@ -28,6 +28,7 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const pace = require('./lib/pace');
 const events = require('./lib/events');
+const health = require('./lib/health');
 const platforms = require('./lib/platforms');
 const mediaLib = require('./lib/media');
 const { publish } = require('./post');
@@ -339,6 +340,10 @@ async function main() {
         `queued with the first comment switched off (${item.id})`);
       if (suppressed) console.log(`first comment suppressed on ${suppressed} post(s) — the watcher will leave them alone`);
     }
+
+    // "Something went out today" — a dead-man with a one-day period, so a
+    // week of nothing posting is an email rather than a discovery.
+    if (anyLive) health.ping('posted', { message: `posted ${item.id}` });
 
     // The event is what makes a queued post count against the shared daily cap.
     events.emit('queue.posted', {

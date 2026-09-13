@@ -104,8 +104,23 @@ if [[ "$want" == all || "$want" == yt-notes ]]; then
     'Draft MWK YouTube show notes'
 fi
 
+if [[ "$want" == all || "$want" == state-copy ]]; then
+  # Nightly. Everything that makes the pipeline idempotent lives in
+  # ~/.local/state/mwk-social on this box, and this box's disk is not backed
+  # up: the first-comment ledger (which post already has its CTA), 47 cached
+  # transcripts Zernio's expired media URLs can never re-fetch, and the only
+  # backup of every YouTube description we overwrote. The share IS backed up
+  # (nightly, Google Drive). Not media/ — that is in R2 — and not events/,
+  # which are shipped to D1 within two minutes.
+  unit mwk-state-copy \
+    'Copy the MWK pipeline state to the backed-up share' \
+    "$repo/scripts/state-copy.sh" \
+    '03:20' \
+    'Nightly copy of MWK state to the share'
+fi
+
 systemctl --user daemon-reload
-for name in mwk-first-comment mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes; do
+for name in mwk-first-comment mwk-ship-events mwk-queue mwk-ship-stats mwk-yt-notes mwk-state-copy; do
   [[ -f "$unit_dir/$name.timer" ]] || continue
   systemctl --user enable --now "$name.timer"
 done

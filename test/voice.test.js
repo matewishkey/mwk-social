@@ -828,3 +828,51 @@ test('the dashboard form refuses held words before anything is uploaded, and say
   assert.match(html, /Not queued:/);
   assert.match(html, /carries one/);
 });
+
+/*
+ * THE ONE ALERT PATH (2026-09-14). Three dead-man checks pinged from jobs that
+ * already run; an unset URL is a no-op so a job never fails because the
+ * alerting did; a failure pings /fail with the reason. Tested with a curl shim
+ * on PATH, so the ping is exercised and not merely declared.
+ */
+test('health.ping is a no-op unset, pings when set, and /fail on a failure', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const health = require('../scripts/lib/health.js');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-curl-'));
+  const log = path.join(dir, 'calls');
+  fs.writeFileSync(path.join(dir, 'curl'), `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\n`, { mode: 0o755 });
+  const savedPath = process.env.PATH;
+  const savedUrl = process.env.MWK_HC_POSTED_URL;
+  try {
+    process.env.PATH = `${dir}:${savedPath}`;
+    delete process.env.MWK_HC_POSTED_URL;
+    assert.equal(health.ping('posted'), false, 'unset is a no-op');
+    assert.ok(!fs.existsSync(log), 'and curl is never called');
+
+    process.env.MWK_HC_POSTED_URL = 'https://hc.example/abc';
+    assert.equal(health.ping('posted', { message: 'posted q1' }), true);
+    assert.equal(health.ping('posted', { ok: false, message: 'nothing' }), true);
+    const calls = fs.readFileSync(log, 'utf8').trim().split('\n');
+    assert.equal(calls.length, 2);
+    assert.match(calls[0], /https:\/\/hc\.example\/abc$/, 'ok pings the bare url');
+    assert.match(calls[0], /posted q1/, 'the message rides along');
+    assert.match(calls[1], /https:\/\/hc\.example\/abc\/fail$/, 'a failure pings /fail');
+    assert.match(calls[0], /-m 10/, 'ten seconds, never longer');
+  } finally {
+    process.env.PATH = savedPath;
+    if (savedUrl === undefined) delete process.env.MWK_HC_POSTED_URL; else process.env.MWK_HC_POSTED_URL = savedUrl;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// Each job that should ping does, by name — declared-and-never-read is the
+// repo's favourite failure and a check nobody pings is an alert that never fires.
+test('every check has exactly the job that pings it', () => {
+  const read = (f) => require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'scripts', f), 'utf8');
+  assert.match(read('ship-events.js'), /health\.ping\('heartbeat'/);
+  assert.match(read('run-queue.js'), /if \(anyLive\) health\.ping\('posted'/);
+  assert.match(read('ship-stats.js'), /health\.ping\('accounts', \{ ok: !broken\.length/);
+  assert.doesNotMatch(read('first-comment.js'), /process\.env\.MWK_COMMENT_HC_URL/, 'the private hook set nowhere is gone');
+});

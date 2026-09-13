@@ -44,6 +44,7 @@ const path = require('path');
 net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const events = require('./lib/events');
+const health = require('./lib/health');
 
 const HEARTBEAT_MS = 10 * 60 * 1000;   // under the dashboard's 15-min stale mark, on purpose
 const BATCH = 500;
@@ -113,6 +114,9 @@ async function main() {
     lastId: pending.length ? pending[pending.length - 1].id : cursor.lastId,
     lastSentAt: new Date().toISOString(),
   });
+  // The dead-man heartbeat: this runs every two minutes and sends an empty
+  // batch when idle, so its silence means the box, not the pipeline, is off.
+  health.ping('heartbeat', { message: `shipped ${pending.length}` });
   console.log(`shipped ${pending.length} event(s) — ${text.slice(0, 120)}`);
 }
 

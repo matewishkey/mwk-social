@@ -28,7 +28,7 @@
  */
 'use strict';
 
-const { execFileSync } = require('child_process');
+const health = require('./lib/health');
 
 const { topicsFor } = require('./lib/topic-tags');
 const { getComments, replyToPost, cli: zernio } = require('./lib/api');
@@ -367,10 +367,11 @@ async function main() {
 
   events.finishRun({ inWindow: posts.length, pending: pending.length, failures });
 
-  const hc = process.env.MWK_COMMENT_HC_URL; // optional Healthchecks.io ping
-  if (hc && !opts.dryRun) {
-    try { execFileSync('curl', ['-fsS', '-m', '10', '-o', '/dev/null', failures ? `${hc}/fail` : hc]); } catch { /* never fail the run on the ping */ }
-  }
+  // There was a private MWK_COMMENT_HC_URL here, set nowhere for a month. The
+  // alerting is lib/health.js now; a comment run with failures marks the
+  // heartbeat check failed so the email names it, and the next clean ship-events
+  // run clears it.
+  if (failures && !opts.dryRun) health.ping('heartbeat', { ok: false, message: `first-comment: ${failures} failure(s)` });
 
   process.exit(failures ? 1 : 0);
 }
