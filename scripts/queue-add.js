@@ -26,8 +26,19 @@
  *                                    (LinkedIn 20, FB/IG/Threads 10, X 4)
  *   --media-wide PATH|URL            the landscape cut, for the platforms that take one
  *   --platforms a,b,c                default: empty, meaning "wherever it fits"
- *   --topics a,b,c                   topic tags, no # needed. Omit to let the
- *                                    watcher derive them from the transcript
+ *   --topics a,b,c                   topic tags, no # needed. GIVE THEM: omitting
+ *                                    them means NO topic tags, on every platform
+ *                                    that carries a native first comment. The
+ *                                    watcher derives them from the transcript,
+ *                                    and it only ever reaches a post that has no
+ *                                    comment yet — a pipeline post already has
+ *                                    one, so it is skipped. Threads is the lone
+ *                                    exception (no native comment there), which
+ *                                    is what makes the gap look like it is not
+ *                                    one. Bit us on 2026-09-13: a reshare went
+ *                                    out to five platforms with the brand tags
+ *                                    and nothing describing the clip, and none
+ *                                    of those platforms can be edited after.
  *   --comment TEXT                   a custom first comment instead of the rotation
  *   --at YYYY-MM-DD                  hold it until that day. The pace still
                                    applies on the day; without this it goes as
