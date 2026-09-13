@@ -508,9 +508,14 @@ most repeated failure in this repo.
 
 ## LinkedIn reshares
 
-- **A LinkedIn account other than the company page is NEVER posted to natively** — `run-queue.js`
-  filters them out. They only ever repost what the company page published. **This is the process
-  and mate is happy with it** (2026-08-26), the company page's low reach notwithstanding.
+- **HIS PROFILE POSTS NATIVELY; THE PAGE AND THE OTHER PROFILE REPOST IT** (since 2026-09-14,
+  reversing the 2026-08-26 shape). `linkedinAccounts().native` is what `run-queue.js` posts to and
+  `.reposters` is who reposts, in order — page first with his words and the tracked CTA, then the
+  other profile **plain**: no words of his on top, no comment in his voice. The page (30 followers)
+  had the native post for a month while the two profiles (7,222) got a repost, and the one under
+  her name said *"Bring me something you wish your computer did."* Words under a person's name have
+  to be that person's. `OWNER_NAME` matches his profile by display name, like the page; with his
+  profile not connected the old shape applies and a test pins the fallback.
 - **"Adding an account is a connection job, never a code change" WAS WRONG.**
   `linkedinAccounts().personal` was `find` where it needed `filter`, so a third account connected
   on 2026-08-22 was invisible to the whole pipeline. No error, one fewer repost than anybody
@@ -519,8 +524,8 @@ most repeated failure in this repo.
   followers) got the tracked comment and the personals (7,192 between them) got a bare repost.
   `reshareComment()` composes one **per account** and `quoteReshare` puts it in
   `platformSpecificData.firstComment`. Failing to compose one never costs the repost.
-- **The two personal reshares are STAGGERED, four hours apart** (mate, 2026-08-22). Two accounts
-  reposting in the same minute reads as one person running two accounts. Zernio holds the
+- **The reposts are STAGGERED, four hours apart** (mate, 2026-08-22) — the page now, the other
+  profile four hours on. Two accounts reposting in the same minute reads as one person running two. Zernio holds the
   `scheduledFor`, so nothing stays running on this box. `MWK_RESHARE_LAG_MINUTES` overrides 240.
 - **Each reshare is caught for itself, and the lookup is caught too.** One account's 422 must not
   cost the others, and none of it may turn an already-published post into a failed one.

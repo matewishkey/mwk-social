@@ -191,7 +191,7 @@ const PLATFORMS = {
     imageMax: 20,            // the highest of the lot; Zernio's LinkedIn page, 2026-08-27
     landscapeOk: true,
     commentsApi: true,
-    reshare: 'api',                // platformSpecificData.reshareUrl — company post, personal quote
+    reshare: 'api',                // platformSpecificData.reshareUrl — his post, page + other profile repost
     metrics: { views:'no', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'partial', saves:'no', clicks:'rare', watchTime:'no' },
     captionMax: 3000,
@@ -281,7 +281,7 @@ function flowFor(name) {
     steps.push({ step: 'the link', how: 'in the first comment, to keep it out of the body' });
   }
 
-  if (p.reshare === 'api') steps.push({ step: 'reshare', how: 'quote-reshared from the personal account', by: 'api' });
+  if (p.reshare === 'api') steps.push({ step: 'reshare', how: 'posted from his profile; the page reposts it with the CTA, the other profile plain', by: 'api' });
   else if (p.reshare === 'manual') steps.push({ step: 'reshare', by: 'manual',
     how: 'your turn — personal timelines are impossible via any API (Meta rule)' });
 

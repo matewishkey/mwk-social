@@ -24,7 +24,8 @@ const voice = require('./voice');
 const shortlink = require('./shortlink');
 
 /*
- * The LinkedIn accounts: one company page, and EVERY personal profile behind it.
+ * The LinkedIn accounts: one company page, EVERY personal profile behind it,
+ * and which one of those is HIS.
  *
  * `personal` is a LIST, and that is not future-proofing — it is a bug fix. It
  * used to be `all.find(a => a !== company)`, which returns the first one and
@@ -32,14 +33,34 @@ const shortlink = require('./shortlink');
  * 2026-08-22 and was invisible to the whole pipeline from the moment it was
  * added: no error, no warning, just one fewer repost than anybody expected.
  *
- * The company page is matched on the display name we post under rather than a
- * hard-coded id, so reconnecting it does not break this.
+ * `owner` is the profile that posts NATIVELY (since 2026-09-14). The company
+ * page has 30 followers; his profile 2,160; the other profile 5,062. For a
+ * month the 30 got the native post and the 7,222 got a plain repost of it —
+ * and the repost under the OTHER profile carried a first-person call to action
+ * in his voice, under her name. The brand voice is "I, never we"; a company
+ * page is structurally "we", so his profile is the only LinkedIn surface where
+ * the voice is even grammatically possible. Native from him, reposted by the
+ * page and by her; hers plain, because words under a person's name have to be
+ * that person's.
+ *
+ * `native` is what run-queue posts to and `reposters` is who reposts it, in
+ * order. With no owner found (renamed, disconnected) it falls back to the old
+ * shape — page native, personals repost — and says so, rather than posting to
+ * nobody. Both are matched on the display name rather than a hard-coded id, so
+ * reconnecting an account does not break this.
  */
+const OWNER_NAME = /visky/i;
+
 function linkedinAccounts() {
   const all = (cli(['accounts:list']).accounts || []).filter((a) => a.platform === 'linkedin' && a.isActive !== false);
   const company = all.find((a) => /wish\s*key/i.test(a.displayName || a.username || ''));
   const personal = all.filter((a) => a !== company);
-  return { company, personal, all };
+  const owner = personal.find((a) => OWNER_NAME.test(a.displayName || a.username || '')) || null;
+  const native = owner || company || null;
+  const reposters = owner
+    ? [company, ...personal.filter((a) => a !== owner)].filter(Boolean)
+    : personal;
+  return { company, personal, owner, native, reposters, all };
 }
 
 /*
@@ -100,8 +121,8 @@ async function reshareComment(account, { clipId = null, topics = [], postKey = n
 async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0, firstComment = null) {
   if (!postUrl) throw new Error('nothing to reshare — no post url');
 
-  const who = account || linkedinAccounts().personal[0];
-  if (!who) throw new Error('no personal LinkedIn account in accounts:list');
+  const who = account || linkedinAccounts().reposters[0];
+  if (!who) throw new Error('no LinkedIn account to repost from in accounts:list');
 
   // reshareUrl is not exposed as a posts:create flag, so this goes to REST.
   const platformData = { reshareUrl: postUrl };
@@ -129,29 +150,39 @@ async function quoteReshare(postUrl, comment, account = null, delayMinutes = 0, 
 }
 
 /*
- * Repost one company post from every personal account there is.
+ * Repost one native post from every account that reposts, in order.
  *
  * Each is caught where it happens: one account failing — a token that needs
  * reconnecting, LinkedIn's duplicate-content 422 — must not cost the reposts
  * from the others, and must never cost the post itself, which is already live.
  * Same rule as the publish groups in run-queue.js, learned the same way.
+ *
+ * WHOSE WORDS GO WHERE. The company page's repost carries his words on top and
+ * the tracked call to action underneath — a page speaking for the show is what
+ * a page is. A personal profile that is not his gets a plain repost and nothing
+ * else: no comment in his voice, no words of his on top. If she wants a line,
+ * she writes it on LinkedIn. Until 2026-09-14 both went out under her name.
  */
 async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES,
   clipId = null, topics = [], firstComment = true } = {}) {
-  const { personal } = linkedinAccounts();
+  const { reposters, owner, company } = linkedinAccounts();
   const results = [];
-  for (let i = 0; i < personal.length; i++) {
-    const who = personal[i];
+  for (let i = 0; i < reposters.length; i++) {
+    const who = reposters[i];
     const name = who.displayName || who.username || who._id || who.id;
     // The first goes now; each one after it is staggered so two accounts never
     // repost the same post in the same minute.
     const delay = i * lagMinutes;
+    // His words and his CTA belong under his name or the show's — never under
+    // another person's. With no owner found the old shape applies and the
+    // personals carry it, as they did before.
+    const speaksForHim = who === company || !owner;
     try {
       // Composed per account so each repost carries its own code. A failure to
       // compose one must not cost the repost — the same rule the comment on a
       // native post follows, for the same reason.
       let cta = null;
-      if (firstComment) {
+      if (firstComment && speaksForHim) {
         try {
           cta = await reshareComment(who, { clipId, topics,
             postKey: `reshare:${clipId || postUrl}:${who._id || who.id}` });
@@ -159,9 +190,9 @@ async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES,
           console.error(`could not compose the CTA for ${name}, reposting without it: ${err.message}`);
         }
       }
-      const post = await quoteReshare(postUrl, comment, who, delay, cta);
+      const post = await quoteReshare(postUrl, speaksForHim ? comment : null, who, delay, cta);
       results.push({ account: name, ok: true, id: post && post._id, delayMinutes: delay,
-        cta: Boolean(cta),
+        cta: Boolean(cta), plain: !speaksForHim,
         at: delay ? new Date(Date.now() + delay * 60000).toISOString() : null });
     } catch (err) {
       results.push({ account: name, ok: false, error: err.message, delayMinutes: delay });
@@ -170,4 +201,4 @@ async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES,
   return results;
 }
 
-module.exports = { quoteReshare, reshareAll, reshareComment, linkedinAccounts, RESHARE_LAG_MINUTES };
+module.exports = { quoteReshare, reshareAll, reshareComment, linkedinAccounts, RESHARE_LAG_MINUTES, OWNER_NAME };

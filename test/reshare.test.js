@@ -87,7 +87,7 @@ test('one account failing does not stop the rest', async () => {
   require.cache[path].exports = {
     cli: () => ({ accounts: [LI('Mate Wish Key', 'co'), LI('Mate Visky', 'a'), LI('Suzy Fay', 'b')] }),
     api: async (_m, _e, { body }) => {
-      if (body.platforms[0].accountId === 'a') throw new Error('422 duplicate content');
+      if (body.platforms[0].accountId === 'co') throw new Error('422 duplicate content');
       return { post: { _id: 'ok' } };
     },
   };
@@ -98,6 +98,65 @@ test('one account failing does not stop the rest', async () => {
     assert.equal(out[0].ok, false);
     assert.match(out[0].error, /422/);
     assert.equal(out[1].ok, true, 'the second account must still have reposted');
+  } finally {
+    if (real) require.cache[path] = real; else delete require.cache[path];
+    delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  }
+});
+
+/*
+ * WHO POSTS AND WHO REPOSTS, since 2026-09-14. His profile is the native post;
+ * the page and the other profile repost it. The 30-follower page had the native
+ * post for a month while the 7,222 followers behind the two profiles got a
+ * plain repost of it — and the repost under HER name carried a first-person
+ * call to action in his voice. Words under a person's name have to be theirs.
+ */
+test('his profile posts natively; the page and the other profile repost', () => {
+  withAccounts([
+    LI('Mate Wish Key', 'co'), LI('Mate Visky', 'a'), LI('Zsuzsanna Elma Fay', 'b'),
+  ], (reshare) => {
+    const { owner, native, reposters } = reshare.linkedinAccounts();
+    assert.equal(owner._id, 'a');
+    assert.equal(native._id, 'a', 'the native post goes out under his name');
+    assert.deepStrictEqual(reposters.map((r) => r._id), ['co', 'b'],
+      'the page first, then the other profile; never the owner reposting himself');
+  });
+});
+
+test('with his profile not connected, the old shape applies and says so', () => {
+  withAccounts([LI('Mate Wish Key', 'co'), LI('Zsuzsanna Elma Fay', 'b')], (reshare) => {
+    const { owner, native, reposters } = reshare.linkedinAccounts();
+    assert.equal(owner, null);
+    assert.equal(native._id, 'co', 'falls back to the page rather than posting to nobody');
+    assert.deepStrictEqual(reposters.map((r) => r._id), ['b']);
+  });
+});
+
+test('nothing in his voice goes out under another person\'s name', async () => {
+  const path = require.resolve('../scripts/lib/api.js');
+  const real = require.cache[path];
+  delete require.cache[require.resolve('../scripts/lib/reshare.js')];
+  const bodies = [];
+  require.cache[path] = new Module(path, null);
+  require.cache[path].loaded = true;
+  require.cache[path].exports = {
+    cli: () => ({ accounts: [LI('Mate Wish Key', 'co'), LI('Mate Visky', 'a'), LI('Zsuzsanna Elma Fay', 'b')] }),
+    api: async (_m, _e, { body }) => { bodies.push(body); return { post: { _id: 'ok' } }; },
+  };
+  try {
+    const reshare = require('../scripts/lib/reshare.js');
+    const out = await reshare.reshareAll('https://linkedin.com/x', 'his words on top', { lagMinutes: 0 });
+    assert.equal(bodies.length, 2);
+    const page = bodies.find((b) => b.platforms[0].accountId === 'co');
+    const hers = bodies.find((b) => b.platforms[0].accountId === 'b');
+    assert.ok(page && hers, 'both repost');
+    assert.equal(page.content, 'his words on top', 'the page carries his words');
+    assert.ok(page.platforms[0].platformSpecificData.firstComment, 'the page carries the tracked CTA');
+    assert.ok(!('content' in hers), 'her repost carries none of his words');
+    assert.ok(!hers.platforms[0].platformSpecificData.firstComment, 'and no comment in his voice');
+    assert.equal(out.find((r) => r.account === 'Zsuzsanna Elma Fay').plain, true);
+    // Positive control: the owner never reposts his own post.
+    assert.ok(!bodies.some((b) => b.platforms[0].accountId === 'a'));
   } finally {
     if (real) require.cache[path] = real; else delete require.cache[path];
     delete require.cache[require.resolve('../scripts/lib/reshare.js')];

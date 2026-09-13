@@ -85,18 +85,18 @@ function fetchMedia(url, token, mediaType) {
 /**
  * Which accounts an item should go to.
  *
- * LinkedIn is the exception: there are two accounts and only ONE of them may be
- * posted to natively. The playbook is company page first, then a quote-reshare
- * from the personal account — never a native post to personal — because the
- * point is to move engagement onto the page, and a native personal post moves
- * none. Without this filter "linkedin" would resolve to both and do the wrong
- * thing silently.
+ * LinkedIn is the exception: there are three accounts and only ONE of them is
+ * posted to natively — the others repost it (lib/reshare.js says which and
+ * why). It was the company page until 2026-09-14; it is his own profile now,
+ * because that is where the brand voice is grammatical and where the followers
+ * are. Without this filter "linkedin" would resolve to all three and post the
+ * same thing three times, silently.
  */
 function accountsFor(want) {
   const { cli } = require('./lib/api');
   const all = (cli(['accounts:list']).accounts || []).filter((a) => a.isActive !== false);
   const chosen = want.length ? all.filter((a) => want.includes(a.platform)) : all;
-  const { company } = reshare.linkedinAccounts();
+  const { native: company } = reshare.linkedinAccounts();
   return chosen
     // An account on a platform this pipeline has never described is skipped, not
     // fatal — connecting one in Zernio must not stop the posts to everywhere
@@ -338,15 +338,15 @@ async function main() {
       data: { queueId: item.id, platforms: outcome },
     });
 
-    // LinkedIn: the company page has it, now share it as him — but only if he
-    // wrote the words. A reshare that fails must not fail the post, which is
-    // already live and correct.
+    // LinkedIn: his profile has it, now the page and the other profile repost
+    // it. A reshare that fails must not fail the post, which is already live
+    // and correct.
     const li = outcome.find((o) => o.platform === 'linkedin' && o.url);
     // reshare === false means "do not"; anything else reposts, with his words
-    // on top only if he wrote some.
+    // on top only if he wrote some — and only where the account speaks for him.
     if (li && item.reshare !== false) {
-      // Every personal account, not just the first. There are two now, and the
-      // second was invisible to this until the list became a list.
+      // Every reposting account, not just the first. A second one was invisible
+      // to this until the list became a list.
       //
       // reshareAll() catches each account for itself, so this try only covers
       // the account LOOKUP failing — but it still has to be here: the post is
@@ -373,8 +373,8 @@ async function main() {
         if (r.ok) {
           const when = r.delayMinutes
             ? `in ${Math.round(r.delayMinutes / 60)}h` : 'now';
-          console.log(`repost from ${r.account} — ${when}${item.reshareText ? ', with your words' : ' (plain repost)'}`
-            + `${r.cta ? ', with its own tracked CTA' : ''}`);
+          console.log(`repost from ${r.account} — ${when}${item.reshareText && !r.plain ? ', with your words' : ' (plain repost)'}`
+            + `${r.cta ? ', with its own tracked CTA' : r.plain ? ', nothing in your voice under their name' : ''}`);
           events.emit('linkedin.reshared', { message: `quote-reshared from ${r.account}`,
             platform: 'linkedin', url: li.url, dedupeKey: `linkedin.reshared|${item.id}|${r.account}` });
         } else {
