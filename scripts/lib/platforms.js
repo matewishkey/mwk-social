@@ -129,9 +129,10 @@ const PLATFORMS = {
      * Cheaper too: a URL tweet is 20c flat and the fee REPLACES the base charge,
      * so one tweet is 20c against the thread's 1.5c + 20c.
      *
-     * Reversing this is one word — 'reply' — and threadWithLink() and its tests
-     * are deliberately still here for that. The evidence is an absence in a
-     * code release, which is weaker than a presence.
+     * Reversing this is one word — 'reply' — plus the threadWithLink() that
+     * git holds (deleted 2026-09-14 with the rest of the dead code; f8a2490
+     * carries it). The evidence for the change is an absence in a code
+     * release, which is weaker than a presence, and that is why the note stays.
      */
     linkPlacement: 'caption',
     supportsFirstComment: false,

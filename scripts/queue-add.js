@@ -57,6 +57,7 @@ const path = require('path');
 
 const { ulid } = require('./lib/events');
 const { PLATFORMS } = require('./lib/platforms');
+const { wordProblems } = require('./lib/words');
 
 const WEB = path.join(__dirname, '..', 'web');
 const BUCKET = 'mwk-social-media';
@@ -137,6 +138,10 @@ function parse(argv) {
   if (opt.bodyFile) opt.body = fs.readFileSync(opt.bodyFile, 'utf8');
   opt.body = (opt.body || '').trim();
   if (!opt.body) throw new Error('nothing to post — pass --body or --body-file');
+  // The gate on his words (lib/words.js). This path is how Restream's caption
+  // got in on 2026-09-13; the dashboard form has the same gate.
+  const held = wordProblems(opt.body);
+  if (held.length) throw new Error(`not queued — ${held.join('; ')}. His words, in his voice, or it does not go.`);
 
   // A bare YYYY-MM-DD, so it unlocks at midnight UTC (10am Brisbane) on that
   // day. A typo here would hold a post for ever with nothing to show for it, so

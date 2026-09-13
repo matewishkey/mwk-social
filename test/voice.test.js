@@ -270,9 +270,9 @@ test('X has a comments API and is still not watched', () => {
  * certain: oon_retweet_reply_filter.rs drops an out-of-network reply before the
  * For You candidate set, so the CTA reached followers only.
  *
- * threadWithLink() and its two tests below stay — reversing this is one word in
- * the table, and the evidence for the change is an ABSENCE in a code release,
- * which is weaker than a presence.
+ * threadWithLink() was kept for three weeks "in case"; it went on 2026-09-14
+ * with the rest of the dead code. git has it (f8a2490 and before) if X ever
+ * makes a reply reach a non-follower again.
  */
 test('no platform posts its link as a thread reply any more', () => {
   const inReply = Object.keys(platformTable.PLATFORMS)
@@ -280,32 +280,10 @@ test('no platform posts its link as a thread reply any more', () => {
   assert.deepStrictEqual(inReply, [], 'the thread CTA is back — was that deliberate?');
   assert.equal(platformTable.get('twitter').linkPlacement, 'caption',
     "X's link belongs in the tweet, where a non-follower can see it");
-  // The two fields this used to assert (supportsThread, markerInCaption) were
-  // read by nothing but this test, and a field only a test reads is a field
-  // that proves nothing. linkPlacement is what post.js actually branches on,
-  // and the test below exercises the thread it produces.
-  const { threadWithLink } = require('../scripts/post.js');
-  assert.equal(typeof threadWithLink, 'function', 'nothing builds the thread the placement promises');
-});
-
-test('the root tweet is clean and the link rides in the reply', () => {
-  const { threadWithLink } = require('../scripts/post.js');
-  const media = [{ url: 'https://example.test/clip.mp4', type: 'video' }];
-  const items = threadWithLink('his words\n\n#MWKShow', 'https://mwkshow.com/ab12', media);
-
-  assert.equal(items.length, 2);
-  assert.ok(!/https?:\/\//.test(items[0].content),
-    'a url in the root tweet is the whole thing we are avoiding');
-  assert.deepStrictEqual(items[0].mediaItems, media,
-    'the clip belongs on the tweet people actually see');
-  assert.equal(items[1].content, 'https://mwkshow.com/ab12');
-  assert.ok(!items[1].mediaItems, 'the reply is a link, nothing else');
-});
-
-test('a thread with no media leaves mediaItems off entirely', () => {
-  const { threadWithLink } = require('../scripts/post.js');
-  assert.deepStrictEqual(threadWithLink('words', 'https://mwkshow.com/x', []),
-    [{ content: 'words' }, { content: 'https://mwkshow.com/x' }]);
+  // 'reply' is no longer a placement anything builds: a platform set to it
+  // would place its link nowhere. The table check is what refuses that.
+  assert.ok(!('reply' in platformTable.SLOT) || platformTable.SLOT.reply === 'caption',
+    'reply must stay a synonym of caption in SLOT, or be removed with the code that read it');
 });
 
 test('a platform carrying its own link gets tags under its own cap', () => {
@@ -792,4 +770,61 @@ test('a pinned variant ignores avoidIndex', async () => {
   const voice = require('../scripts/lib/voice');
   const pinned = await voice.firstComment('rotation:pin', { platform: 'facebook', variantIndex: 1, avoidIndex: 1 });
   assert.strictEqual(pinned.index, 1, 'the pinned index must survive a colliding avoidIndex');
+});
+
+/*
+ * THE GATE ON HIS WORDS (2026-09-14). Restream's auto-caption — a question hook
+ * with emoji — went out under his name on five platforms through the queue,
+ * because the CTA, the link slot and the aspect ratio were all checked and the
+ * body was not. Two mechanical rules, both his, on both doors: the dashboard
+ * form (web/src/lib/words.js) and queue-add.js (scripts/lib/words.js). Two
+ * runtimes, one rule — so the fixtures run through both and any disagreement
+ * fails here rather than in a caption.
+ */
+test('the gate on his words refuses emoji and a question-hook first line, on both doors', async () => {
+  const box = require('../scripts/lib/words.js');
+  const worker = await import(require('node:path').join(__dirname, '..', 'web', 'src', 'lib', 'words.js'));
+  const cases = [
+    ['Ever thought about how much a customer really costs? 🤔💰', 2],
+    ['Ever thought about how much a customer really costs?', 1],
+    ['Someone came in wanting a website built and left able to build it themselves.', 0],
+    ['A website for her practice.\n\nWhat did it take? Two hours.', 0],   // a question later is fine
+    ['Three thousand of the right people to call 📞', 1],
+    ['', 0],
+    ['\n\n  Is this a hook?  \n', 1],                                     // the first NON-BLANK line
+  ];
+  for (const [body, n] of cases) {
+    const a = box.wordProblems(body);
+    const b = worker.wordProblems(body);
+    assert.deepStrictEqual(a, b, `the two copies disagree on ${JSON.stringify(body)}`);
+    assert.equal(a.length, n, `${JSON.stringify(body)} → ${JSON.stringify(a)}`);
+  }
+  // Positive control on the fixtures: the case the gate exists for is refused
+  // for both reasons, by name.
+  const why = box.wordProblems(cases[0][0]);
+  assert.match(why[0], /emoji/);
+  assert.match(why[1], /hook/);
+});
+
+test('the dashboard form refuses held words before anything is uploaded, and says why', async () => {
+  const { queueAction, queuePage } = await import(require('node:path').join(__dirname, '..', 'web', 'src', 'pages', 'queue.js'));
+  let inserted = false, put = false;
+  const env = { DB: { prepare() { return { bind() { inserted = true; return { run: async () => {} }; } }; } },
+    MEDIA: { put: async () => { put = true; } } };
+  const form = new FormData();
+  form.set('do', 'add');
+  form.set('body', 'Ever thought about how much a customer really costs? 🤔💰');
+  form.set('media', new File(['x'], 'clip.mp4', { type: 'video/mp4' }));
+  const res = await queueAction(new Request('https://social.example/queue', { method: 'POST', body: form }), env, 'm@x.com');
+  assert.equal(res.status, 303);
+  assert.match(res.headers.get('location'), /\/queue\?held=/);
+  assert.match(decodeURIComponent(res.headers.get('location')), /emoji/);
+  assert.equal(inserted, false, 'nothing is written');
+  assert.equal(put, false, 'nothing is uploaded either — the gate is before the R2 put');
+
+  const html = queuePage({ email: 'm@x.com', tz: 'Australia/Brisbane', waiting: [], done: [], total: 0,
+    pace: { perDay: 6, today: 0, minGapMinutes: 90, tz: 'Australia/Brisbane', nextAt: null, why: null },
+    held: 'emoji — nothing the show says out loud carries one' });
+  assert.match(html, /Not queued:/);
+  assert.match(html, /carries one/);
 });

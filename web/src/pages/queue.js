@@ -11,6 +11,7 @@
  */
 import { esc, card, layout, when, ago, tile, pager } from '../lib/html.js';
 import { ulid } from '../lib/access.js';
+import { wordProblems } from '../lib/words.js';
 
 const POSTABLE = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
 
@@ -107,6 +108,13 @@ export async function queueAction(request, env, email) {
 
   const text = String(form.get('body') || '').trim();
   if (!text) return back;
+  // The gate on his words — lib/words.js says why it exists. Refused here,
+  // before anything is uploaded, and the page says which rule and keeps
+  // nothing: he retypes it in his own voice or it does not go.
+  const held = wordProblems(text);
+  if (held.length) {
+    return Response.redirect(new URL(`/queue?held=${encodeURIComponent(held.join('; '))}`, request.url).toString(), 303);
+  }
   const platforms = POSTABLE.filter((p) => form.get(`p_${p}`));
   const mediaUrl = String(form.get('mediaUrl') || '').trim() || null;
 
@@ -145,7 +153,7 @@ export async function queueAction(request, env, email) {
 }
 
 export function queuePage({ email, tz, waiting, done, pace,
-  page = 1, size = 25, total = 0, params = '' }) {
+  page = 1, size = 25, total = 0, params = '', held = null }) {
 
   // What is actually going out, not the words "has media". A queued clip is the
   // one thing he cannot check anywhere else before it publishes — it is not on a
@@ -205,6 +213,8 @@ export function queuePage({ email, tz, waiting, done, pace,
 <h1>Queue</h1>
 <p class="lede">Add as many as you like. They go out one at a time, spaced apart —
 so five things queued at once do not land as five posts in a minute.</p>
+${held ? `<div class="card"><div class="card-body"><b class="bad">Not queued:</b> ${esc(held)}.
+  Say it in your own words — a plain sentence about what the person got — and it goes.</div></div>` : ''}
 
 <div class="tiles">
   ${tile(waiting.length, 'waiting')}

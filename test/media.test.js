@@ -98,11 +98,6 @@ test('probe reports what is actually in the file', { skip: !have('ffmpeg') || !h
   }
 });
 
-test('a non-https media url is refused before curl ever sees it', () => {
-  assert.throws(() => media.downloadDirect('file:///etc/passwd', '/dev/null'), /non-https/);
-  assert.throws(() => media.downloadDirect('http://example.com/v.mp4', '/dev/null'), /non-https/);
-});
-
 /* ---------------------------------------------------------------- stills -- */
 
 /*

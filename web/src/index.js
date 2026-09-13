@@ -278,7 +278,8 @@ async function queue(env, tz, snapshots, email, url) {
   // the page and the publisher would eventually disagree about what today holds.
   const pace = ((snapshots.pace || {}).body) || { perDay: '—', today: '—', minGapMinutes: null, tz, nextAt: null, why: '' };
   return queuePage({ email, tz, waiting: waiting.results || [], done: done.results || [],
-    pace, page, size: HISTORY_PAGE, total: rows, params: url.searchParams });
+    pace, page, size: HISTORY_PAGE, total: rows, params: url.searchParams,
+    held: url.searchParams.get('held') });
 }
 
 /*

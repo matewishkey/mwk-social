@@ -264,36 +264,6 @@ const linkInCaption = (platform) => {
 };
 
 /*
- * Does the link go in a thread reply rather than the post itself?
- *
- * NOTHING today: X moved to linkPlacement 'caption' on 2026-08-24. Kept because
- * 'reply' is a legitimate value of a config field and reversing the decision is
- * one word in the platform table — not because this runs. Do not believe a
- * claim that it does.
- *
- * The original reason was never the 403s, which were `xCapabilities.inbox`, an
- * account toggle defaulting to off and on since 2026-08-22. It was that an
- * out-of-network reply never enters the For You candidate set, so the CTA only
- * ever reached existing followers. See platforms.js.
- */
-const linkInReply = (platform) => {
-  try { return platformTable.get(platform).linkPlacement === 'reply'; } catch { return false; }
-};
-
-/*
- * The root tweet and the reply that carries the link, as threadItems.
- *
- * Pure on purpose — the media and the link are resolved by the caller, so the
- * shape that goes on the wire is testable without a network. The media rides on
- * the ROOT: threadItems[0] is the tweet people see, and the reply is a link.
- */
-function threadWithLink(caption, link, media) {
-  const root = { content: caption };
-  if (media && media.length) root.mediaItems = media;
-  return [root, { content: link }];
-}
-
-/*
  * Is this a platform where no url in a POST is clickable, so the CTA has to
  * point at the bio instead? Instagram and TikTok, both verified: caption, Reel
  * and comment are all plain text there.
@@ -451,12 +421,6 @@ async function publish(opts) {
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
         entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
-      if (linkInReply(a.platform) && !linkToProfile(a.platform, opts)) {
-        // threadItems REPLACES the top-level content for this platform — the
-        // caption is published as threadItems[0], not as the post body.
-        entry.platformSpecificData = Object.assign(entry.platformSpecificData || {},
-          { threadItems: threadWithLink(caption, await linkFor(a.platform, opts, 'reply'), media) });
-      }
       b.platforms.push(entry);
     }
     const tt = accts.find((a) => a.platform === 'tiktok');
@@ -482,10 +446,6 @@ async function publish(opts) {
   const toProfile = accounts.filter((a) => linkToProfile(a.platform, opts));
   if (toProfile.length) {
     console.log(`note: ${toProfile.map((a) => a.platform).join(', ')} make no url clickable — the CTA points at the bio, and no code is minted`);
-  }
-  const inReply = accounts.filter((a) => linkInReply(a.platform));
-  if (inReply.length) {
-    console.log(`note: ${inReply.map((a) => a.platform).join(', ')} publish as a thread — clean root tweet, link in the reply`);
   }
   console.log(`${bodies.length} request(s): ${bodies.map((b) => b.platforms.map((p) => p.platform).join('+')).join(' | ')}`);
 
@@ -597,4 +557,4 @@ if (require.main === module) {
   main().catch((err) => { console.error(err.message); process.exit(1); });
 }
 
-module.exports = { publish, resolveAccounts, threadWithLink, captionForPlatform, FIRST_COMMENT_PLATFORMS };
+module.exports = { publish, resolveAccounts, captionForPlatform, FIRST_COMMENT_PLATFORMS };

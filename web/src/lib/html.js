@@ -20,14 +20,6 @@ export function when(iso, tz, withYear = false) {
   } catch { return iso; }
 }
 
-export function day(iso, tz) {
-  if (!iso) return '—';
-  try {
-    return new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: 'short' })
-      .format(new Date(iso));
-  } catch { return iso; }
-}
-
 export const ago = (iso) => {
   if (!iso) return '';
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);

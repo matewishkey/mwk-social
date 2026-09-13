@@ -1,10 +1,9 @@
--- The dashboard's storage. Three tables and no projections, deliberately.
---
--- An earlier design maintained clip/clip_target projection tables in SQL so the
--- dashboard could render current state without scanning the log. That work is
--- already done on the box: mirror-ledger.json IS the projection, computed by the
--- thing that knows the truth. Shipping it as a snapshot removes a whole class of
--- drift — a projection that disagrees with the ledger — for less code.
+-- The dashboard's storage. Tables for what is written at the far end or must
+-- outlive Zernio's window (the queue, links, clicks, metrics, proposals); the
+-- platform table, the voice and the pace arrive as SNAPSHOTS computed on the
+-- box, never rebuilt here — two runtimes computing one answer is how they
+-- disagree. (The Restream mirror ledger this header once described was retired
+-- on 2026-08-20; its file was deleted from the box on 2026-09-14.)
 
 -- Append-only. INSERT OR IGNORE on the ULID makes a retried batch free, and the
 -- unique dedupe_key stops the same decision being recorded twice from two runs.

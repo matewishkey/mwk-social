@@ -688,10 +688,10 @@ The invariants:
   - **X's "link penalty" is REPORTING, and this note has been wrong in BOTH directions.** What is
     actually known: two hand-made posts with a link got 1 impression each, on an account with 8
     followers. That is evidence of 8 followers. **Do not rebuild a mechanic on this claim again.**
-  - **Reversing it is one word in the platform table.** `threadWithLink()` and its tests are
-    deliberately still there, because the evidence for the change is an ABSENCE in a code release,
-    which is weaker than a presence. `threadItems` **REPLACES the top-level `content`** for that
-    platform, so the media has to ride in `threadItems[0]`.
+  - **Reversing it is one word in the platform table plus the code git has.** `threadWithLink()`
+    was kept three weeks "in case" and deleted with the dead code on 2026-09-14 (`f8a2490` and
+    earlier carry it). If it ever comes back: `threadItems` **REPLACES the top-level `content`**
+    for that platform, so the media has to ride in `threadItems[0]`.
 - **X's 403s were an ACCOUNT TOGGLE, not the plan.** `PUT /v1/accounts/{id}` takes `xCapabilities:
   { analytics, inbox }`, **both default `false`**, and both 403 in a way that reads exactly like a
   plan limit. Both are on and stay on. They unlock `GET /v1/twitter/search` (300 req/15 min) and

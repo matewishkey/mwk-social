@@ -177,9 +177,12 @@ test('every place post.js mints a link names where the link is going', () => {
   // the link becomes unattributable to a placement, which is half the question.
   const calls = src.match(/linkFor\([^)]*\)/g) || [];
   const invocations = calls.filter((c) => !c.startsWith('linkFor(platform, opts, medium'));
-  assert.ok(invocations.length >= 2, 'expected linkFor to be called at least twice');
+  // One since 2026-09-14: the caption link. The thread reply's call went with
+  // threadWithLink(); the comment link is minted in commentFor() through
+  // shortlink directly and carries its medium there.
+  assert.ok(invocations.length >= 1, `expected linkFor to be called at least once, found ${invocations.length}`);
   for (const c of invocations) {
-    assert.match(c, /,\s*'(caption|comment|reply|profile)'\)$/, `${c} does not name a medium`);
+    assert.match(c, /,\s*'(caption|comment|profile)'\)$/, `${c} does not name a medium`);
   }
 });
 

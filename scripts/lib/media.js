@@ -32,38 +32,10 @@ const CACHE = process.env.MWK_MEDIA_CACHE ||
     'mwk-social', 'media');
 
 const MIN_BYTES = 64 * 1024;          // anything smaller is an error page, not a video
-const DOWNLOAD_TIMEOUT_SEC = 300;
 
 const sh = (cmd, args, timeoutMs = 360000) =>
   execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26, timeout: timeoutMs });
 
-
-/**
- * Pull the file down from the signed URL Zernio handed us.
- * @returns {boolean} false when the URL has expired; throws on anything else.
- */
-function downloadDirect(url, dest) {
-  // The URL is Zernio's, not ours: `--` stops one beginning with a dash being
-  // read as a curl flag, and the scheme check keeps file:// away from curl.
-  if (!/^https:\/\//i.test(url)) throw new Error(`refusing non-https media url: ${String(url).slice(0, 40)}`);
-  const tmp = `${dest}.part`;
-  let code;
-  try {
-    code = sh('curl', ['-sSL', '--max-time', String(DOWNLOAD_TIMEOUT_SEC), '-A', 'Mozilla/5.0',
-      '-o', tmp, '-w', '%{http_code}', '--', url]).trim();
-  } catch (err) {
-    fs.rmSync(tmp, { force: true });
-    throw new Error(`download failed: ${(err.stderr || err.message).toString().trim().slice(0, 120)}`);
-  }
-  const size = fs.existsSync(tmp) ? fs.statSync(tmp).size : 0;
-  if (code === '403' || code === '404' || size < MIN_BYTES) {
-    fs.rmSync(tmp, { force: true });
-    return false;                                    // expired — the caller falls back
-  }
-  if (!/^2/.test(code)) { fs.rmSync(tmp, { force: true }); throw new Error(`download returned HTTP ${code}`); }
-  fs.renameSync(tmp, dest);
-  return true;
-}
 
 /*
  * The ffprobe container names for a still picture. Each single-image demuxer is
@@ -220,4 +192,4 @@ function check(platform, p) {
   return problems;
 }
 
-module.exports = { probe, youtubeProbe, check, downloadDirect, CACHE };
+module.exports = { probe, youtubeProbe, check, CACHE };
