@@ -329,6 +329,12 @@ had already published were jargon the rule rejects.
 - **`--sync` proposes but cannot act on an UPCOMING stream** — yt-dlp refuses a scheduled live
   event (`This live event will begin in N hours`), so it fails that video every run until it airs.
   Its comments are closed too. Both are expected; neither is a fault to chase.
+- **RESTREAM IS BACK (2026-09-13), AND THE EXTERNAL SWEEP ONLY REACHES YOUTUBE.** A Restream reel
+  lands as a Facebook Reel *and* a YouTube Short in the same minute; `sources()` sees the Short
+  (~90 min behind, via `analytics:posts`) and is blind to the Reel for ever, so the Facebook copy
+  needs a comment by hand. Widening that sweep is a decision, not a fix — a test pins it to
+  YouTube on purpose. **Restream also mirrors a live stream as TWO YouTube videos**, one vertical
+  and one landscape, same title and duration; both are public and both want the CTA.
 - **A test stream is still a video on the channel.** Five carried the placeholder title *Watch Me
   Work* and the description *Testing desktop view*, two of them a duplicate pair of the same
   5-hour stream. The description sync files a proposal; **nothing here writes a TITLE**, so a
@@ -581,7 +587,12 @@ The invariants:
 - **A comment read for a video the account doesn't own returns `success` with an EMPTY LIST**, not
   an error. So "no comments" never proves "not yet commented".
 - **YouTube blocks comments on private videos** — 403, and `firstComment` silently never lands.
-  Unlisted is fine. The watcher treats a 403 as permanent.
+  Unlisted is fine. **A 403 IS NOT ALWAYS PERMANENT, AND TREATING IT AS SUCH COST TWO STREAMS
+  THEIR CTA** (2026-09-13): YouTube closes the comments endpoint *while a stream is live* — live
+  chat is the surface then — so the 10:00 run on a stream that ended 10:18 wrote it off for ever
+  and by 21:55 the comments were open with nothing under either video. A 403 now carries a
+  `retryUntil` (`MWK_COMMENTS_403_RETRY_HOURS`, 24), and that window must stay UNDER the sweep's
+  own `--hours` or the retry falls due after the post has left the window. A test pins the pair.
 - **Report every time to him in BRISBANE time** (mate, 2026-08-21). The box stays on `Etc/UTC` and
   that is correct — so `systemctl`, `journalctl` and every log stamp are UTC, and quoting one
   verbatim is ten hours wrong to him. `TZ=Australia/Brisbane date '+%H:%M %Z'`. The dashboard

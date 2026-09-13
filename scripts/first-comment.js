@@ -52,6 +52,26 @@ const shortlink = require('./lib/shortlink');
 // is only an upper bound, and the next hourly run picks it up the moment it can.
 const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
 
+/*
+ * A 403 ON THE COMMENT READ IS NOT ALWAYS PERMANENT, AND TREATING IT AS SUCH
+ * COST TWO LIVE STREAMS THEIR CTA (found 2026-09-13). YouTube closes the
+ * comments endpoint WHILE A STREAM IS LIVE — live chat is the surface then —
+ * so the 10:00 run on a stream that ended at 10:18 saw a 403, wrote it down as
+ * closed for ever, and eleven hours later the comments were open with nothing
+ * under either video. Same shape as the nine streams sources() exists to fix.
+ *
+ * So a 403 is recorded with a retryUntil rather than for good, and the hourly
+ * run tries again until the post is this old. Past it the entry stays without
+ * one and is permanent: a private video or comments switched off never opens.
+ * Keep it UNDER the collection window (--hours, 48 by default) or the retry
+ * comes due after the post has already fallen out of the sweep.
+ */
+const COMMENTS_403_RETRY_HOURS = Number(process.env.MWK_COMMENTS_403_RETRY_HOURS || 24);
+
+/** Is this state entry still owed another look? */
+const isRetryable = (entry) =>
+  Boolean(entry && entry.retryUntil && Date.parse(entry.retryUntil) > Date.now());
+
 // TikTok is absent because its API exposes no comments at all. X is absent for
 // a different reason and the distinction has been got wrong twice: it HAS a
 // comments API since 2026-08-22, but its CTA ships with the post as a thread
@@ -178,7 +198,7 @@ async function main() {
 
   events.initRun({ source: 'first-comment' });
   const posts = collectPosts(opts);
-  const pending = posts.filter((p) => !state[p.key]);
+  const pending = posts.filter((p) => !state[p.key] || isRetryable(state[p.key]));
   console.log(`[${stamp}] ${posts.length} post(s) in window across ${opts.platforms.join(', ')}, ${pending.length} without a recorded first comment`);
 
   if (opts.seed) {
@@ -215,12 +235,16 @@ async function main() {
         closed = true;
       }
       if (closed) {
-        state[target.key] = { commentedAt: null, note: 'comments unavailable (403)', url: target.url };
+        const retryUntil = new Date(Date.parse(target.publishedAt) + COMMENTS_403_RETRY_HOURS * 3600 * 1000);
+        const again = retryUntil.getTime() > Date.now();
+        state[target.key] = { commentedAt: null, note: 'comments unavailable (403)', url: target.url,
+          ...(again ? { retryUntil: retryUntil.toISOString() } : {}) };
         saveState(state);
-        events.emit('comment.skipped', { message: 'comments closed on this post', level: 'warn',
+        events.emit('comment.skipped', { message: again ? 'comments closed for now, will try again' : 'comments closed on this post',
+          level: 'warn',
           platform: target.platform, postKey: target.key, url: target.url, accountId: target.accountId,
-          dedupeKey: `comment.skipped|${target.key}`, data: { reason: 'comments-closed-403' } });
-        console.log(`skip  ${target.key} — comments closed on this post (${target.url})`);
+          dedupeKey: `comment.skipped|${target.key}`, data: { reason: 'comments-closed-403', retryUntil: again ? retryUntil.toISOString() : null } });
+        console.log(`skip  ${target.key} — comments closed${again ? `, retrying until ${retryUntil.toISOString()}` : ' on this post'} (${target.url})`);
         continue;
       }
       if (done) {

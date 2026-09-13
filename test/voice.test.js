@@ -200,6 +200,48 @@ test('the watcher covers exactly the platforms commentWatched() names', () => {
 });
 
 /*
+ * A 403 ON A LIVE STREAM'S COMMENTS IS TRANSIENT, AND RECORDING IT AS PERMANENT
+ * COST TWO STREAMS THEIR CTA (2026-09-13). YouTube closes the comments endpoint
+ * while a stream is live, so the 10:00 run on a stream that ended at 10:18 wrote
+ * "closed" for ever; at 21:55 the comments read fine and neither video had one.
+ *
+ * The invariant worth pinning is the pair: a 403 inside the window writes a
+ * retryUntil, and the pending filter reads it. Either half alone is the
+ * declared-and-never-read trap. And the window must stay UNDER the default
+ * collection window, or the retry falls due after the post has left the sweep.
+ */
+test('a 403 on the comment read is retried, not written off for ever', () => {
+  const src = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+
+  const retry = src.match(/const COMMENTS_403_RETRY_HOURS = Number\(process\.env\.\w+ \|\| (\d+)\)/);
+  assert.ok(retry, 'the 403 retry window must stay a named constant in first-comment.js');
+
+  // The 403 branch has to record the deadline, or nothing ever comes back to it.
+  const closed = src.slice(src.indexOf('if (closed) {'), src.indexOf('if (done) {'));
+  assert.ok(/retryUntil/.test(closed), 'the 403 branch must write a retryUntil');
+  assert.ok(/COMMENTS_403_RETRY_HOURS/.test(closed), 'the deadline must come from the constant');
+
+  // ...and the pending filter has to read it back.
+  const pending = src.match(/const pending = posts\.filter\(([^;]*)\);/);
+  assert.ok(pending, 'the pending filter must still be a one-liner over state');
+  assert.ok(/isRetryable/.test(pending[1]),
+    'a state entry inside its retry window must come back as pending');
+  assert.ok(/retryUntil/.test(src.match(/const isRetryable = [^;]*;/)[0]),
+    'isRetryable must key off retryUntil');
+
+  // Positive control on the same parse: the caption grace is a sibling constant
+  // and this regex finds it, so failing to find the 403 one means it is gone.
+  const caption = src.match(/const CAPTION_GRACE_HOURS = Number\(process\.env\.\w+ \|\| (\d+)\)/);
+  assert.ok(caption, 'positive control: CAPTION_GRACE_HOURS parses the same way');
+
+  const hours = src.match(/opts = \{ hours: (\d+)/);
+  assert.ok(hours, 'the default collection window must stay readable');
+  assert.ok(Number(retry[1]) < Number(hours[1]),
+    `a ${retry[1]}h retry never comes due inside a ${hours[1]}h sweep`);
+});
+
+/*
  * X has a comments API again — the 403s were an account toggle, not the plan —
  * and it must STILL be left to the watcher's exclusion list, because its CTA
  * goes out as a thread reply when the post publishes. A watcher comment on top
