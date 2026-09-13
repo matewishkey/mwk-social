@@ -40,9 +40,28 @@ test('Instagram and TikTok are the platforms with no clickable link in a post', 
   });
   assert.deepStrictEqual(dead.sort(), ['instagram', 'tiktok']);
   for (const p of dead) {
-    assert.equal(platforms.get(p).linkPlacement, 'profile',
-      `${p} must point at the bio rather than print a url nobody can follow`);
+    assert.ok(['profile', 'none'].includes(platforms.get(p).linkPlacement),
+      `${p} must point at the bio or say nothing, never print a url nobody can follow`);
   }
+  // Instagram's bio IS a live link, so it says so. TikTok's is not — a personal
+  // account under 1,000 followers renders it as plain text (checked in the app,
+  // 2026-09-14) — so it says nothing about a link at all. Three weeks of captions
+  // claimed "link in my bio" about a line nobody could tap.
+  assert.equal(platforms.get('instagram').linkPlacement, 'profile');
+  assert.equal(platforms.get('tiktok').linkPlacement, 'none');
+  assert.equal(platforms.get('tiktok').linkClickable.profile, false);
+  assert.equal(platforms.linkIsLive('tiktok'), false);
+});
+
+test("a 'none' placement is only honest when nothing is live — the table check says so", () => {
+  // Positive control: the real table is consistent.
+  assert.deepStrictEqual(platforms.linkProblems(), []);
+  // A platform that says 'none' while its bio is live is a link nobody was handed.
+  const saved = platforms.PLATFORMS.tiktok.linkClickable;
+  platforms.PLATFORMS.tiktok.linkClickable = { ...saved, profile: true };
+  try {
+    assert.ok(platforms.linkProblems().some((p) => /tiktok: places no link although the profile would be live/.test(p)));
+  } finally { platforms.PLATFORMS.tiktok.linkClickable = saved; }
 });
 
 test('a platform that can carry a live link never points at the bio instead', () => {

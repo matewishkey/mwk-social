@@ -125,7 +125,9 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   an out-of-network reply never reaches the For You feed, so that CTA only reached existing
   followers, and the demotion it was dodging is not in X's open-sourced ranker. One tweet is 20c.
 - **Instagram and TikTok get NO LINK AT ALL** — a url is plain text on both, in a caption and in a
-  comment alike. Their CTA says "link in my bio" and mints nothing. The bio link is the tracked one.
+  comment alike. Instagram's CTA says "link in my bio" and mints nothing; the bio link is the
+  tracked one. **TikTok says nothing about a link** (since 2026-09-14): the bio link is plain text
+  too on a personal account under 1,000 followers, so the caption is his words and the tags.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
 - Tags go in the caption **or** the comment, never both. **The 5-cap is Instagram's; "caption and

@@ -69,11 +69,21 @@ const PLATFORMS = {
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 2200,
     hashtagsInCaption: 'all',
-    // Nothing is clickable on TikTok either — caption or comment, it is plain
-    // text. Five short codes were minted for TikTok captions and took ZERO
-    // human clicks, which is what a dead url looks like in the data.
-    linkClickable: { caption: false, comment: false, profile: true },
-    linkPlacement: 'profile',      // the bio is the only live link TikTok has
+    // Nothing is clickable on TikTok — caption or comment, it is plain text.
+    // Five short codes were minted for TikTok captions and took ZERO human
+    // clicks, which is what a dead url looks like in the data.
+    //
+    // AND THE BIO IS NOT CLICKABLE EITHER. A website link in a TikTok bio is
+    // tappable on a Business account, or on a personal one past 1,000
+    // followers; this is a personal account with three (mate, 2026-09-14: "I
+    // have less than 1000 follower, so not tapable"). For three weeks every
+    // TikTok caption said "link in my bio" about a line of plain text. So the
+    // placement is 'none': his words and the tags, and no claim about a link
+    // at all. An honest nothing beats a lie. Flip `profile` back to true the
+    // day the account is Business or past the threshold — and check it in the
+    // app, because no logged-out fetch can read a TikTok profile.
+    linkClickable: { caption: false, comment: false, profile: false },
+    linkPlacement: 'none',         // no live slot anywhere — say nothing about a link
     supportsFirstComment: false,
     deletable: false,              // posts:unpublish → "TikTok does not support post deletion
                                    // via API" (2026-08-21, against two real duplicates). Same as
@@ -251,7 +261,12 @@ function flowFor(name) {
       note: p.commentsApi ? 'a comments API exists; the link simply does not go there' : 'no comments API at all' });
   }
 
-  if (p.linkPlacement === 'profile') {
+  if (p.linkPlacement === 'none') {
+    steps.push({ step: 'the link', how: 'none — nothing here is clickable, the bio included',
+      note: 'a url is plain text in the caption and in a comment, and the bio link is plain '
+        + 'text too on a personal account under 1,000 followers. So the post carries no link '
+        + 'and says nothing about one; a claim nobody can act on is worse than silence' });
+  } else if (p.linkPlacement === 'profile') {
     steps.push({ step: 'the link', how: 'the bio — the post says so, and no code is minted',
       note: 'a url is plain text here, in the caption and in a comment alike. A tracked code '
         + 'spent on a click that cannot happen reads as indifference rather than as unreachable' });
@@ -302,7 +317,9 @@ const commentWatched = (name) => {
  * Which surface a platform's link actually lands on. `reply` is a post of its
  * own on X, so it is governed by the caption rule, not the comment one.
  */
-const SLOT = { caption: 'caption', reply: 'caption', comment: 'comment', profile: 'profile' };
+// 'none' is a placement with no slot: the platform has nowhere a link is live,
+// so the post carries no link and makes no claim about one.
+const SLOT = { caption: 'caption', reply: 'caption', comment: 'comment', profile: 'profile', none: null };
 
 /*
  * Is the link we place on this platform a LIVE link, or plain text?
@@ -399,8 +416,15 @@ function linkProblems() {
   for (const name of Object.keys(PLATFORMS)) {
     const p = PLATFORMS[name];
     if (!p.linkClickable) { out.push(`${name}: no linkClickable — say where a url is live`); continue; }
+    if (!(p.linkPlacement in SLOT)) { out.push(`${name}: linkPlacement '${p.linkPlacement}' is not a slot`); continue; }
     const slot = SLOT[p.linkPlacement];
-    if (!slot) { out.push(`${name}: linkPlacement '${p.linkPlacement}' is not a slot`); continue; }
+    // 'none' is only honest when there is genuinely nowhere: a live slot left
+    // unused is a link nobody was handed, which is the opposite mistake.
+    if (slot === null) {
+      const live = Object.keys(p.linkClickable).filter((k) => p.linkClickable[k]);
+      if (live.length) out.push(`${name}: places no link although the ${live.join('/')} would be live`);
+      continue;
+    }
     if (!p.linkClickable[slot]) {
       out.push(`${name}: places its link in the ${slot}, where it is not clickable`);
     }

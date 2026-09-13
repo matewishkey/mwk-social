@@ -599,10 +599,13 @@ test('the workflows page says where each platform\'s link actually goes', async 
   const html = configPage({ email: 'm@x.com', tz: TZ, snapshots: {
     platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() } } });
 
-  // TikTok has no clickable link anywhere, so the page must say the bio — not
-  // a tracked code, which is what it said while the codes were being wasted.
+  // TikTok has no clickable link anywhere — not the caption, not a comment, and
+  // not the bio either on a personal account under 1,000 followers (checked in
+  // the app by mate, 2026-09-14). The page said "the bio" for three weeks while
+  // every caption claimed a link that was plain text. It must say none.
   const tiktok = html.split('<h2>tiktok</h2>')[1].split('</section>')[0];
-  assert.match(tiktok, /the bio — the post says so, and no code is minted/);
+  assert.match(tiktok, /none — nothing here is clickable, the bio included/);
+  assert.ok(!/the post says so/.test(tiktok), 'TikTok must not claim a bio link');
   // Match the CLAIM, not the explanation: the note legitimately uses the words
   // "a tracked code" while saying why one is not spent here.
   assert.ok(!/with its own tracked code/.test(tiktok), 'no code is minted for TikTok any more');

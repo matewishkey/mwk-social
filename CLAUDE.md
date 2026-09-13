@@ -165,7 +165,11 @@ had already published were jargon the rule rejects.
   codes took **0 and 1** human clicks, which reads as "nobody cared" rather than "nobody could".
 - **`linkClickable` is the fact; `linkPlacement` is the decision, and `platforms.linkProblems()`
   refuses to let them disagree.** A test asserts it returns empty.
-- **`linkPlacement: 'profile'` means: say where the link is, mint nothing.** Instagram and TikTok.
+- **`linkPlacement: 'profile'` means: say where the link is, mint nothing.** Instagram only, since
+  2026-09-14. **TikTok is `'none'`: the bio link is plain text too** on a personal account under
+  1,000 followers (mate checked in the app: *"I have less than 1000 follower, so not tapable"*), so
+  for three weeks every TikTok caption said "link in my bio" about a line nobody could tap. `'none'`
+  carries no link and makes no claim; `linkProblems()` refuses it on any platform with a live slot.
   `{show}` renders as `voice.profileCta(platform)`, and any variant carrying a url is dropped from
   the pool — that url is exactly as dead. **Every phrasing MUST be in `markers[]`** or the guard
   cannot recognise its own comment and re-comments for ever. `profileCtaBy.youtube` says "channel
