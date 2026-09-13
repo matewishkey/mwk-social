@@ -963,3 +963,74 @@ test('the site-wide views tile is wired to the same guard, and only when youtube
   assert.match(s, /change\(recent\.views, prior\.views, ytViewsBlocked\)/,
     'the tile must pass it, or the guard is declared and never read');
 });
+
+/* ------------------------------------------------- auto-approved proposals -- */
+
+/*
+ * A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF (mate, 2026-09-13).
+ *
+ * The line is boilerplateOnly(), imported by api.js rather than re-derived —
+ * the dashboard's own "approve N boilerplate" button asks the same question,
+ * and two copies is how one of them starts approving a rewrite. So the test
+ * that matters is the PAIR: a swap goes in approved, a rebuild goes in waiting,
+ * and both halves come from the one function.
+ */
+const proposeVia = async (items) => {
+  const { api } = await src('api.js');
+  const rows = [];
+  const env = {
+    INGEST_TOKEN: 'tok',
+    DB: {
+      prepare(sql) { return { bind: (...args) => { rows.push({ sql, args }); return { sql, args }; } }; },
+      batch: async (stmts) => stmts.map(() => ({ meta: { changes: 1 } })),
+    },
+  };
+  const request = new Request('https://ingest.example/youtube/propose', {
+    method: 'POST', headers: { Authorization: 'Bearer tok' }, body: JSON.stringify({ items }),
+  });
+  const res = await api(request, env, new URL('https://ingest.example/youtube/propose'));
+  return { rows, body: await res.json() };
+};
+
+test('a tail swap files itself approved; a rewrite still waits for him', async () => {
+  const { rows, body } = await proposeVia([
+    { videoId: 'swp', kind: 'swap', currentText: 'his words\n\nold tail', proposed: 'his words\n\nnew tail' },
+    { videoId: 'apd', kind: 'append', currentText: 'his words', proposed: 'his words\n\nthe blurb' },
+    { videoId: 'rbd', kind: 'rebuild', currentText: 'his words', proposed: 'a model wrote this' },
+  ]);
+  assert.equal(rows.length, 3);
+
+  const state = (i) => rows[i].args[4];
+  const decidedBy = (i) => rows[i].args[8];
+  assert.equal(state(0), 'approved', 'a swap changes our tail under words he already said yes to');
+  assert.equal(state(1), 'approved', 'an append adds the blurb and replaces nothing');
+  assert.equal(state(2), 'proposed', 'a rebuild is a summary in his voice — he decides');
+
+  // An automatic decision must not read as his. The page prints decided_by.
+  assert.match(String(decidedBy(0)), /^auto:/);
+  assert.equal(decidedBy(2), null, 'nothing decided it, so nobody decided it');
+  assert.equal(body.autoApproved, 2, 'the response says how many went straight through');
+});
+
+/*
+ * Same bug class as the queue insert above, and this insert just grew two
+ * columns: a binding with no placeholder lands silently and the row still
+ * appears. Count them, and pin that a rejection is still final — auto-approve
+ * decides the STATE a row is filed in, never whether a "no" gets asked again.
+ */
+test('the proposal insert binds what it declares, and a rejection stays final', async () => {
+  const { rows } = await proposeVia([
+    { videoId: 'x', kind: 'swap', currentText: 'a', proposed: 'b' },
+  ]);
+  const { sql, args } = rows[0];
+  assert.equal(args.length, (sql.match(/\?/g) || []).length,
+    `${args.length} values bound at ${(sql.match(/\?/g) || []).length} placeholders`);
+  for (const col of ['state', 'decided_at', 'decided_by', 'kind']) {
+    assert.match(sql, new RegExp(`\\b${col}\\b`), `${col} must be named in the insert`);
+  }
+  // Positive control on the same read: the guard that reopens a changed row is
+  // still there, so finding no 'rejected' below means it is genuinely excluded.
+  assert.match(sql, /yt_proposal\.proposed <> excluded\.proposed/, 'the churn guard must survive');
+  assert.ok(!/state\s*=\s*'rejected'|'rejected'/.test(sql.split('WHERE')[1] || ''),
+    'the WHERE clause never reopens a rejected row');
+});

@@ -261,6 +261,14 @@ had already published were jargon the rule rejects.
   - That last rule exists because a left-over stream title put a guest in a video he is not in:
     `_6zckinR5VI` is titled "Istvan David: Exploring Light" and its notes credited Istvan with
     mate's own projects. 1,368 words of transcript, no mention of him.
+- **A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF** (mate, 2026-09-13: *"can we auto
+  approve these comments"*). `propose()` files a `swap` or an `append` as **approved**, stamped
+  `decided_by: auto:boilerplate`, and the next run applies it — a `rebuild` regenerates the opening
+  with a model and still waits for him. The line is `boilerplateOnly()`, **imported** by `api.js`
+  from the dashboard page rather than re-derived: the bulk "approve N boilerplate" button asks
+  the identical question, and two copies is how one of them starts approving a rewrite.
+  **It decides the STATE a row is filed in and nothing else** — the WHERE clause is untouched, so
+  a rejection is still final and an unchanged re-file is still a no-op.
 - **`--repropose <id…>` is how a voice change reaches what is already written.** `sync()` cannot:
   a recognisably-ours description takes the swap path, which is right for a stale tail and useless
   for a wrong opening. It files proposals and never writes.

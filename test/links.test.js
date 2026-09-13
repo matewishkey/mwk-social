@@ -452,14 +452,24 @@ test('suppressing a post makes the watcher skip it, and never rewrites a real co
 test('an out-of-date description can be re-proposed; an unchanged one cannot', () => {
   const src = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'web', 'src', 'api.js'), 'utf8');
-  const sql = src.slice(src.indexOf('INSERT INTO yt_proposal'), src.indexOf(').bind(i.videoId'));
+  const sql = src.slice(src.indexOf('INSERT INTO yt_proposal'), src.indexOf('`,\n    ).bind(i.videoId'));
   assert.match(sql, /yt_proposal\.proposed <> excluded\.proposed/,
     'comparing the text is what stops the churn — a state check alone drops real changes');
   assert.match(sql, /state IN \('approved', 'applied'\)/,
     'an approved-but-unwritten row carries the OLD words and must be reopened too');
   assert.ok(!/'rejected'/.test(sql), 'he said no — asking again is not what no means');
-  assert.match(sql, /state = 'proposed', decided_at = NULL/,
-    'a reopened row has to lose its old decision, or it looks approved');
+  /*
+   * The decision a reopened row carries must come from the NEW row, never
+   * survive from the old one. It was a literal 'proposed' with decided_at NULL
+   * until auto-approve arrived (2026-09-13) and the state became per-row — the
+   * invariant did not change, only where the value comes from. Leaving the old
+   * decided_at standing is the failure either way: it reads as approved.
+   */
+  assert.match(sql, /state = excluded\.state/, 'the reopened row takes the new state');
+  for (const col of ['decided_at', 'decided_by']) {
+    assert.match(sql, new RegExp(`${col} = excluded\\.${col}`),
+      `a reopened row must take the new ${col}, not keep the old one`);
+  }
 });
 
 test('the propose endpoint reports what landed, not what was sent', () => {

@@ -17,6 +17,7 @@
  */
 
 import { tokenOk, ulid, shortCode } from './lib/access.js';
+import { boilerplateOnly } from './pages/youtube.js';
 
 const json = (o, status = 200) => Response.json(o, { status });
 
@@ -434,26 +435,56 @@ async function fileAction(body, env) {
  */
 const PROPOSAL_KINDS = ['swap', 'rebuild', 'append'];
 
+/*
+ * A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF (mate, 2026-09-13:
+ * "can we auto approve these comments").
+ *
+ * boilerplateOnly() is the line, and it is IMPORTED rather than re-derived: the
+ * dashboard's bulk "approve N boilerplate" button already asks exactly this
+ * question, and two copies of it is how one of them starts approving a rewrite.
+ * 'swap' is our own tail changing under words he already said yes to; 'append'
+ * puts the blurb under a description we never wrote a line of. 'rebuild'
+ * regenerates the opening with a model, so it still waits for him — 4 of the
+ * proposals standing when this went in were rebuilds, and every one of them is
+ * a summary in his voice.
+ *
+ * It decides only the STATE a row is filed in. The WHERE clause below is
+ * untouched, so a rejection is still final: he said no, and a re-file that
+ * matches it is a no-op, not a second ask.
+ */
+function autoState(item) {
+  return boilerplateOnly({ kind: item.kind, current_text: item.currentText || '', proposed: item.proposed || '' })
+    ? 'approved' : 'proposed';
+}
+const AUTO_BY = 'auto:boilerplate';
+
 async function propose(body, env) {
   const items = Array.isArray(body.items) ? body.items : [];
   if (!items.length) return json({ ok: true, filed: 0 });
   const now = new Date().toISOString();
-  const res = await env.DB.batch(items.map((i) => env.DB.prepare(
-    `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at, kind)
-     VALUES (?,?,?,?,'proposed',?,?)
-     ON CONFLICT(video_id) DO UPDATE SET
-       title = excluded.title, current_text = excluded.current_text,
-       proposed = excluded.proposed, proposed_at = excluded.proposed_at, kind = excluded.kind,
-       state = 'proposed', decided_at = NULL, decided_by = NULL, applied_at = NULL
-     WHERE yt_proposal.state = 'proposed'
-        OR (yt_proposal.state IN ('approved', 'applied')
-            AND yt_proposal.proposed <> excluded.proposed)`,
-  ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', now,
-    PROPOSAL_KINDS.includes(i.kind) ? i.kind : null)));
+  const res = await env.DB.batch(items.map((i) => {
+    const kind = PROPOSAL_KINDS.includes(i.kind) ? i.kind : null;
+    const state = autoState({ ...i, kind });
+    const by = state === 'approved' ? AUTO_BY : null;
+    const at = state === 'approved' ? now : null;
+    return env.DB.prepare(
+      `INSERT INTO yt_proposal (video_id, title, current_text, proposed, state, proposed_at, kind, decided_at, decided_by)
+       VALUES (?,?,?,?,?,?,?,?,?)
+       ON CONFLICT(video_id) DO UPDATE SET
+         title = excluded.title, current_text = excluded.current_text,
+         proposed = excluded.proposed, proposed_at = excluded.proposed_at, kind = excluded.kind,
+         state = excluded.state, decided_at = excluded.decided_at,
+         decided_by = excluded.decided_by, applied_at = NULL
+       WHERE yt_proposal.state = 'proposed'
+          OR (yt_proposal.state IN ('approved', 'applied')
+              AND yt_proposal.proposed <> excluded.proposed)`,
+    ).bind(i.videoId, i.title || null, i.currentText || '', i.proposed || '', state, now, kind, at, by);
+  }));
   // What actually landed, not what was sent — "filed: 22" when nineteen were
   // dropped is the kind of number somebody believes.
   const filed = res.reduce((n, r) => n + ((r.meta && r.meta.changes) || 0), 0);
-  return json({ ok: true, filed, sent: items.length });
+  const auto = items.filter((i) => autoState({ ...i, kind: PROPOSAL_KINDS.includes(i.kind) ? i.kind : null }) === 'approved').length;
+  return json({ ok: true, filed, sent: items.length, autoApproved: auto });
 }
 
 const pending = async (_body, env) => json({
