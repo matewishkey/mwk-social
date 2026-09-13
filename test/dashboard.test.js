@@ -268,10 +268,14 @@ const row = (date, over = {}) => ({
 // and the trend pill AFTER it, so either half alone finds only one of them.
 const tileFor = (html, label) => (html.split('<div class="tile')
   .find((part) => part.includes(`<span>${label}</span>`)) || '');
-const reachPill = (html) => {
-  const pills = tileFor(html, 'people reached').match(/<span class="pill [^"]*">([^<]*)<\/span>/g) || [];
+// The clicks tile is the observable for the window logic since 2026-09-14:
+// reach and actions no longer carry an arrow at all (they keep settling for
+// weeks), and a click is stamped the moment it happens, so its arrow is real.
+const clicksPill = (html) => {
+  const pills = tileFor(html, 'link clicks from social').match(/<span class="pill [^"]*">([^<]*)<\/span>/g) || [];
   return pills.length ? pills[pills.length - 1] : '';
 };
+const clicksOn = (pairs) => pairs.map(([d, n]) => ({ day: d, n }));
 
 /*
  * A morning is not a week. Today's numbers are still arriving, so putting them
@@ -280,19 +284,20 @@ const reachPill = (html) => {
  */
 test('today is in neither comparison window', async () => {
   const { statsPage } = await src('pages/stats.js');
-  const steady = [row(isoDay(-8), { reach: 100 }), row(isoDay(-1), { reach: 100 })];
+  const steady = [[isoDay(-8), 10], [isoDay(-1), 10]];
+  const daily = [row(isoDay(-8)), row(isoDay(-1))];
 
   const withToday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily: [...steady, row(isoDay(0), { reach: 10000 })] });
-  assert.match(reachPill(withToday), /about the same/,
+    daily, split: [{ bot: 0, n: 1 }], clicksByDay: clicksOn([...steady, [isoDay(0), 1000]]) });
+  assert.match(clicksPill(withToday), /about the same/,
     'a huge partial day must not move a week-on-week figure');
 
   // Positive control: the SAME spike one day earlier is a complete day, and it
   // must move the number. Without this the assertion above would also pass on a
   // page that had simply stopped comparing anything.
   const withYesterday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily: [...steady, row(isoDay(-2), { reach: 10000 })] });
-  assert.doesNotMatch(reachPill(withYesterday), /about the same/,
+    daily, split: [{ bot: 0, n: 1 }], clicksByDay: clicksOn([...steady, [isoDay(-2), 1000]]) });
+  assert.doesNotMatch(clicksPill(withYesterday), /about the same/,
     'a complete day inside the window must still count');
 });
 
@@ -312,11 +317,18 @@ test('a channel with no history behind the older window shows its start date, no
     'a channel younger than the comparison must not be given a percentage');
 
   // Positive control: the same numbers from a channel that WAS reporting before
-  // the older window opened do get a percentage.
+  // the older window opened get the OTHER reason — "still settling" — and no
+  // percentage either. Since 2026-09-14 no channel row carries an arrow on seen:
+  // daily_metric is lifetime accrual by publish date and a Facebook day is
+  // three-quarters of its final number at midnight, so every arrow pointed down.
   const old = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
     daily, platformSince: { facebook: isoDay(-60) } });
-  assert.match(chanRow(old, 'facebook'), /[+-]\d+%/,
-    'a channel with real history behind it should get a real percentage');
+  assert.match(chanRow(old, 'facebook'), /still settling/,
+    'a channel with history says why it has no arrow');
+  assert.doesNotMatch(chanRow(old, 'facebook'), /[+-]\d+%/,
+    'seen never gets a percentage — it is not settled for weeks');
+  assert.doesNotMatch(chanRow(young, 'facebook'), /still settling/,
+    '"too new" beats "still settling": a channel with no older window has nothing to settle against');
 });
 
 /*
@@ -647,7 +659,7 @@ test('the stats page separates people from crawlers and says so', async () => {
     targets: [{ target: 'https://github.com/matewishkey/mwk-og-image-generator', n: 0, codes: 3 }],
     split: [{ bot: 1, n: 1 }, { bot: 2, n: 37 }], links: 9, snapshots: {} });
 
-  assert.match(html, /<b>0<\/b>\s*<span>link clicks<\/span>/, 'zero people is what to show');
+  assert.match(html, /<b>0<\/b>\s*<span>link clicks from social<\/span>/, 'zero people is what to show');
   assert.match(html, /38 not counted/, 'and the ignored traffic is named, not hidden');
   assert.match(html, /link-preview crawler/);
   assert.match(html, /logged before this was measured/);
@@ -963,8 +975,43 @@ test('the site-wide views tile is wired to the same guard, and only when youtube
   assert.match(s, /ytViewsBlocked/, 'the site-wide total needs its own blocked value');
   assert.match(s, /r\.platform === 'youtube' && r\.views/,
     'it must check youtube actually reported views in the older window');
-  assert.match(s, /change\(recent\.views, prior\.views, ytViewsBlocked\)/,
-    'the tile must pass it, or the guard is declared and never read');
+  // The tile carries no arrow since 2026-09-14 (views keep settling); the
+  // week-on-week row is where the guard lives now, and it must still win over
+  // the generic "still settling" — naming the unit change is the more specific
+  // truth, and a reader deciding whether to trust a views trend needs it.
+  assert.match(s, /'video views', recent\.views, prior\.views, num, ytViewsBlocked \|\| SETTLING/,
+    'the week-on-week row must pass it first, or the guard is declared and never read');
+  assert.ok(!/change\(recent\.views, prior\.views/.test(s),
+    'the views tile no longer draws a trend at all');
+});
+
+/*
+ * THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE'S OWN CODES (2026-09-14). The two
+ * booking buttons on matewishkey.com were 56 of 91 counted hits all-time and
+ * 16 of 16 in a week the tile read "16 link clicks (people)" — every one a
+ * press by somebody already on the site, none brought there by a post. They
+ * get their own card, called what they are.
+ */
+test('website button presses are their own card and never in the social click numbers', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    split: [{ bot: 0, n: 2 }], snapshots: {},
+    website: [{ code: '30zc4', note: 'Public Show pre-talk', n: 40 }] });
+  assert.match(html, /On the website/);
+  assert.match(html, /Public Show pre-talk/);
+  assert.match(html, /<td class="num">40<\/td>/);
+  assert.match(html, /<b>2<\/b>\s*<span>link clicks from social<\/span>/,
+    'the social tile shows the social count, not 42');
+  assert.match(html, /Not clicks\s+from social/);
+
+  // And the queries that feed the social numbers all say so. Positive control:
+  // the website card's own query names platform = 'website' the other way.
+  const src_ = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
+  const block = src_.slice(src_.indexOf('const SOCIAL ='), src_.indexOf('// Fold the two attribution routes'));
+  const social = (block.match(/\$\{SOCIAL\}/g) || []).length;
+  assert.ok(social >= 4, `clicks, targets, split and clicksByDay must all exclude the website (found ${social})`);
+  assert.match(block, /l\.platform = 'website'/, 'the website card reads the other side of the same line');
 });
 
 /* ------------------------------------------------- auto-approved proposals -- */

@@ -582,6 +582,16 @@ The invariants:
   immediately said what the old one hid.
 - **Comparable across channels: posts, actions, actions per post, tracked clicks.** Not comparable:
   seen, and any rate built on it. Kept because they are what we have, never ranked.
+- **SEEN AND ACTIONS GET NO WEEK-ON-WEEK ARROW, AND THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE**
+  (2026-09-14, from the measurement review; mate: *"fix them"*). The settle table answered its
+  question: at day end a Facebook post's reach is 75% of final, LinkedIn 66%, Instagram 70%, and
+  none but TikTok is settled a week later — so the recent window is always lower and a flat channel
+  read −10 to −20% every week. Those rows say *still settling*; clicks, days posted and followers
+  keep their arrows. "People reached" is *reach, summed* — three platforms' unique reach added up is
+  not a count of anyone. And the two booking-button codes on matewishkey.com were 56 of 91 counted
+  hits all-time and 16 of 16 in the week the tile read "16 link clicks (people)": every social click
+  query carries `l.platform IS NOT 'website'` now, and the buttons get their own card, called what
+  they are — presses, unjoined to any post, some of them crawler pairs.
 - **The settle curve is being RECORDED and read by nothing, on purpose, from 2026-08-26.**
   `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
   "is the last complete day settled?" had no answer and the trend excluded today on instinct. A

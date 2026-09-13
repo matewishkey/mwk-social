@@ -159,8 +159,18 @@ async function overview(request, env, tz, snapshots, email, url) {
 
 async function stats(env, tz, snapshots, email) {
   const from = new Date(Date.now() - STATS_DAYS * 86400_000).toISOString().slice(0, 10);
+  /*
+   * SOCIAL clicks and WEBSITE clicks are two different things and were one
+   * number until 2026-09-14. The two booking-calendar codes live on his own
+   * site, so a hit on them is a button press by somebody already there — it
+   * says nothing about whether any post brought anyone anywhere. They were 56
+   * of 91 counted hits all-time, and 16 of 16 in the week the tile read "16 link
+   * clicks (people)" with the social number underneath at zero. Every social
+   * figure below excludes platform = 'website'; the website gets its own card.
+   */
+  const SOCIAL = "l.platform IS NOT 'website'";
   const [daily, followers, clicks, targets, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince] = await Promise.all([
+    followerHistory, clicksByDay, platformSince, accountSince, website] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -173,12 +183,12 @@ async function stats(env, tz, snapshots, email) {
       // a click on a code minted before codes were per-platform can still be
       // attributed by where it came from — it is NOT evidence of a person.
       `SELECT l.platform, c.referer_host, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${counted('c')} GROUP BY l.platform, c.referer_host`).bind(from).all(),
+        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY l.platform, c.referer_host`).bind(from).all(),
     // What people actually clicked, rather than only where from.
     env.DB.prepare(
       `SELECT l.target, COUNT(*) n, COUNT(DISTINCT l.code) codes
          FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${counted('c')} GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
+        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
     /*
      * The honest denominator: how much of the traffic was not a person.
      *
@@ -189,7 +199,8 @@ async function stats(env, tz, snapshots, email) {
      */
     env.DB.prepare(
       `SELECT CASE WHEN c.bot <> 0 THEN c.bot WHEN ${counted('c')} THEN 0 ELSE 1 END bot,
-              COUNT(*) n FROM click c WHERE c.at >= ? GROUP BY 1`).bind(from).all(),
+              COUNT(*) n FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND ${SOCIAL} GROUP BY 1`).bind(from).all(),
     env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
 
     /*
@@ -204,8 +215,8 @@ async function stats(env, tz, snapshots, email) {
         WHERE day >= ? ORDER BY day`).bind(from).all(),
     // Clicks per day, so the scoreboard has a shape and not only a total.
     env.DB.prepare(
-      `SELECT substr(c.at, 1, 10) day, COUNT(*) n FROM click c
-        WHERE c.at >= ? AND ${counted('c')} GROUP BY day ORDER BY day`).bind(from).all(),
+      `SELECT substr(c.at, 1, 10) day, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY day ORDER BY day`).bind(from).all(),
     /*
      * When each platform and each account was FIRST seen — over the whole table,
      * not the rendered window, which is the point of a separate query.
@@ -221,6 +232,10 @@ async function stats(env, tz, snapshots, email) {
      */
     env.DB.prepare('SELECT platform, MIN(date) first FROM daily_metric GROUP BY platform').all(),
     env.DB.prepare('SELECT account_id, MIN(day) first FROM follower_point GROUP BY account_id').all(),
+    // The website's own codes, by code: button presses on the site itself.
+    env.DB.prepare(
+      `SELECT l.code, l.note, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND l.platform = 'website' AND ${counted('c')} GROUP BY l.code ORDER BY n DESC`).bind(from).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -236,6 +251,7 @@ async function stats(env, tz, snapshots, email) {
     daily: daily.results || [], followers: followers.results || [], clicks: folded,
     targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0,
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
+    website: website.results || [],
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])) });
 }

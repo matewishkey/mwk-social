@@ -127,6 +127,25 @@ function spark(series, label = '') {
  * cheerful 0%. `blocked` is the caller's way of saying "the older window is not
  * a fair denominator", and it produces a reason instead of a number.
  */
+/*
+ * SEEN AND ACTIONS GET NO WEEK-ON-WEEK ARROW, since 2026-09-14.
+ *
+ * daily_metric is not activity by day; it is lifetime accrual attributed to
+ * the post's publish date, and it keeps moving for weeks. The revision table
+ * recorded since 26 Aug says how much: at the end of its own day a Facebook
+ * post's reach is 75% of what it will settle at, LinkedIn 66%, Instagram 70%,
+ * and none but TikTok is settled a week later. So "the recent seven complete
+ * days" is ~85% settled against a prior window at ~97%, and a channel doing
+ * exactly the same reads −10 to −20% every single week — past the ±5% band
+ * this page calls "about the same". The three guards below all close lies in
+ * the flattering direction; this was the one lying the other way.
+ *
+ * Deleted rather than caveated (his rule). Clicks and cadence keep their
+ * arrows: a click is stamped when it happens and a day we posted is a fact by
+ * midnight. Followers keep theirs: a level, read the same way both ends.
+ */
+const SETTLING = 'still settling';
+
 function change(now, before, blocked = null) {
   if (blocked) return { text: blocked, tone: 'plain', dir: '', note: true };
   if (!before && !now) return null;
@@ -165,7 +184,7 @@ function totals(rows) {
 
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   targets = [], split = [], links = 0, days = WINDOW_DAYS,
-  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {} }) {
+  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [] }) {
   const platformTable = ((snapshots.platforms || {}).body || {}).flows || [];
   const metricsFor = Object.fromEntries(platformTable.map((f) => [f.platform, (f.capabilities || {}).metrics || {}]));
 
@@ -383,7 +402,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
         // fairFor first: "this channel is too new" beats "the unit moved",
         // because a channel with no older window has nothing to compare either way.
         blocked: fairFor(p.platform)
-          || (p.platform === 'youtube' && seenKey === 'views' ? viewsUnitBlocked(priorFrom) : null),
+          || (p.platform === 'youtube' && seenKey === 'views' ? viewsUnitBlocked(priorFrom) : null)
+          || SETTLING,
         now: mine(recentRows),
         before: mine(priorRows),
         series: allDays.map((d) => ({
@@ -510,6 +530,25 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <td class="num">${t.n}</td></tr>`).join('')}</tbody></table>`
     : '<p class="empty">Nothing clicked yet.</p>';
 
+  /*
+   * The website's own codes — the booking buttons — in their own card, and
+   * called what they are. A hit here is a button press by somebody already on
+   * the site; nothing joins it to the post that brought them (no cookie, no
+   * parameter, by his rule), most arrive with no referer, and the two buttons
+   * on two different pages have been pressed within three seconds of each
+   * other three times, which is a crawler or him, not a prospect. Not a social
+   * result, and never added to the social numbers above.
+   */
+  const websiteRows = website.length ? `<table>
+    <thead><tr><th>button</th><th class="num">presses</th></tr></thead>
+    <tbody>${website.map((w) => `<tr>
+      <td>${esc(w.note || w.code)}<div class="faint" style="font-size:.72rem">${esc(w.code)}</div></td>
+      <td class="num">${w.n}</td></tr>`).join('')}</tbody></table>
+    <p class="note">Calendar-button presses on matewishkey.com itself, in the same window. Not clicks
+      from social — nothing links a press to the post that brought the person, and some pairs are a
+      crawler pressing both buttons at once. Bookings actually made are not measured anywhere.</p>`
+    : '<p class="empty">No button presses on the site in this window.</p>';
+
   const splitCard = (crawler || unknown || human) ? `
     <table>
       <thead><tr><th>traffic</th><th class="num">hits</th></tr></thead>
@@ -539,19 +578,21 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <th class="num">${esc(short(priorFrom))}–${esc(short(priorTo))}</th>
       <th class="num">change</th></tr></thead>
     <tbody>
-      ${wowRow('people reached', recent.reach || recent.impressions, prior.reach || prior.impressions)}
-      ${wowRow('video views', recent.views, prior.views, num, ytViewsBlocked)}
+      ${wowRow('reach, summed', recent.reach || recent.impressions, prior.reach || prior.impressions, num, SETTLING)}
+      ${wowRow('video views', recent.views, prior.views, num, ytViewsBlocked || SETTLING)}
       ${wowRow('likes, comments, shares, saves',
         recent.likes + recent.comments + recent.shares + recent.saves,
-        prior.likes + prior.comments + prior.shares + prior.saves)}
-      ${wowRow('actions per post', perPostNow, perPostBefore, (v) => v.toFixed(1))}
-      ${wowRow('link clicks (people)', clicksNow, clicksBefore, (v) => String(v))}
+        prior.likes + prior.comments + prior.shares + prior.saves, num, SETTLING)}
+      ${wowRow('actions per post', perPostNow, perPostBefore, (v) => v.toFixed(1), SETTLING)}
+      ${wowRow('link clicks from social (people)', clicksNow, clicksBefore, (v) => String(v))}
       ${wowRow('days we posted', cadenceNow, cadenceBefore, (v) => `${v}/7`)}
     </tbody></table></div>
   <p class="note">Both columns are seven whole days. Today is in neither — it is still in
     progress, and putting a morning against a full week draws a fall that is only the clock.
-    A day's numbers also keep moving for a while after it ends, so the most recent column is
-    the one still settling.</p>`;
+    Reach, views and actions keep moving for weeks after a post goes out (a Facebook day is
+    three-quarters of its final number at midnight, LinkedIn two-thirds), so the recent column is
+    always lower than it will end up and an arrow on it would point down every week. Those rows
+    get no arrow. Clicks and days posted are final by midnight and keep theirs.</p>`;
 
   const body = `
 <h1>Stats</h1>
@@ -559,13 +600,12 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   Trend compares ${esc(short(recentFrom))}–${esc(short(recentTo))} against ${esc(short(priorFrom))}–${esc(short(priorTo))}.</p>
 
 <div class="tiles">
-  ${trendTile(num(tot.reach || tot.impressions || 0), 'people reached', 'plain', 'did anyone see it',
-    change(recent.reach || recent.impressions, prior.reach || prior.impressions))}
-  ${trendTile(num(tot.views || 0), 'video views', 'plain', '', change(recent.views, prior.views, ytViewsBlocked))}
+  ${trendTile(num(tot.reach || tot.impressions || 0), 'reach, summed', 'plain',
+    'FB + IG + LI added up — not a count of people', null)}
+  ${trendTile(num(tot.views || 0), 'video views', 'plain', '', null)}
   ${trendTile(perPostAll.toFixed(1), 'actions per post',
-    perPostAll >= 4 ? 'ok' : perPostAll >= 2 ? 'warn' : 'bad', 'did anyone care',
-    change(perPostNow, perPostBefore))}
-  ${trendTile(human, 'link clicks', human ? 'ok' : 'plain',
+    perPostAll >= 4 ? 'ok' : perPostAll >= 2 ? 'warn' : 'bad', 'did anyone care', null)}
+  ${trendTile(human, 'link clicks from social', human ? 'ok' : 'plain',
     crawler || unknown ? `${crawler + unknown} not counted` : 'people, not crawlers',
     change(clicksNow, clicksBefore))}
   ${trendTile(cadence.toFixed(1), 'days a week we post',
@@ -597,6 +637,8 @@ ${card('Channels, side by side', channelTable)}
   ${card('Clicks by channel', clickRows)}
   ${card('What they clicked', targetRows)}
 </div>
+
+${card('On the website', websiteRows)}
 
 <div class="two">
   ${card('What counted, and what did not', splitCard)}
