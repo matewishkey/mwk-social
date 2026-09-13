@@ -50,3 +50,39 @@ test('a url with no published status still counts as live', () => {
 test('a clean run says nothing rather than inventing a note', () => {
   assert.equal(verdict([live('facebook'), live('threads')]).result.note, null);
 });
+
+/*
+ * UNKNOWN IS NOT FAILED (2026-09-14). A publish request that times out at our
+ * end aborts the client while Zernio keeps working; a platform still
+ * 'processing' when waitForResults gives up is the same shape. Both used to
+ * read as 'failed', which is the one status the dashboard offers Re-queue on
+ * — over content that may already be live and, on two platforms, undeletable.
+ */
+const unknown = (p) => ({ platform: p, status: 'unknown', url: null, error: 'timed out; Zernio may still publish it' });
+
+test('a timed-out group is unknown, and unknown is never a failure', () => {
+  const v = verdict([unknown('instagram'), unknown('threads')]);
+  assert.equal(v.result.status, 'posted', 'never failed, so never re-queued by the box');
+  assert.equal(v.anyLive, false);
+  assert.match(v.result.note, /nothing confirmed/);
+  assert.match(v.result.note, /instagram, threads unknown/);
+  assert.match(v.result.note, /look on the platform/);
+});
+
+test('a platform still processing when we stopped waiting is unknown too', () => {
+  const v = verdict([live('facebook'), { platform: 'threads', status: 'processing', url: null }]);
+  assert.equal(v.result.status, 'posted');
+  assert.match(v.result.note, /threads unknown/);
+  assert.doesNotMatch(v.result.note, /threads failed/);
+});
+
+test('failed and unknown are named apart, so the note says what to do with each', () => {
+  const v = verdict([live('facebook'), dead('twitter'), unknown('tiktok')]);
+  assert.match(v.result.note, /twitter failed — re-queue by hand/);
+  assert.match(v.result.note, /tiktok unknown/);
+});
+
+// Positive control: a platform that SAID failed, alone, is still a failure.
+test('a platform that reported failure, alone, is still failed', () => {
+  assert.equal(verdict([dead('twitter')]).result.status, 'failed');
+});

@@ -123,9 +123,31 @@ async function metrics(body, env) {
  * Hand the box the next thing to post. Claiming is a conditional UPDATE, so two
  * runs overlapping cannot both get the same row.
  */
+/*
+ * A RUN KILLED MID-PUBLISH LEFT ITS ITEM 'claimed' FOR EVER, AND NOTHING LOOKED
+ * (engineering review, 2026-09-14). run-queue claims before it downloads and
+ * publishes, and its only exits are the two /queue/result calls — a SIGTERM,
+ * an earlyoom kill (both in the journal) or a reboot in between runs neither.
+ * The row then sits at 'claimed', skipped by every later claim, invisible to
+ * the "waiting" count, showing "going out" on the dashboard until somebody
+ * wonders why. So a claim older than this is marked FAILED with a note — never
+ * re-queued: the run may have published to some platforms before it died, and
+ * a re-queue would post those again. His Re-queue button is the human look
+ * that rule requires. Forty minutes is past the longest legitimate run (a 240 s
+ * publish per group, a handful of groups, the reshares) with room to spare.
+ */
+const STALE_CLAIM_MINUTES = 40;
+
 async function claim(body, env) {
   const now = new Date().toISOString();
   const platforms = Array.isArray(body.platforms) ? body.platforms : null;
+
+  const stale = new Date(Date.now() - STALE_CLAIM_MINUTES * 60_000).toISOString();
+  await env.DB.prepare(
+    `UPDATE queue_item SET status = 'failed',
+       note = 'the run that claimed this died mid-publish — check every platform by hand before re-queueing'
+      WHERE status = 'claimed' AND claimed_at < ?`,
+  ).bind(stale).run();
 
   // `not_before` holds an item until its day. A bare date compares correctly
   // against an ISO timestamp ('2026-08-31' <= '2026-08-31T00:00:00.000Z'), so
@@ -198,7 +220,8 @@ async function result(body, env) {
   const now = new Date().toISOString();
   // 'queued' is allowed back in deliberately: the box releases a claim it could
   // not act on (bad media, a platform down) rather than burning the item.
-  const allowed = ['queued', 'posted', 'failed', 'cancelled'];
+  // 'released' is a dry run handing it back — see below; it spends no attempt.
+  const allowed = ['queued', 'posted', 'failed', 'cancelled', 'released'];
   if (!allowed.includes(status)) return json({ ok: false, error: 'bad status' }, 400);
 
   /*
@@ -218,6 +241,17 @@ async function result(body, env) {
    */
   let write = status;
   let text = note || null;
+  /*
+   * 'released' is a dry run handing the item back untouched. It used to hand
+   * it back as 'queued', which counts as an attempt — so three dry runs marked
+   * a perfectly good item failed. A release is not an attempt at anything.
+   */
+  if (status === 'released') {
+    await env.DB.prepare(
+      `UPDATE queue_item SET status = 'queued', claimed_at = NULL, note = ? WHERE id = ?`,
+    ).bind(text, id).run();
+    return json({ ok: true, status: 'queued' });
+  }
   if (status === 'queued') {
     const row = await env.DB.prepare('SELECT attempts FROM queue_item WHERE id = ?').bind(id).first();
     const attempts = ((row && row.attempts) || 0) + 1;

@@ -180,6 +180,83 @@ test('the pending endpoint expires stale rewrites and names what not to redraft'
   assert.deepStrictEqual(body.items, []);
 });
 
+/*
+ * The Retry button is offered ONLY for platforms that said failed. A timeout or
+ * a platform still processing is unknown, gets no button, and says so.
+ */
+test('an unknown platform gets no Retry button, only a note to look by hand', async () => {
+  const { failedPlatforms, unknownPlatforms, queuePage } = await src('pages/queue.js');
+  const pace = { perDay: 6, today: 0, minGapMinutes: 90, tz: TZ, nextAt: null, why: null };
+  const row = { id: 'q1', status: 'posted', body: 'x', platforms: '[]', first_comment: 1, priority: 0,
+    created_at: new Date().toISOString(),
+    result: JSON.stringify([
+      { platform: 'facebook', status: 'published', url: 'https://fb/1' },
+      { platform: 'twitter', status: 'failed', url: null, error: 'media' },
+      { platform: 'threads', status: 'processing', url: null },
+      { platform: 'tiktok', status: 'unknown', url: null, error: 'timed out' },
+    ]) };
+  assert.deepEqual(failedPlatforms(row), ['twitter'], 'only the platform that said failed');
+  assert.deepEqual(unknownPlatforms(row), ['threads', 'tiktok']);
+
+  const html = queuePage({ email: 'm@x.com', tz: TZ, waiting: [], done: [row], total: 1, pace });
+  assert.match(html, /Retry 1<\/button>/, 'twitter can be retried');
+  assert.doesNotMatch(html, /Retry 3/, 'threads and tiktok must not be offered a second copy');
+
+  // A row with only unknowns: no button at all, a note instead.
+  const only = { ...row, result: JSON.stringify([{ platform: 'instagram', status: 'unknown', url: null }]) };
+  const html2 = queuePage({ email: 'm@x.com', tz: TZ, waiting: [], done: [only], total: 1, pace });
+  assert.doesNotMatch(html2, /Retry \d/);
+  assert.match(html2, /instagram: unknown, check by hand/);
+});
+
+/*
+ * A claim older than forty minutes is a run that died. It is marked failed
+ * with a note — never re-queued, since it may have published before dying —
+ * and the sweep runs inside claim() so the next tick is what notices.
+ */
+test('claim() marks a stale claim failed, and never queued', async () => {
+  const { api } = await src('api.js');
+  const seen = [];
+  const env = { INGEST_TOKEN: 'tok', DB: { prepare(sql) {
+    const stmt = { bind: (...args) => { seen.push({ sql, args }); return stmt; },
+      run: async () => ({ meta: { changes: 0 } }), all: async () => ({ results: [] }), first: async () => null };
+    return stmt;
+  } } };
+  const request = new Request('https://ingest.example/queue/claim', {
+    method: 'POST', headers: { Authorization: 'Bearer tok' }, body: '{}' });
+  await api(request, env, new URL('https://ingest.example/queue/claim'));
+  const sweep = seen.find((s) => /status = 'claimed' AND claimed_at < \?/.test(s.sql));
+  assert.ok(sweep, 'the sweep runs on every claim');
+  assert.match(sweep.sql, /SET status = 'failed'/);
+  assert.doesNotMatch(sweep.sql, /'queued'/, 'a dead run is never re-queued by the code');
+  assert.match(sweep.sql, /check every platform by hand/);
+  const minutesAgo = (Date.now() - Date.parse(sweep.args[0])) / 60_000;
+  assert.ok(minutesAgo > 39 && minutesAgo < 41, `cutoff is 40 minutes back, got ${minutesAgo.toFixed(1)}`);
+  assert.ok(seen.indexOf(sweep) < seen.findIndex((s) => /status = 'queued'/.test(s.sql)),
+    'the sweep runs before the select, or a dead claim is skipped one more time');
+});
+
+/*
+ * A dry run hands the item back as 'released', which is not an attempt. It
+ * used to come back as 'queued', and three dry runs marked the item failed.
+ */
+test('a released item goes back to queued without spending an attempt', async () => {
+  const { api } = await src('api.js');
+  const seen = [];
+  const env = { INGEST_TOKEN: 'tok', DB: { prepare(sql) {
+    const stmt = { bind: (...args) => { seen.push({ sql, args }); return stmt; },
+      run: async () => ({ meta: { changes: 1 } }), first: async () => ({ attempts: 2 }) };
+    return stmt;
+  } } };
+  const request = new Request('https://ingest.example/queue/result', {
+    method: 'POST', headers: { Authorization: 'Bearer tok' },
+    body: JSON.stringify({ id: 'q1', status: 'released', note: 'dry run' }) });
+  const body = await (await api(request, env, new URL('https://ingest.example/queue/result'))).json();
+  assert.equal(body.status, 'queued');
+  assert.ok(!seen.some((s) => /SET attempts/.test(s.sql)), 'no attempt is counted');
+  assert.ok(seen.some((s) => /SET status = 'queued', claimed_at = NULL/.test(s.sql)));
+});
+
 test('sync() holds every video on the skip list before any build', () => {
   const s = require('node:fs').readFileSync(
     require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');

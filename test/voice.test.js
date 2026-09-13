@@ -639,8 +639,11 @@ test('a failed publish request cannot take the published ones down with it', () 
   assert.ok(/catch\s*\(err\)/.test(body), 'the per-request loop does not catch');
   assert.match(body, /status:\s*'failed'/,
     'a failed request must name its own platforms failed, not throw the group away');
-  assert.match(body, /if \(!posts\.length && failures\.length\) throw/,
-    'a total failure must still throw — nothing is live, so there is nothing to protect');
+  // Since 2026-09-14 a timed-out request is UNKNOWN, not failed, and unknown
+  // is not thrown: it may be out, so it is reported. A total failure that the
+  // platform actually reported still throws.
+  assert.match(body, /if \(!posts\.length && failures\.length && !platforms\.some\(\(p\) => p\.status === 'unknown'\)\) throw/,
+    'a total failure must still throw — nothing is live, so there is nothing to protect — unless it is unknown');
   // The catch has to sit INSIDE the loop, or it is the same bug one line out.
   assert.ok(body.indexOf('try {') < body.indexOf("api('POST', '/posts'"),
     'the try opens after the request it is meant to guard');

@@ -533,6 +533,33 @@ async function publish(opts) {
         platforms.push(p);
       }
     } catch (err) {
+      /*
+       * A TIMEOUT IS NOT A FAILURE. The request aborted at our end; Zernio
+       * keeps processing, and the notes said "reconcile by searching
+       * posts:list for the caption just composed" for three weeks without
+       * any code doing it. So: look. If the post is there, wait on it like any
+       * other. If it is not, the platforms are UNKNOWN — recorded as such,
+       * never as failed, because failed is what gets re-queued and a second
+       * copy on Instagram or TikTok cannot be deleted.
+       */
+      if (timedOut(err)) {
+        console.error(`  ${targets.join('+')} timed out at our end — checking whether Zernio has it`);
+        const found = reconcile(body);
+        if (found) {
+          posts.push(found);
+          console.log(`post ${found._id} — found by its caption after the timeout`);
+          for (const p of await waitForResults(found._id)) {
+            console.log(`  ${p.platform.padEnd(10)} ${p.status.padEnd(10)} ${p.platformPostUrl || p.errorMessage || ''}`);
+            platforms.push(p);
+          }
+        } else {
+          for (const platform of targets) {
+            platforms.push({ platform, status: 'unknown', platformPostId: null,
+              platformPostUrl: null, errorMessage: 'timed out; Zernio may still publish it' });
+          }
+        }
+        continue;
+      }
       console.error(`  ${targets.join('+')} failed: ${err.message}`);
       failures.push(err);
       for (const platform of targets) {
@@ -542,8 +569,24 @@ async function publish(opts) {
     }
   }
   // Nothing got out at all — no partial success to protect, so say so loudly.
-  if (!posts.length && failures.length) throw failures[0];
+  // An unknown is not nothing: it may be out, so it is reported, not thrown.
+  if (!posts.length && failures.length && !platforms.some((p) => p.status === 'unknown')) throw failures[0];
   return { post: posts[0], posts, platforms };
+}
+
+const timedOut = (err) => /timeout|timed out|aborted/i.test(`${err && err.name} ${err && err.message}`);
+
+/**
+ * The post we just tried to create, if Zernio made it despite our timeout —
+ * matched on the exact caption, and only if it is minutes old, so an older
+ * post with the same words (a retry, a re-queue) is never mistaken for it.
+ */
+function reconcile(body, { withinMinutes = 15 } = {}) {
+  let res;
+  try { res = zernio(['posts:list', '--limit', '10']); } catch { return null; }
+  const since = Date.now() - withinMinutes * 60_000;
+  return (res.posts || []).find((p) => (p.content || '') === (body.content || '')
+    && Date.parse(p.createdAt || 0) >= since) || null;
 }
 
 async function main() {

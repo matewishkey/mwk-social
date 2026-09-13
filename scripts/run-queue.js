@@ -125,18 +125,27 @@ function accountsFor(want) {
  */
 function verdict(outcome) {
   const anyLive = outcome.some((o) => o.status === 'published' || o.url);
-  const failed = outcome.filter((o) => o.status !== 'published' && !o.url);
-  if (!anyLive) {
+  const isLive = (o) => o.status === 'published' || o.url;
+  // 'failed' is the platform saying so. Anything else that is not live — a
+  // request that timed out at our end, a platform still 'processing' when we
+  // stopped waiting — is UNKNOWN: Zernio may be publishing it right now. An
+  // unknown is never a failure, because a failure is what gets re-queued, and
+  // a re-queue of something that did go out is the duplicate this function
+  // exists to prevent (2026-08-21, three copies on TikTok, two undeletable).
+  const failed = outcome.filter((o) => !isLive(o) && o.status === 'failed');
+  const unknown = outcome.filter((o) => !isLive(o) && o.status !== 'failed');
+  if (!anyLive && !unknown.length) {
     return { anyLive, result: { status: 'failed', result: outcome, note: 'no platform reported a live post' } };
   }
+  const parts = [];
+  if (failed.length) parts.push(`${failed.map((f) => f.platform).join(', ')} failed — re-queue by hand if you want them`);
+  if (unknown.length) parts.push(`${unknown.map((u) => u.platform).join(', ')} unknown (timed out or still processing) — look on the platform before doing anything`);
   return {
     anyLive,
     result: {
       status: 'posted',
       result: outcome,
-      note: failed.length
-        ? `live, but ${failed.map((f) => f.platform).join(', ')} failed — re-queue by hand if you want them`
-        : null,
+      note: parts.length ? `${anyLive ? 'live, but ' : 'nothing confirmed: '}${parts.join('; ')}` : null,
     },
   };
 }
@@ -252,7 +261,9 @@ async function main() {
         console.log(`would post to ${accts.map((a) => a.platform).join(', ')}`
           + (set.length ? ` with ${set.map((m) => path.basename(m.file)).join(', ')}` : ' with no media'));
       }
-      await call('/queue/result', { id: item.id, status: 'queued', note: 'dry run' }, api);
+      // 'released', not 'queued': a dry run is not an attempt, and three of
+      // them used to mark the item failed.
+      await call('/queue/result', { id: item.id, status: 'released', note: 'dry run' }, api);
       return;
     }
 

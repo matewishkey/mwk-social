@@ -25,7 +25,22 @@ export function failedPlatforms(row) {
   try { outcome = JSON.parse(row.result || '[]'); } catch { return []; }
   if (!Array.isArray(outcome)) return [];
   const live = new Set(outcome.filter((o) => o.status === 'published' || o.url).map((o) => o.platform));
-  return [...new Set(outcome.map((o) => o.platform))].filter((p) => p && !live.has(p));
+  // 'failed' is the platform SAYING so. A request that timed out at our end,
+  // or a platform still 'processing' when the run stopped waiting, is unknown
+  // — Zernio may well be publishing it — and unknown gets no Retry button:
+  // the second copy on Instagram or TikTok cannot be deleted.
+  const failed = new Set(outcome.filter((o) => o.status === 'failed').map((o) => o.platform));
+  return [...new Set(outcome.map((o) => o.platform))].filter((p) => p && !live.has(p) && failed.has(p));
+}
+
+/** Platforms whose fate the run could not learn — neither live nor refused. */
+export function unknownPlatforms(row) {
+  let outcome;
+  try { outcome = JSON.parse(row.result || '[]'); } catch { return []; }
+  if (!Array.isArray(outcome)) return [];
+  const live = new Set(outcome.filter((o) => o.status === 'published' || o.url).map((o) => o.platform));
+  return [...new Set(outcome.filter((o) => o.status !== 'failed').map((o) => o.platform))]
+    .filter((p) => p && !live.has(p));
 }
 
 const STATUS = {
@@ -181,7 +196,8 @@ export function queuePage({ email, tz, waiting, done, pace,
       : failedPlatforms(i).length ? `
         <form method="post" class="inline-form"><input type="hidden" name="do" value="retry">
           <input type="hidden" name="id" value="${esc(i.id)}"><button
-            title="Queue it again for ${esc(failedPlatforms(i).join(', '))} only">Retry ${failedPlatforms(i).length}</button></form>` : ''}</td>
+            title="Queue it again for ${esc(failedPlatforms(i).join(', '))} only">Retry ${failedPlatforms(i).length}</button></form>`
+      : unknownPlatforms(i).length ? `<span class="faint" title="the request timed out or the platform was still processing — look on the platform before doing anything">${esc(unknownPlatforms(i).join(', '))}: unknown, check by hand</span>` : ''}</td>
     </tr>`;
   };
 

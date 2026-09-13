@@ -478,10 +478,20 @@ most repeated failure in this repo.
   after five platforms had published, and the next tick reposted everything, three times over.
   Each group is caught where it happens and `verdict()` returns `posted` with the failures named.
   **A retry after a partial publish is a human's decision, not the code's.**
-- **A publish call that times out has NOT necessarily failed.** The request aborts at the client and
-  Zernio keeps processing, so a timeout is *unknown* — reconcile by searching `posts:list` for the
-  caption just composed. The publish timeout is 240s and the queue claims an item **before** the
-  request for this reason.
+- **A publish call that times out has NOT necessarily failed, and since 2026-09-14 the code
+  agrees.** The request aborts at the client and Zernio keeps processing. `post.js` now reconciles
+  a timeout by searching `posts:list` for the exact caption, minutes old; found, it waits on it like
+  any other; not found, the platforms are recorded **`unknown`** — and `verdict()` never turns an
+  unknown into `failed`, because failed is what the dashboard offers Re-queue on. A platform still
+  `processing` when `waitForResults` gives up is unknown the same way. The queue page shows
+  *"unknown, check by hand"* and no button. For three weeks this note described a reconciliation no
+  code performed, and a slow Zernio was marked failed over content that was live.
+- **A claim older than 40 minutes is a run that died** (killed by earlyoom, SIGTERM, a reboot —
+  all in the journal) and `claim()` marks it **failed with a note, never re-queued**: it may have
+  published before it died. Before this it sat at `claimed` for ever, skipped by every claim and
+  invisible to the waiting count.
+- **A dry run hands its item back as `released`, not `queued`** — `queued` counts as an attempt,
+  and three dry runs used to mark a good item failed.
 - **`--no-first-comment` used to hold for about an hour** — post.js sent none, then the watcher
   found a published post with no CTA and posted one. `comment-state.js` is shared by both:
   `run-queue.js` writes a suppression entry keyed `<platform>:<native post id>`. **It never
