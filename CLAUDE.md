@@ -273,6 +273,12 @@ had already published were jargon the rule rejects.
   the identical question, and two copies is how one of them starts approving a rewrite.
   **It decides the STATE a row is filed in and nothing else** — the WHERE clause is untouched, so
   a rejection is still final and an unchanged re-file is still a no-op.
+- **A REWRITE HE HAS NOT ANSWERED IN 14 DAYS IS A NO, AND AN UNDECIDED ONE IS NEVER RE-DRAFTED**
+  (2026-09-14). Four `rebuild` proposals were re-built by the model nightly for a week and re-filed
+  with `proposed_at` reset, so "drafted hours ago" sat on proposals he had scrolled past for weeks.
+  `/youtube/pending` first expires anything `proposed` older than 14 days to `rejected`
+  (`decided_by: auto:14-days`), then returns `skip` — every video waiting or refused — and `sync()`
+  holds those before `build()`. One look; silence means keep what is there.
 - **`--repropose <id…>` is how a voice change reaches what is already written.** `sync()` cannot:
   a recognisably-ours description takes the swap path, which is right for a stale tail and useless
   for a wrong opening. It files proposals and never writes.

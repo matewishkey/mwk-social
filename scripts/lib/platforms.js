@@ -153,7 +153,11 @@ const PLATFORMS = {
     imageMax: 10,            // Zernio's Facebook page, 2026-08-27
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
     commentsApi: true,
-    reshare: 'manual',             // personal timelines are impossible via any API (Meta rule)
+    // Personal timelines are impossible via any API (Meta rule). This was
+    // 'manual' — a "share it yourself" row filed on the dashboard per post —
+    // until 2026-09-14: twelve filed, none done, and the tile that would carry
+    // a real alarm read 13 for three weeks. If he shares one, he shares one.
+    reshare: 'none',
     metrics: { views:'partial', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'yes', saves:'no', clicks:'yes', watchTime:'no' },
     captionMax: 63206,
@@ -282,8 +286,6 @@ function flowFor(name) {
   }
 
   if (p.reshare === 'api') steps.push({ step: 'reshare', how: 'posted from his profile; the page reposts it with the CTA, the other profile plain', by: 'api' });
-  else if (p.reshare === 'manual') steps.push({ step: 'reshare', by: 'manual',
-    how: 'your turn — personal timelines are impossible via any API (Meta rule)' });
 
   return { platform: name, steps, capabilities: p };
 }

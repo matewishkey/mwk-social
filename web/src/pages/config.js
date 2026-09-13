@@ -70,7 +70,6 @@ function explainers(flows, voice) {
   const never = by('none');
   const resharing = {
     api: flows.filter((f) => (f.capabilities || {}).reshare === 'api').map((f) => f.platform),
-    manual: flows.filter((f) => (f.capabilities || {}).reshare === 'manual').map((f) => f.platform),
   };
   const list = (xs) => xs.length ? xs.join(', ') : 'nothing';
   const v = voice || {};
@@ -101,14 +100,13 @@ ${v.shortLinkHost ? `<p>Every comment carries a <b>${esc(v.shortLinkHost)}</b> l
 
 ${card('How resharing works', `
 <p>Resharing is possible on <b>${esc(list(resharing.api))}</b> and nowhere else.</p>
-<p>The pattern is deliberate: the post goes out natively on the <b>company page</b>, and your
-  <b>personal account</b> quote-reshares it with a thought on top. The personal account is the one
-  with an audience, and the point is to move that engagement onto the page — so it never
-  native-posts. Write the thought in the queue form and it happens automatically; leave it empty and
-  nothing is reshared. <b>It is never generated for you.</b></p>
-<p>On <b>${esc(list(resharing.manual))}</b> a personal timeline cannot be posted to through any API
-  — that is a Meta rule rather than something missing here. So a live post files an item under
-  <b>Your turn</b> on the Overview with a direct link: one click, share it yourself, tick it off.</p>
+<p>The post goes out natively from <b>your own profile</b> — that is where the followers are and
+  the only place the voice is first person. The <b>company page</b> reposts it straight away with
+  your thought on top and the tracked link underneath; the <b>other connected profile</b> reposts it
+  four hours later, plain — nothing of yours goes out under someone else's name. Write the thought
+  in the queue form; leave it empty and the reposts carry none. <b>It is never generated for you.</b></p>
+<p>A Facebook personal timeline cannot be posted to through any API — that is a Meta rule. Nothing
+  asks you to share one by hand any more; if you share one, you share one.</p>
 `)}`;
 }
 

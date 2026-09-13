@@ -385,17 +385,14 @@ async function main() {
       }
     }
 
-    // Facebook cannot post to a personal timeline through any API, so a live FB
-    // post becomes a link to click rather than a thing we pretend we did.
-    for (const o of outcome) {
-      if (o.platform === 'facebook' && o.url && platforms.get('facebook').reshare === 'manual') {
-        await call('/actions', {
-          kind: 'fb-personal-share', platform: 'facebook', url: o.url,
-          label: 'Share this to your personal timeline',
-          dedupeKey: `fb-personal-share|${item.id}`,
-        }, api).catch(() => {});
-      }
-    }
+    /*
+     * There used to be a "share this to your personal Facebook" action filed
+     * here for every live Facebook post. Twelve were filed between 21 Aug and
+     * 8 Sep and he did none of them, so the "need you" tile read 13 for three
+     * weeks and anything real would have landed under twelve stale rows he had
+     * learned to scroll past. Removed 2026-09-14. The rule for manual_action
+     * from now on: a row is filed only if not doing it costs something.
+     */
     console.log(anyLive ? 'posted' : 'nothing went live — marked failed');
   } catch (err) {
     // Put it back rather than burn it — but ONLY if nothing went live. Once a

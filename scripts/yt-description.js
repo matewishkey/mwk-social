@@ -246,7 +246,11 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
 
   // Anything approved since last time goes out first — he has already decided,
   // and making him wait a cycle for a decision he made is just rude.
-  const { items: approved, applied = [] } = await call('/youtube/pending', {});
+  // `skip` is every video with a proposal he has not answered or has said no
+  // to. Building for those again is a model call that lands nowhere — propose()
+  // drops a re-file on a rejected row and merely re-ages a proposed one.
+  const { items: approved, applied = [], skip = [] } = await call('/youtube/pending', {});
+  const skipSet = new Set(skip);
   // Videos already carrying exactly what we wrote. Re-proposing those is churn,
   // not a change: build() regenerates the opening every run and it never matches.
   const alreadyWritten = new Map(applied.map((a) => [a.video_id, (a.proposed || '').trim()]));
@@ -276,6 +280,7 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
   let filled = 0;
   for (const id of ids) {
     try {
+      if (skipSet.has(id)) { console.log(`hold  ${id} — a proposal is waiting on him, or he said no`); continue; }
       const existing = currentDescription(id);
 
       if (existing.trim()) {

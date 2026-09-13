@@ -487,11 +487,35 @@ async function propose(body, env) {
   return json({ ok: true, filed, sent: items.length, autoApproved: auto });
 }
 
-const pending = async (_body, env) => json({
+/*
+ * A REWRITE HE HAS NOT ANSWERED IN 14 DAYS IS A NO. Four rebuilds stood for
+ * weeks while the nightly run re-drafted each of them with a model — a minute
+ * of compute each — and re-filed them with proposed_at reset to now, so the
+ * dashboard said "drafted hours ago" about proposals he had scrolled past for
+ * a fortnight. One look; silence means keep what is there. Rejected here is
+ * the same rejected as his button: propose()'s WHERE never reopens it.
+ *
+ * `skip` is the list sync() must not build() for — everything still waiting
+ * on him plus everything he (or this) said no to — so an undecided proposal
+ * is neither re-drafted nor re-aged.
+ */
+const REWRITE_EXPIRY_DAYS = 14;
+
+const pending = async (_body, env) => {
+  const now = new Date();
+  const cutoff = new Date(now.getTime() - REWRITE_EXPIRY_DAYS * 86400_000).toISOString();
+  await env.DB.prepare(
+    `UPDATE yt_proposal SET state = 'rejected', decided_at = ?, decided_by = ?
+      WHERE state = 'proposed' AND proposed_at < ?`,
+  ).bind(now.toISOString(), `auto:${REWRITE_EXPIRY_DAYS}-days`, cutoff).run();
+  return json({
   ok: true,
   items: (await env.DB.prepare(
     `SELECT video_id, title, proposed FROM yt_proposal WHERE state = 'approved' ORDER BY decided_at`,
   ).all()).results || [],
+  skip: ((await env.DB.prepare(
+    `SELECT video_id FROM yt_proposal WHERE state IN ('proposed', 'rejected')`,
+  ).all()).results || []).map((r) => r.video_id),
   // What we last wrote, so a re-draft can tell "unchanged" from "never done".
   // Without this the loop never converges: the opening paragraph is generated
   // and never matches byte for byte, so every applied description immediately
@@ -499,7 +523,8 @@ const pending = async (_body, env) => json({
   applied: (await env.DB.prepare(
     `SELECT video_id, proposed FROM yt_proposal WHERE state = 'applied'`,
   ).all()).results || [],
-});
+  });
+};
 
 async function applied(body, env) {
   const ids = Array.isArray(body.videoIds) ? body.videoIds : [];

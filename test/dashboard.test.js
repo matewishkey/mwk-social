@@ -94,8 +94,8 @@ test('the workflow page names who does each step, including nobody', async () =>
     snapshots: { platforms: { body: { flows: flows() }, updatedAt: new Date().toISOString() } } });
   assert.match(html, /tiktok/);
   assert.match(html, /impossible/, 'TikTok and X have no comments API we can use');
-  assert.match(html, /your turn/, 'Facebook resharing is manual');
-  assert.match(html, /automatic/, 'LinkedIn resharing is not');
+  assert.doesNotMatch(html, /your turn/, 'nothing asks him to share Facebook by hand any more (2026-09-14)');
+  assert.match(html, /automatic/, 'LinkedIn resharing is');
   assert.match(html, /watcher/, 'Threads gets its comment from the watcher');
 });
 
@@ -130,8 +130,64 @@ test('the workflow page explains resharing, and who has to do it', async () => {
   assert.match(html, /How resharing works/);
   assert.match(html, /possible on <b>linkedin<\/b> and nowhere else/);
   assert.match(html, /never generated for you/, 'the commentary is his, not ours');
+  assert.match(html, /your own profile/, 'the native post is his, since 2026-09-14');
   assert.match(html, /company page/);
-  assert.match(html, /Your turn/, 'facebook resharing lands on the overview');
+  assert.match(html, /someone else's name/, 'the other profile reposts plain');
+  assert.doesNotMatch(html, /Your turn/, 'nothing files a Facebook share for him any more');
+});
+
+/*
+ * A REWRITE HE HAS NOT ANSWERED IN 14 DAYS IS A NO (2026-09-14). Four rebuilds
+ * were re-drafted by the model every night for a week and re-filed with their
+ * age reset, so "drafted hours ago" sat on proposals he had ignored for weeks.
+ * The endpoint the box reads first expires them, then hands back the list of
+ * videos NOT to build for — waiting or refused — so nothing re-drafts them.
+ */
+test('the pending endpoint expires stale rewrites and names what not to redraft', async () => {
+  const { api } = await src('api.js');
+  const seen = [];
+  const env = {
+    INGEST_TOKEN: 'tok',
+    DB: { prepare(sql) {
+      const stmt = {
+        bind: (...args) => { seen.push({ sql, args }); return stmt; },
+        run: async () => { seen.push({ sql, ran: true }); return { meta: { changes: 0 } }; },
+        all: async () => {
+          seen.push({ sql, all: true });
+          if (/IN \('proposed', 'rejected'\)/.test(sql)) return { results: [{ video_id: 'w1' }, { video_id: 'no1' }] };
+          return { results: [] };
+        },
+      };
+      return stmt;
+    } },
+  };
+  const request = new Request('https://ingest.example/youtube/pending', {
+    method: 'POST', headers: { Authorization: 'Bearer tok' }, body: '{}',
+  });
+  const body = await (await api(request, env, new URL('https://ingest.example/youtube/pending'))).json();
+
+  const expiry = seen.find((s) => /SET state = 'rejected'/.test(s.sql) && s.args);
+  assert.ok(expiry, 'stale proposals are expired before anything is read');
+  assert.match(expiry.sql, /state = 'proposed' AND proposed_at < \?/, 'only undecided rows, only past the cutoff');
+  assert.match(String(expiry.args[1]), /^auto:\d+-days$/, 'an automatic no is stamped as one, never as his');
+  const cutoff = Date.parse(expiry.args[2]);
+  const daysAgo = (Date.now() - cutoff) / 86400_000;
+  assert.ok(daysAgo > 13.9 && daysAgo < 14.1, `the cutoff is 14 days back, got ${daysAgo.toFixed(2)}`);
+  assert.ok(seen.findIndex((s) => s.ran && /rejected/.test(s.sql)) < seen.findIndex((s) => s.all),
+    'the expiry runs BEFORE the reads, or a just-expired row is still handed back to build');
+
+  assert.deepStrictEqual(body.skip, ['w1', 'no1'], 'waiting and refused both come back as skip');
+  assert.deepStrictEqual(body.items, []);
+});
+
+test('sync() holds every video on the skip list before any build', () => {
+  const s = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'scripts', 'yt-description.js'), 'utf8');
+  const fn = s.slice(s.indexOf('async function sync('), s.indexOf('console.log(`${filled} filled'));
+  assert.match(fn, /skip = \[\]/, 'sync must read skip from /youtube/pending');
+  const hold = fn.indexOf('skipSet.has(id)');
+  const build = fn.indexOf('await build(id)');
+  assert.ok(hold > 0 && build > 0 && hold < build, 'the hold must come before the first build()');
 });
 
 test('the workflow page survives the box never having shipped the table', async () => {
