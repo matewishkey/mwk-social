@@ -652,6 +652,14 @@ The invariants:
   in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job never fails
   because the alerting did. A test drives it through a curl shim. The Healthchecks project has to
   exist first — it is mate's account to create it in.
+- **A HUNG JOB IS A TIMER THAT NEVER FIRES AGAIN, AND NOTHING WOULD SAY SO.** systemd refuses to
+  start a oneshot while its last run is still active, so one wedged `yt-dlp` or `ffmpeg` stops that
+  job for good — and with no alert path the only sign is a dashboard number that quietly stops
+  moving. Every unit now carries `TimeoutStartSec` (`install-timers.sh`: ship-events 2min,
+  ship-stats 5min, state-copy 15min, first-comment 20min, queue 30min, yt-notes 90min) and every
+  `execFileSync` that touches the network carries its own (`yt-dlp`/`ffmpeg` 10 min, the Zernio CLI
+  4 min, matching the REST publish timeout). **The unit ceiling is the backstop, not the mechanism**
+  — a subprocess killed by its own timeout fails one video; a unit killed by systemd fails the run.
 - **The box's disk is not backed up, and `~/.local/state/mwk-social/` is what makes the pipeline
   idempotent** — the first-comment ledger, 47 cached transcripts Zernio's expired URLs can never
   re-fetch, the only backup of every description overwritten. `scripts/state-copy.sh` copies it to

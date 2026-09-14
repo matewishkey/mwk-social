@@ -41,7 +41,11 @@ const BLOCKED = voice.blockedTags();
  */
 const RULES_VERSION = 2;
 
-const sh = (cmd, args) => execFileSync(cmd, args, { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26 });
+// ffmpeg stripping audio, yt-dlp fetching it: minutes at worst, never hours. A
+// wedged one used to pin the whole run and, with it, the timer — systemd will
+// not restart a oneshot whose last run is still going (2026-09-14).
+const sh = (cmd, args) => execFileSync(cmd, args,
+  { stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 1 << 26, timeout: 600000 });
 
 function cachePath(key) {
   return path.join(CACHE, key.replace(/[^\w.-]/g, '_') + '.json');

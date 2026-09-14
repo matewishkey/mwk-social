@@ -16,8 +16,16 @@ mkdir -p "$unit_dir"
 # ~/.secrets and the dashboard's ingest token in td-sops, and neither is
 # something systemd's EnvironmentFile can read. mise owns node and systemd gets
 # no login shell, so PATH is spelled out.
+# A HUNG JOB IS A TIMER THAT NEVER FIRES AGAIN, SILENTLY. systemd will not start
+# a oneshot while its last run is still active, so one wedged yt-dlp or ffmpeg
+# stops that job for good — and with no alert path (his call, 2026-09-14) the
+# only sign is a number on the dashboard that quietly stops moving. Every unit
+# gets a ceiling: past it systemd kills the run and the next tick starts clean.
+# The subprocesses carry their own timeouts as well; this is the backstop for
+# the ones nobody thought of. Generous on purpose — a real run must never be
+# cut short. Sixth positional argument, defaulting to ten minutes.
 unit() {
-  local name="$1" description="$2" command="$3" schedule="$4" timer_description="$5"
+  local name="$1" description="$2" command="$3" schedule="$4" timer_description="$5" max="${6:-10min}"
   cat > "$unit_dir/$name.service" <<UNIT
 [Unit]
 Description=$description
@@ -27,6 +35,7 @@ After=network-online.target
 Type=oneshot
 Environment=PATH=%h/.local/share/mise/shims:%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 WorkingDirectory=$repo
+TimeoutStartSec=$max
 ExecStart=$repo/scripts/with-secrets.sh $command
 UNIT
 
@@ -51,7 +60,8 @@ if [[ "$want" == all || "$want" == first-comment ]]; then
     'Post the standard first comment on new MWK posts' \
     "$repo/scripts/first-comment.js" \
     '*:00' \
-    'Check for new MWK posts needing their first comment'
+    'Check for new MWK posts needing their first comment' \
+    '20min'
 fi
 
 if [[ "$want" == all || "$want" == ship-events ]]; then
@@ -62,7 +72,8 @@ if [[ "$want" == all || "$want" == ship-events ]]; then
     'Ship the MWK event log to the dashboard' \
     "$repo/scripts/ship-events.js" \
     '*:0/2' \
-    'Ship new MWK events to Cloudflare'
+    'Ship new MWK events to Cloudflare' \
+    '2min'
 fi
 
 if [[ "$want" == all || "$want" == queue ]]; then
@@ -80,7 +91,8 @@ if [[ "$want" == all || "$want" == queue ]]; then
     'Post the next queued MWK item, if it is a good moment' \
     "$repo/scripts/run-queue.js --scheduled" \
     '*:05,10,15,20,25,30,35,40,45' \
-    'Check whether a queued post is due'
+    'Check whether a queued post is due' \
+    '30min'
 fi
 
 if [[ "$want" == all || "$want" == ship-stats ]]; then
@@ -90,7 +102,8 @@ if [[ "$want" == all || "$want" == ship-stats ]]; then
     'Ship MWK analytics, follower counts and the platform table' \
     "$repo/scripts/ship-stats.js" \
     '*:35' \
-    'Ship MWK analytics to the dashboard'
+    'Ship MWK analytics to the dashboard' \
+    '5min'
 fi
 
 if [[ "$want" == all || "$want" == yt-notes ]]; then
@@ -101,7 +114,8 @@ if [[ "$want" == all || "$want" == yt-notes ]]; then
     'Draft YouTube show notes and file them for approval' \
     "$repo/scripts/yt-description.js --sync" \
     '05:40' \
-    'Draft MWK YouTube show notes'
+    'Draft MWK YouTube show notes' \
+    '90min'
 fi
 
 if [[ "$want" == all || "$want" == state-copy ]]; then
@@ -116,7 +130,8 @@ if [[ "$want" == all || "$want" == state-copy ]]; then
     'Copy the MWK pipeline state to the backed-up share' \
     "$repo/scripts/state-copy.sh" \
     '03:20' \
-    'Nightly copy of MWK state to the share'
+    'Nightly copy of MWK state to the share' \
+    '15min'
 fi
 
 systemctl --user daemon-reload

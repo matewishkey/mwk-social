@@ -66,7 +66,12 @@ const BACKUP = path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '
 // The constant half of every description, and the identity tags, both from
 // config/voice.json so there is one place to change what we say.
 
-const yt = (args) => execFileSync('yt-dlp', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+// Ten minutes: reading a description is seconds and fetching auto-captions for
+// a four-hour stream is minutes, but a yt-dlp that hangs would wedge this job
+// for ever — systemd will not restart a oneshot whose last run is still going.
+// install-timers.sh carries the unit-level backstop.
+const yt = (args) => execFileSync('yt-dlp', args,
+  { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 600000 }).trim();
 const currentDescription = (id) => yt(['-q', '--no-warnings', '--print', '%(description)s', '--', `https://www.youtube.com/watch?v=${id}`]);
 const currentTitle = (id) => yt(['-q', '--no-warnings', '--print', '%(title)s', '--', `https://www.youtube.com/watch?v=${id}`]);
 

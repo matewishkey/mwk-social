@@ -93,7 +93,10 @@ function zernio(args) {
   try {
     // stderr is piped, not inherited: the CLI echoes its JSON error bodies there
     // and they would otherwise litter the journal alongside our own log lines.
-    out = execFileSync(CLI, args, { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    out = execFileSync(CLI, args,
+      // Four minutes, matching the REST publish timeout: the CLI talks to
+      // Zernio and a hung call must not outlive the job that made it.
+      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], timeout: 240000 });
   } catch (err) {
     out = (err.stdout || '').toString();
     if (!out.trim()) throw new Error(`zernio ${args[0]} failed: ${err.message}`);
