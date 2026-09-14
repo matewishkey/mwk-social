@@ -612,9 +612,10 @@ The invariants:
   `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
   "is the last complete day settled?" had no answer and the trend excluded today on instinct. A
   `BEFORE UPDATE` trigger now keeps the superseded value in `daily_metric_revision`, with both
-  timestamps — the gap between them is the lag. **This is the one deliberate exception to "wire it
-  or do not add it": it is evidence being gathered, not a field somebody forgot.** Around
-  2026-09-09 there is enough to set the exclusion from data, or to drop a trend that cannot stand up.
+  timestamps — the gap between them is the lag. **Answered 2026-09-14** (1,071 rows): not settled
+  on any platform but TikTok, not by +7 days on four of six, so the seen/actions trend was dropped
+  rather than excluded-by-N-days (see the arrows note above). The table keeps recording; the one
+  thing it is now good for is age-matching, if a trend on seen is ever wanted back.
 - **Trend guards, each with a positive control**: today is in neither window; a channel younger than
   the older window gets its start date (`platformSince` is queried over the WHOLE table, not the
   rendered thirty days); **connecting an account is not growth** — the follower total counts only
