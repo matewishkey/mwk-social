@@ -532,13 +532,11 @@ most repeated failure in this repo.
   her name said *"Bring me something you wish your computer did."* Words under a person's name have
   to be that person's. `OWNER_NAME` matches his profile by display name, like the page; with his
   profile not connected the old shape applies and a test pins the fallback.
-  ⚠ **NOT YET EXERCISED ON A REAL POST.** The routing was read back live (native = Mate Visky,
-  reposters = the page then Zsuzsanna) and the tests pass, but **no native post to a PERSONAL
-  LinkedIn profile has ever gone through Zernio from here** — every LinkedIn post until 2026-09-14
-  went to the company page. `accounts:health` says `canPost: true` and the platform notes record a
-  personal profile's own video limit, so it should work; that is a capability documented, not one
-  exercised. The next LinkedIn clip is the first real run — read `posts:list` after it rather than
-  assuming, and if it 422s the fallback is one word (`OWNER_NAME` matching nothing).
+  **EXERCISED 2026-09-14, and it works.** The first real run put the clip on Mate Visky's profile
+  natively (`urn:li:ugcPost:7505403963706490880`), the page reshared it with his words and the
+  tracked CTA, and Zsuzsanna's profile was scheduled plain four hours out — the designed shape, no
+  422, read back off `posts:list` rather than assumed. That closes the three weeks this line spent
+  describing a capability documented rather than one exercised.
 - **"Adding an account is a connection job, never a code change" WAS WRONG.**
   `linkedinAccounts().personal` was `find` where it needed `filter`, so a third account connected
   on 2026-08-22 was invisible to the whole pipeline. No error, one fewer repost than anybody

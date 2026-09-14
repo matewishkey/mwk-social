@@ -31,6 +31,28 @@ unqueued post is a stall, not caution. Say the words are yours and easy to repla
 alternatives underneath rather than in front of him. Never PUBLISH words he has not seen — that
 is what queueing protects.
 
+**EVERY POST IS AN INVITATION TO THE SHOW, SO IT ENDS ON THE LINE** (mate, 2026-09-14:
+*"the end is always prompt it yourself right? ... the idea is really to invite folks to the
+show"*). A drafted caption lands on **Prompt it yourself!** The exclamation mark is part of it
+(`matewishkey.com/brand`: *"yourself! takes it in the answer"*), and the wording is the site's,
+never a paraphrase — read it off the live page rather than typing it from memory.
+
+- **The pair is the full form**: *Why let others solve your problems with AI?* then *Prompt it
+  yourself!* Use both where the caption has not already asked the question. Where the clip asks
+  it out loud, the answer alone is right and repeating it is padding.
+- **"Invite" is not "teach", and the brand page bans the second one outright** (*"Never position
+  him as the expert, the teacher"*). The post says the thing is doable and where to come; it does
+  not run a lesson. The goal is *"to create curiosity, not to prove that somebody became a
+  developer"*.
+- **This is a caption rule, not a comment rule.** The tracked CTA already lands as the first
+  comment (`voice.json` `firstComment.plain[0]` IS the pair), so check for a collision before
+  repeating it: only X puts a CTA in the post itself, and there `linkFor()` returns the bare url
+  with no prose, so a caption landing the line never doubles up. Computed per platform with
+  `voice.firstComment(key, {platform})`.
+- **It was missed once, on a clip that WAS the argument.** A 28s clip about people selling
+  themselves as AI experts went out ending *"Worth knowing before the invoice turns up."*
+  Diagnosing the problem is not the post; the answer is.
+
 A still picture rather than a clip: `mwk-image`.
 
 ## 2. The hashtags are for normal humans, never for tech people
