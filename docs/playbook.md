@@ -14,10 +14,17 @@ the queue (dashboard) ──> run-queue.js ──> Facebook · Instagram · YouT
 first-comment.js (hourly) ────┴─────────────────────┘   fills anything the publish missed
 ```
 
-**Everything publishes from here** (2026-08-21). There used to be a second origin — Restream put
-clips on Facebook and a mirror copied them onward — which is why this file once carried a whole
-chapter on deciding whether a copy already existed somewhere. One origin means nothing to
-reconcile, and that chapter, `mirror.js` and `lib/matcher.js` are all gone.
+**Everything the QUEUE publishes comes from here** (2026-08-21). There used to be a second origin —
+Restream put clips on Facebook and a mirror copied them onward — which is why this file once carried
+a whole chapter on deciding whether a copy already existed somewhere. That chapter, `mirror.js` and
+`lib/matcher.js` are all gone, and they are not coming back.
+
+**Two things still arrive from outside, and both are expected.** He goes live straight on YouTube,
+so a live stream never enters `posts:list` at all; and **Restream is posting again (2026-09-13)**,
+which lands a reel on Facebook and YouTube in the same minute. `first-comment.js` sweeps
+`analytics:posts --platform youtube` for exactly this — **YouTube only, on purpose**, with a test
+pinning it there. The Facebook copy is handled by hand. Do not rebuild an "is a copy already over
+there?" check: that was the mirror's job and the mirror is why it hurt.
 
 Four ways the call-to-action gets under a post:
 
@@ -26,7 +33,8 @@ Four ways the call-to-action gets under a post:
 | **At publish time** | `platformSpecificData.firstComment`, posted by Zernio seconds after the post | Facebook, Instagram, LinkedIn, YouTube |
 | **Afterwards** | `scripts/first-comment.js`, hourly — Threads has no native field, and it also catches a native comment that silently failed | + Threads |
 | **In the caption** | the link rides in the post itself — X has a comments API, but a comment would be the same link twice under one tweet, and an out-of-network REPLY never reaches the For You feed at all | X |
-| **Nowhere — the bio instead** | a url is dead text in a caption AND a comment on both, so the CTA names the bio and mints no code | Instagram, TikTok |
+| **Nowhere — the bio instead** | a url is dead text in a caption AND a comment, so the CTA names the bio and mints no code | Instagram |
+| **Nowhere, and it says nothing** | the bio is dead text too — a TikTok bio link is tappable only on a Business account or past 1,000 followers, and this account is neither (checked in the app, 2026-09-14). His words and the tags, no link and no claim about one | TikTok |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
 carries the marker — whoever put it there.
@@ -73,11 +81,11 @@ in the wrong place.
 |---|---|---|---|
 | **Facebook** | yes | yes | Pages only, never personal timelines. ~60-day tokens |
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
-| **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. Post to the company page, then repost from personal — plainly, no commentary, which is the default. A thought on top is optional and always his |
+| **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. **His own profile posts natively** (2026-09-14) — that is where the followers are and the only place the voice is first person. The company page reposts it with his thought on top and the tracked CTA underneath; any other connected profile reposts **plain**, because words under a person's name have to be that person's. A thought on top is optional and always his |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
 | **A still picture** | — | — | Five take one: Facebook, Instagram, LinkedIn, Threads, X. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (LinkedIn 20, Facebook/Instagram/Threads 10, X 4) and `platforms.galleryFor()` is its only reader; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
-| **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there anyway — the CTA names the bio. Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
+| **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there — in the caption, in a comment, and **in the bio**, which is tappable only on a Business account or past 1,000 followers. So a TikTok post carries no link and makes no claim about one (2026-09-14). Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
 
 ### The two worth getting right
@@ -107,9 +115,10 @@ an external link. Two things closed that: the demotion is not in `xai-org/x-algo
 link terms are user features measuring dwell time on one), and the reply had a cost that was
 certain — `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate
 set, so the CTA was only ever surfaced to existing followers. It stayed readable to anyone who
-opened the root tweet, and to nobody else. **Reversing it is one word in the platform table**, and
-`threadWithLink()` is still there for that: the evidence is an absence in a code release, which is
-weaker than a presence.
+opened the root tweet, and to nobody else. **Reversing it is one word in the platform table** plus the code
+git holds: `threadWithLink()` was kept three weeks "in case" and deleted on 2026-09-14 (`f8a2490`
+and earlier carry it). The note stays because the evidence for the change is an absence in a code
+release, which is weaker than a presence.
 
 **`threadItems` replaces the top-level `content` for that platform.** The caption is published as
 `threadItems[0]` and the media has to ride there with it; a top-level `content` is kept for
@@ -186,7 +195,11 @@ guessed.
 
 ## The pace, and what runs it
 
-Five systemd `--user` timers, all from `scripts/install-timers.sh`:
+Six systemd `--user` timers, all from `scripts/install-timers.sh`. Each carries a
+`TimeoutStartSec` ceiling: systemd will not restart a oneshot whose last run is still active, so
+one wedged subprocess would stop that job for good (2026-09-14).
+
+
 
 | Unit | When | What |
 |---|---|---|
@@ -195,6 +208,7 @@ Five systemd `--user` timers, all from `scripts/install-timers.sh`:
 | `mwk-ship-events` | `*:0/2` | ships the event log to the dashboard |
 | `mwk-ship-stats` | `*:35` | analytics, follower counts, the platform table |
 | `mwk-yt-notes` | `05:40` | drafts YouTube show notes for approval |
+| `mwk-state-copy` | `03:20` | copies the box-only state to the backed-up share — this disk is not backed up |
 
 The queue asks every five minutes, so something queued goes out within five rather than waiting
 up to an hour for a tick — it is safe to ask that often because `lib/pace.js`, not the timer, is
@@ -317,10 +331,12 @@ things would eventually disagree about what today already holds.
 
 ## Reading the API
 
-`posts:list` has a pipeline post the instant it publishes, and since everything publishes from
-here it is the whole universe — **read it alone**. `analytics:posts` lags minutes behind and is
-only worth reading for its numbers; it used to be swept per platform because it was the one place
-app-authored posts appeared, and that went with the mirror.
+`posts:list` has a pipeline post the instant it publishes, and for anything the QUEUE sent it is
+the whole universe. **It is not the whole universe full stop** — a live stream started on YouTube
+and a reel Restream posted never enter it, so `first-comment.js` also sweeps
+`analytics:posts --platform youtube` (~90 min behind). YouTube only, deliberately, with a test
+pinning it there; sweeping every platform is what the mirror removal was right to delete.
+`analytics:posts` lags minutes behind on everything else and is otherwise only worth its numbers.
 
 Neither `/v1/analytics/posts` nor `/v1/analytics/daily` is a REST route — Zernio answers an unknown
 path with its marketing site, so a wrong one fails as "not JSON" rather than as a 404. Use the CLI

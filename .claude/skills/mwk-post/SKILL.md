@@ -135,10 +135,12 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   2026-08-24. The behaviour stays because never spending the budget twice is free.
 - **Every code minted carries the queue item id**, so a click answers "which platform, which
   placement, which video" on `/links`. Nothing to do by hand; `run-queue.js` passes it down.
-- **A LinkedIn post is three posts and three codes**: the company page publishes it, then every
-  personal profile reposts that — staggered four hours apart, each with **its own** tracked CTA
-  comment. The company page has 2 followers and the personals hold 7,192, so a repost with no link
-  was most of the audience with nowhere to go (fixed 2026-08-24).
+- **A LinkedIn post is three surfaces and two codes** (since 2026-09-14): **his own profile
+  publishes it**, the company page reposts it with his thought on top and **its own** tracked CTA,
+  and any other connected profile reposts **plain** — no words of his, no comment in his voice,
+  because words under a person's name have to be that person's. Reposts stagger four hours apart.
+  It ran the other way for a month — the 30-follower page posting natively while the two profiles
+  holding 7,222 merely reposted — which is the reason for the flip, not a detail of it.
 - **A vertical clip under three minutes sent to YouTube is a SHORT, and a url in a Short is plain
   text** — description and comment alike. `run-queue.js` works this out per clip and the CTA names
   the channel instead of spending a code. The pipeline only sends YouTube the wide cut, so this

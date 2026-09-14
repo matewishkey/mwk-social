@@ -24,7 +24,7 @@ the skill and leave a pointer. Two copies of a rule is how one of them drifts.
 Procedures live in `.claude/skills/`, not in this file. A skill loads when the work calls for it;
 this file loads every session whether it is relevant or not.
 
-- **`mwk-status`** — where the pipeline stands: unpushed work, the five timers, the queue and the
+- **`mwk-status`** — where the pipeline stands: unpushed work, the six timers, the queue and the
   pace, account health, what is waiting on mate. The sweep every restart starts with.
 - **`mwk-post`** — his words or a clip to a queued post: the voice, the hashtag rule, the media
   checks, `scripts/queue-add.js`, and what will actually happen once it is in.
@@ -532,6 +532,13 @@ most repeated failure in this repo.
   her name said *"Bring me something you wish your computer did."* Words under a person's name have
   to be that person's. `OWNER_NAME` matches his profile by display name, like the page; with his
   profile not connected the old shape applies and a test pins the fallback.
+  ⚠ **NOT YET EXERCISED ON A REAL POST.** The routing was read back live (native = Mate Visky,
+  reposters = the page then Zsuzsanna) and the tests pass, but **no native post to a PERSONAL
+  LinkedIn profile has ever gone through Zernio from here** — every LinkedIn post until 2026-09-14
+  went to the company page. `accounts:health` says `canPost: true` and the platform notes record a
+  personal profile's own video limit, so it should work; that is a capability documented, not one
+  exercised. The next LinkedIn clip is the first real run — read `posts:list` after it rather than
+  assuming, and if it 422s the fallback is one word (`OWNER_NAME` matching nothing).
 - **"Adding an account is a connection job, never a code change" WAS WRONG.**
   `linkedinAccounts().personal` was `find` where it needed `filter`, so a third account connected
   on 2026-08-22 was invisible to the whole pipeline. No error, one fewer repost than anybody
@@ -686,7 +693,7 @@ The invariants:
   An Instagram story shared onward to Facebook has no API analytics on the Facebook side.
 - **Native/past posts**: `analytics:posts --source external` picks up app-made posts on a ~90 min
   sync. **YouTube is the one platform that still reads it** (`first-comment.js`'s `sources()`) —
-  see *Live streams* below. Anywhere else a post made outside the pipeline is handled by hand.
+  see *Live streams* above. Anywhere else a post made outside the pipeline is handled by hand.
 
 ## X: follows only
 

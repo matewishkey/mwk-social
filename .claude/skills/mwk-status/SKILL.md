@@ -1,6 +1,6 @@
 ---
 name: mwk-status
-description: Where the MWK social pipeline stands right now — unpushed work, the five timers and their last runs, what is in the queue and when it may go, account health, what is waiting for mate. Use at the start of a session, after a restart, or whenever he asks "where are we".
+description: Where the MWK social pipeline stands right now — unpushed work, the six timers and their last runs, what is in the queue and when it may go, account health, what is waiting for mate. Use at the start of a session, after a restart, or whenever he asks "where are we".
 ---
 
 # mwk-status — the sweep, so nobody rediscovers it by hand
@@ -28,12 +28,14 @@ anything else.
 
 ```sh
 systemctl --user list-timers 'mwk-*' --all --no-pager
-for u in mwk-queue mwk-first-comment mwk-ship-events mwk-ship-stats mwk-yt-notes; do
+for u in mwk-queue mwk-first-comment mwk-ship-events mwk-ship-stats mwk-yt-notes mwk-state-copy; do
   echo "=== $u ==="; journalctl --user -u "$u" -n 12 --no-pager -o cat
 done
 ```
 
-Five units, all `Type=oneshot`. What each says when it is healthy:
+Six units, all `Type=oneshot`, each with a `TimeoutStartSec` ceiling — systemd will not restart a
+oneshot whose last run is still active, so one wedged subprocess would stop that job for good
+(2026-09-14). A unit killed at its ceiling is a real fault; report it. What each says when healthy:
 
 | Unit | Healthy looks like |
 |---|---|
@@ -42,6 +44,7 @@ Five units, all `Type=oneshot`. What each says when it is healthy:
 | `mwk-ship-events` | `shipped N event(s)` or `nothing new, and the last heartbeat was N min ago` |
 | `mwk-ship-stats` | `shipped N daily row(s)` + `shipped the platform table, the voice and the pace` |
 | `mwk-yt-notes` | `N filled, N proposed, N approved and written` |
+| `mwk-state-copy` | one line, nightly: `copied <size> to .../state`. It is the only backup of the cached transcripts and the description originals — this box's disk is not backed up |
 
 **One `mwk-yt-notes` failure is normal, not a fault:** a live event that has not aired
 (`This live event will begin in N days`). An uncaptioned video is no longer a FAIL at all — it
@@ -70,8 +73,9 @@ to `*:45`. There is **no time-of-day window** — only six a day, ninety minutes
     console.log("BROKEN",a.platform,a.username,JSON.stringify(a.issues));})'
 ```
 
-Ten accounts (three of them LinkedIn — two people and the company page — plus a Reddit
-connection nothing in this pipeline posts to). **`warning` is routine — never report it as a fault.** Zernio refreshes tokens
+Nine accounts, three of them LinkedIn — two people and the company page. (A Reddit connection was
+here in August and is gone; if `accounts:list` grows one again, `platforms.known()` skips it rather
+than failing the run.) **`warning` is routine — never report it as a fault.** Zernio refreshes tokens
 lazily, so an account passes through `warning` with "Token expired or expiring soon (auto-refresh
 pending)" and returns to `healthy` on its own. Only `needsReconnect: true` or `status: error` is
 a problem.

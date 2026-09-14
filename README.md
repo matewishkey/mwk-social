@@ -17,8 +17,9 @@ Queue five things at once and you get five posts across the day, not five in a m
 
 **Every post carries a route back to the show.** A first comment with a tracked
 `mwkshow.com/<code>` link, minted per platform and placement, so a click says which channel and
-which clip earned it. Where a url is not clickable at all — Instagram, TikTok, a YouTube Short — the
-comment names where the link *is* instead of spending a code on a click that cannot happen.
+which clip earned it. Where a url is not clickable at all — Instagram, a YouTube Short — the
+comment names where the link *is* instead of spending a code on a click that cannot happen. On
+TikTok not even the bio is clickable, so a post there carries no link and claims none.
 
 **It knows what each platform will actually accept**, and checks before sending rather than
 letting a publish fail an item it has already claimed: duration, aspect, codec, audio, caption
@@ -33,7 +34,7 @@ length, and which platforms take a still at all.
 | `scripts/post.js` | The publisher: composes a caption per platform, mints the links, attaches the native first comment |
 | `scripts/first-comment.js` | The net under it — Threads has no native first-comment field, and any platform's can silently fail |
 | `scripts/yt-description.js` | Writes YouTube descriptions from each video's own transcript, and files a proposal rather than overwriting words already approved |
-| `scripts/lib/platforms.js` | The table every routing decision reads — what each platform accepts, where its link goes, how many stills it takes. Add a field here and wire it in the same commit: four have shipped read by nothing |
+| `scripts/lib/platforms.js` | The table every routing decision reads — what each platform accepts, where its link goes, how many stills it takes. Add a field here and wire it in the same commit: five have shipped read by nothing |
 | `scripts/lib/media.js` | Probes a clip and says which platforms will take it |
 | `scripts/lib/topic-tags.js` | Works out what a video was about, so the comment can say so in ordinary words |
 | `scripts/lib/pace.js` | The one thing that decides *when* |
