@@ -603,24 +603,35 @@ The invariants:
   immediately said what the old one hid.
 - **Comparable across channels: posts, actions, actions per post, tracked clicks.** Not comparable:
   seen, and any rate built on it. Kept because they are what we have, never ranked.
-- **SEEN AND ACTIONS GET NO WEEK-ON-WEEK ARROW, AND THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE**
-  (2026-09-14, from the measurement review; mate: *"fix them"*). The settle table answered its
-  question: at day end a Facebook post's reach is 75% of final, LinkedIn 66%, Instagram 70%, and
-  none but TikTok is settled a week later — so the recent window is always lower and a flat channel
-  read −10 to −20% every week. Those rows say *still settling*; clicks, days posted and followers
-  keep their arrows. "People reached" is *reach, summed* — three platforms' unique reach added up is
-  not a count of anyone. And the two booking-button codes on matewishkey.com were 56 of 91 counted
-  hits all-time and 16 of 16 in the week the tile read "16 link clicks (people)": every social click
-  query carries `l.platform IS NOT 'website'` now, and the buttons get their own card, called what
-  they are — presses, unjoined to any post, some of them crawler pairs.
+- **SEEN AND ACTIONS GET THEIR ARROW BACK BY BEING READ AT A MATCHED AGE**
+  (2026-09-15; they had none between 14 and 15 Sep). The 14 Sep removal was right about the
+  fault and wrong about the remedy: `daily_metric` is lifetime accrual attributed to a publish
+  date, so last week sits ~85% settled against the week before at ~97% and a flat channel read
+  −10 to −20% every week. **`daily_metric_revision` is the same number at every age**, so every
+  day on both sides is now read at **one day old** (`TREND_AGE_DAYS`) and the curve cancels
+  instead of being subtracted. The age is forced, not tuned: yesterday is the youngest day in
+  the recent window, so a day is the most maturity both windows are guaranteed to have.
+  **The raw numbers were not a small overstatement** — measured 2026-09-15, raw reach read
+  +495% week on week where the matched figure was +51%, and views +4864% against +238%.
+  A series first written after the cut is **unknown, never zero**; a day that cannot be answered
+  is dropped from **both** windows and the count is printed. **The views row still carries the
+  YouTube unit guard on top** — age-matching fixes a maturity difference and cannot fix a change
+  of unit. Drops are counted ONCE, not per metric: summing across four action columns reported
+  44 missing days where there were 11.
+- **THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE** (2026-09-14; mate: *"fix them"*).
+  "People reached" is *reach, summed* — three platforms' unique reach added up is not a count of
+  anyone. The two booking-button codes on matewishkey.com were 56 of 91 counted hits all-time and
+  16 of 16 in the week the tile read "16 link clicks (people)": every social click query carries
+  `l.platform IS NOT 'website'` now, and the buttons get their own card, called what they are.
+
 - **The settle curve is being RECORDED and read by nothing, on purpose, from 2026-08-26.**
   `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
   "is the last complete day settled?" had no answer and the trend excluded today on instinct. A
   `BEFORE UPDATE` trigger now keeps the superseded value in `daily_metric_revision`, with both
   timestamps — the gap between them is the lag. **Answered 2026-09-14** (1,071 rows): not settled
-  on any platform but TikTok, not by +7 days on four of six, so the seen/actions trend was dropped
-  rather than excluded-by-N-days (see the arrows note above). The table keeps recording; the one
-  thing it is now good for is age-matching, if a trend on seen is ever wanted back.
+  on any platform but TikTok, not by +7 days on four of six. **And on 2026-09-15 the table stopped
+  being read by nothing** — age-matching is exactly the use it was kept for, and it is now what the
+  seen/actions trend rests on. `valueAtAge()` in `stats.js` is the reader.
 - **Trend guards, each with a positive control**: today is in neither window; a channel younger than
   the older window gets its start date (`platformSince` is queried over the WHOLE table, not the
   rendered thirty days); **connecting an account is not growth** — the follower total counts only
