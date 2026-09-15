@@ -265,7 +265,7 @@ function totals(rows) {
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   targets = [], split = [], links = 0, days = WINDOW_DAYS,
   followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [],
-  revisions = [] }) {
+  revisions = [], funnel = [] }) {
   const platformTable = ((snapshots.platforms || {}).body || {}).flows || [];
   const metricsFor = Object.fromEntries(platformTable.map((f) => [f.platform, (f.capabilities || {}).metrics || {}]));
 
@@ -694,6 +694,69 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   // Same days for every metric, so the largest single count is the answer.
   const matchedDropped = Math.max(seenM.dropped, viewsM.dropped, actM.dropped);
 
+  /*
+   * ---- the funnel ---------------------------------------------------------
+   * The only thing on this page that answers the question the project exists
+   * for. Four stages: a post is seen, somebody clicks out of it, somebody on
+   * /show opens the booking calendar, somebody books.
+   *
+   * THE LAST STAGE IS NOT ZERO, IT IS UNMEASURED, and the difference is the
+   * whole point. The calendar is Google's and nothing reports back from it, so
+   * writing 0 there would be inventing a measurement to complete a picture.
+   * "Nobody booked" is his to say; "we cannot see bookings" is ours.
+   *
+   * The two booking codes are `campaign = 'book'` on his own site, so a press
+   * is somebody already on /show reaching for the calendar. That makes the
+   * social-clicks row NOT a parent of it: most people who reach /show never
+   * came through one of our links at all, and stacking them as a funnel with a
+   * percentage between would claim a path the data cannot trace. They are shown
+   * as separate counts with that said out loud.
+   */
+  const stage = (k) => funnel.find((f) => f.stage === k) || { all_time: 0, recent: 0, days: 0 };
+  const social = stage('social');
+  const bookPublic = stage('30zc4');
+  const bookPrivate = stage('g9q8j');
+  const pressesAll = (bookPublic.all_time || 0) + (bookPrivate.all_time || 0);
+  const firstClickEver = funnel.reduce((min, f) =>
+    (f.first_seen && (!min || f.first_seen < min) ? f.first_seen : min), null);
+  // Two identical columns are not a finding, they are a window that has not
+  // opened yet. Say which it is.
+  const windowsOverlap = firstClickEver && firstClickEver >= shift(new Date().toISOString().slice(0, 10), -days);
+
+  const funnelRow = (name, row, note = '') => `<tr>
+    <td>${esc(name)}${note ? `<em class="sub">${esc(note)}</em>` : ''}</td>
+    <td class="num">${esc(num(row.all_time || 0))}</td>
+    <td class="num faint">${esc(num(row.recent || 0))}</td>
+    <td class="num faint">${row.days ? `${esc(String(row.days))} days` : ''}</td></tr>`;
+
+  const funnelCard = card('Does any of it produce a guest', `
+    <div class="wrap"><table>
+      <thead><tr><th></th><th class="num">all time</th><th class="num">last ${days} days</th>
+        <th class="num">spread over</th></tr></thead>
+      <tbody>
+        ${funnelRow('clicked a link in a post', social, 'people leaving a post, counted')}
+        ${funnelRow('opened the show booking calendar', bookPublic, 'the button on /show')}
+        ${funnelRow('opened the private session calendar', bookPrivate, 'the one-to-one button')}
+        <tr><td>booked a slot<em class="sub">Google\u2019s calendar, nothing reports back</em></td>
+          <td class="num">${'\u2014'}</td><td class="num faint">${'\u2014'}</td>
+          <td class="num faint">not measured</td></tr>
+      </tbody>
+    </table></div>
+    <p class="note">${pressesAll
+      ? `<b>${esc(num(pressesAll))} presses on a booking button, across ${esc(String(Math.max(bookPublic.days || 0, bookPrivate.days || 0)))} separate days.</b>
+         People are reaching the calendar. Whether any of them finished is the one step here that is
+         not instrumented, and it is not going to be: it is a Google page and it tells us nothing.
+         If the answer is still no guests, the leak is between opening that calendar and confirming
+         a time, which is a thing to look at in a browser rather than in this table.`
+      : 'Nobody has opened a booking calendar yet.'}
+      The booking buttons live on matewishkey.com, so a press is somebody already on the page.
+      Most of them did not arrive through one of our links, which is why these rows are counts
+      rather than a funnel with percentages between them: the path is not traceable and a
+      percentage would claim it was.${windowsOverlap
+        ? ` <b>The two columns are nearly the same window right now</b> \u2014 the first click ever recorded
+          is ${esc(firstClickEver)}, so almost everything is inside the last ${days} days. They will
+          separate as the record gets longer.` : ''}</p>`);
+
   // ---- week on week, as a table ------------------------------------------
   const wowRow = (name, now, before, fmt = num, blocked = null) => `<tr>
     <td>${esc(name)}</td>
@@ -749,6 +812,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
     fFirst === fLast ? { text: 'one reading so far', tone: 'plain', dir: '', note: true }
       : change(followersNow, followersThen))}
 </div>
+
+${funnelCard}
 
 ${card('Week on week', wow)}
 

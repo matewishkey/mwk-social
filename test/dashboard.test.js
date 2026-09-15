@@ -1265,3 +1265,91 @@ test('dropped days are counted once, not once per metric', () => {
   assert.match(s, /Math\.max\(seenM\.dropped, viewsM\.dropped, actM\.dropped\)/,
     'and folded across the three pairs with max, not a sum');
 });
+
+/* ------------------------------------------------------------- the funnel -- */
+
+/*
+ * A STAGE WE CANNOT SEE MUST NOT BE PRINTED AS A ZERO.
+ *
+ * The booking calendar is Google's and reports nothing back, so "nobody booked"
+ * and "we cannot see bookings" are different claims and only the second is
+ * ours. A 0 in that row would be a measurement we invented to complete a
+ * picture, and it is exactly the shape of error this page exists to refuse.
+ *
+ * The other half: the social-click row is NOT a parent of the booking rows.
+ * The buttons live on his own site, so most people pressing them never touched
+ * one of our links. A percentage between those rows would claim a path the data
+ * cannot trace, so there must not be one.
+ */
+const FUNNEL = [
+  { stage: 'social', all_time: 38, recent: 38, first_seen: '2026-08-21', last_seen: '2026-09-15', days: 12 },
+  { stage: '30zc4', all_time: 43, recent: 43, first_seen: '2026-08-24', last_seen: '2026-09-14', days: 19 },
+  { stage: 'g9q8j', all_time: 14, recent: 14, first_seen: '2026-08-24', last_seen: '2026-09-13', days: 9 },
+];
+
+test('the booking stage reads as unmeasured, never as zero', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    snapshots: {}, funnel: FUNNEL });
+  assert.match(html, /booked a slot/, 'the stage is shown at all');
+  assert.match(html, /nothing reports back/, 'and says why it cannot be counted');
+  assert.match(html, /not measured/, 'the cell says unmeasured');
+  // The row must not carry a number. Pull the booking row out and check it.
+  const row = html.slice(html.indexOf('booked a slot'), html.indexOf('booked a slot') + 400);
+  assert.ok(!/>0</.test(row), 'a zero in that row would be a measurement we invented');
+});
+
+test('the funnel counts the presses and never divides one stage by another', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    snapshots: {}, funnel: FUNNEL });
+  assert.match(html, /57 presses on a booking button/, '43 + 14, counted, stated plainly');
+  assert.match(html, /19 separate days/, 'spread matters: one burst is not the same as steady traffic');
+  assert.match(html, /counts\s+rather than a funnel with percentages/,
+    'it must say why there is no conversion rate between the rows');
+  // A conversion rate between social clicks and presses would be this number.
+  assert.ok(!/150%|150 %/.test(html), '43 presses over 38 clicks is not a conversion rate');
+});
+
+test('two identical columns are called a short record, not a finding', async () => {
+  const { statsPage } = await src('pages/stats.js');
+  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    snapshots: {}, funnel: FUNNEL });
+  assert.match(html, /nearly the same window right now/,
+    'all-time and last-30 are the same while the record is this short, and the page must say so');
+  // The positive control: with a click older than the window, the note goes away.
+  const older = [{ ...FUNNEL[0], first_seen: '2020-01-01' }, FUNNEL[1], FUNNEL[2]];
+  const html2 = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
+    snapshots: {}, funnel: older });
+  assert.ok(!/nearly the same window right now/.test(html2),
+    'once the record is longer than the window the caveat must disappear on its own');
+});
+
+/*
+ * A LINK'S CLICK COUNT IS ALL TIME, AND THAT IS RIGHT, BUT IT GETS READ AS
+ * "recently" (mate, 2026-09-15: "I need report always vs last 1 months"). A code
+ * minted in August that earned three clicks in August and none since looks
+ * identical to one earning three a week. Two columns, so the question "is this
+ * still working" has somewhere to be asked.
+ */
+test('every link row carries all-time clicks and the last 30 days beside it', async () => {
+  const { linksPage } = await src('pages/links.js');
+  const html = linksPage({ email: 'm@x.com', tz: TZ, host: 'mwkshow.com', totals: { human: 9 },
+    campaigns: [{ campaign: 'clip', links: 4, human: 9, human_recent: 2 }],
+    rows: [{ code: 'abc', target: 'https://x.test/', campaign: 'clip', human: 7, human_recent: 1,
+      crawler: 3, created_at: '2026-08-01T00:00:00Z' }] });
+  assert.match(html, /<th class="num">last 30d<\/th>/, 'the column is labelled on the link table');
+  assert.match(html, />7</, 'all time still shows');
+  assert.match(html, />1</, 'and the recent count beside it');
+});
+
+test('the campaign summary gets the same two columns', () => {
+  const s = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'pages', 'links.js'), 'utf8');
+  assert.match(s, /c\.human_recent/, 'a campaign total that is all-time only answers half the question');
+  const sql = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
+  assert.match(sql, /AS human_recent/, 'and the query has to actually compute it');
+  assert.match(sql, /date\('now','-30 days'\)/,
+    'the window is computed in SQLite, because the optional WHERE shifts every placeholder number');
+});

@@ -128,6 +128,7 @@ export function linksPage({ email, tz, host, rows, campaigns, totals, minted, er
       : (l.label ? `<span class="lbl">${esc(String(l.label).slice(0, 46))}</span>`
         : '<span class="faint">—</span>')}</td>
     <td class="num ${l.human ? 'good' : ''}">${l.human || 0}</td>
+    <td class="num ${l.human_recent ? 'good' : 'faint'}">${l.human_recent || 0}</td>
     <td class="num faint">${l.crawler || 0}</td>
     <td class="tgt"><a href="${esc(l.target)}" target="_blank" rel="noopener">${esc(l.target)}</a>
       ${l.note ? `<span class="nt">${esc(l.note)}</span>` : ''}</td>
@@ -168,7 +169,7 @@ ${err ? `<div class="card badbox"><div class="card-body"><b>Not minted.</b> ${es
 
 ${card('What the links are for', campaigns.length ? `<div class="wrap"><table>
   <thead><tr><th>what for</th><th></th><th class="num">links</th><th class="num">clicks</th>
-    <th class="num">crawlers</th></tr></thead>
+    <th class="num">last 30d</th><th class="num">crawlers</th></tr></thead>
   <tbody>${campaigns.map((c) => {
     const m = meta(c.campaign);
     return `<tr>
@@ -177,6 +178,7 @@ ${card('What the links are for', campaigns.length ? `<div class="wrap"><table>
       ${m ? `<span class="nt">${esc(m.blurb)}</span>` : ''}</td>
     <td class="faint mono">${esc(c.campaign)}</td>
     <td class="num">${c.links}</td><td class="num ${c.human ? 'good' : ''}">${c.human || 0}</td>
+    <td class="num ${c.human_recent ? 'good' : 'faint'}">${c.human_recent || 0}</td>
     <td class="num faint">${c.crawler || 0}</td></tr>`;
   }).join('')}</tbody></table></div>`
   : '<p class="empty">Nothing carries a campaign yet — everything minted before 22 August predates the field.</p>')}
@@ -226,7 +228,7 @@ ${here ? `<p class="ctx">${esc(here.blurb)} ${tagFor(campaign)}</p>` : ''}
 </div>
 <div class="wrap"><table>
   <thead><tr><th>code</th><th>what for</th><th>where it lives</th><th>the spot</th>
-    <th>which clip</th><th class="num">clicks</th><th class="num">bots</th>
+    <th>which clip</th><th class="num">clicks</th><th class="num">last 30d</th><th class="num">bots</th>
     <th>goes to</th><th>minted</th></tr></thead>
   <tbody>${rows.length ? rows.map(row).join('')
     : '<tr><td colspan="9" class="empty">Nothing here.</td></tr>'}</tbody>

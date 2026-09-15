@@ -175,7 +175,7 @@ async function stats(env, tz, snapshots, email) {
    */
   const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
   const [daily, followers, clicks, targets, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince, website, revisions] = await Promise.all([
+    followerHistory, clicksByDay, platformSince, accountSince, website, revisions, funnel] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -246,6 +246,33 @@ async function stats(env, tz, snapshots, email) {
               written_at, superseded_at
          FROM daily_metric_revision WHERE date >= ? ORDER BY date, platform, superseded_at`)
       .bind(trendFrom).all(),
+    /*
+     * THE FUNNEL, and it is the only query on this page that answers the
+     * question the whole project exists for: does any of this produce a guest.
+     *
+     * Three stages we can see and one we cannot. A social click is somebody
+     * leaving a post; a press on one of the two `campaign = 'book'` codes is
+     * somebody already on /show opening the booking calendar. What happens in
+     * Google's calendar after that is not ours and is not instrumented, so the
+     * last stage is reported as unmeasured rather than as zero — 'nobody booked'
+     * and 'we cannot see bookings' are different claims and only one is ours to
+     * make.
+     *
+     * Both columns are counted clicks, so a preview fetch is not a person.
+     * all_time is genuinely all of it; `recent` is the same 30 days the rest of
+     * the page uses, which for clicks is currently almost the same window --
+     * the first click ever recorded is 21 Aug. The page says so rather than
+     * printing two identical numbers and letting them look like a finding.
+     */
+    env.DB.prepare(
+      `SELECT CASE WHEN l.platform = 'website' THEN l.code ELSE 'social' END stage,
+              COUNT(*) all_time,
+              SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent,
+              MIN(substr(c.at, 1, 10)) first_seen, MAX(substr(c.at, 1, 10)) last_seen,
+              COUNT(DISTINCT substr(c.at, 1, 10)) days
+         FROM click c JOIN link l ON l.code = c.code
+        WHERE ${counted('c')}
+        GROUP BY stage`).bind(from).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -264,7 +291,7 @@ async function stats(env, tz, snapshots, email) {
     website: website.results || [],
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
-    revisions: revisions.results || [] });
+    revisions: revisions.results || [], funnel: funnel.results || [] });
 }
 
 // What is still waiting is never paged — it is short, and it is the half he
@@ -309,7 +336,23 @@ async function links(env, tz, email, url) {
   // c is LEFT JOINed, so a link with no clicks has c.code NULL: `counted`
   // evaluates NULL, the CASE falls through to 0 and the link reads zero rather
   // than dropping out of the table.
+  /*
+   * `human` is ALL TIME and always has been, which is the right default for a
+   * link: a code minted in August that still earns a click this week is the
+   * same code. `recent` is the last 30 days beside it, so "is this still
+   * working" and "did this ever work" are two columns rather than one number
+   * that quietly means the first and gets read as the second (mate, 2026-09-15:
+   * "I need report always vs last 1 months").
+   *
+   * The window is computed in SQLite rather than bound, because the WHERE
+   * clause here is optional and the placeholder numbering shifts under it —
+   * `date('now','-30 days')` has no such problem and needs no parameter. c.at
+   * is a full ISO stamp and the cut is a date, which compares correctly because
+   * ISO 8601 sorts lexically.
+   */
   const counts = `SUM(CASE WHEN ${counted('c')} THEN 1 ELSE 0 END) AS human,
+                  SUM(CASE WHEN ${counted('c')} AND c.at >= date('now','-30 days')
+                      THEN 1 ELSE 0 END) AS human_recent,
                   SUM(CASE WHEN c.code IS NOT NULL AND ${automated('c')} THEN 1 ELSE 0 END) AS crawler`;
 
   const totalRow = await env.DB.prepare(
