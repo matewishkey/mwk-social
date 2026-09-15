@@ -53,7 +53,10 @@ const replyToPost = (postId, accountId, message) =>
 // The CLI, for the read commands that have no REST equivalent worth writing out
 // (posts:list, analytics:posts). stderr is piped rather than inherited: the CLI
 // echoes its JSON error bodies there and they would litter the journal.
-const CLI = path.join(__dirname, '..', '..', 'node_modules', '.bin', 'zernio');
+// MWK_ZERNIO_CLI swaps the binary for a shim, which is the only way a job that
+// shells out to it can be driven end to end in a test. Unset everywhere but
+// the suite; the real path is the default.
+const CLI = process.env.MWK_ZERNIO_CLI || path.join(__dirname, '..', '..', 'node_modules', '.bin', 'zernio');
 
 function cli(args) {
   let out;

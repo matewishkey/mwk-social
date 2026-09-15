@@ -138,12 +138,35 @@ const isStory = (post, pf) =>
  * one platform where a link under a long-form video is actually clickable.
  * Sweeping every platform is what the mirror removal was right to delete.
  */
+/*
+ * THE SECOND SOURCE IS THE OPTIONAL ONE AND IT MUST NOT TAKE THE RUN WITH IT.
+ * A transient 503 from the analytics backend exited the whole sweep at
+ * 2026-09-15 02:00 UTC, so every Instagram, Facebook, LinkedIn and Threads post
+ * in that hour went uncommented over a dependency none of them use. posts:list
+ * stays fatal — with no pipeline output there is nothing to do, and a clean exit
+ * would be a lie — while this one degrades to "no external YouTube sources this
+ * run".
+ *
+ * IT IS COUNTED AS A FAILURE, which is the whole of what makes the degrade safe.
+ * A silent skip here is precisely the shape that cost nine live streams their
+ * CTA: the run would report success while the one source that can see a stream
+ * never ran, and --hours eventually carries that stream out of the window for
+ * good. Failing loudly costs one retry an hour; failing quietly costs a stream.
+ */
 function sources(opts) {
   const out = [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
+  let failures = 0;
   if (opts.platforms.includes('youtube')) {
-    out.push(zernio(['analytics:posts', '--platform', 'youtube', '--limit', String(opts.limit)]));
+    try {
+      out.push(zernio(['analytics:posts', '--platform', 'youtube', '--limit', String(opts.limit)]));
+    } catch (err) {
+      failures++;
+      console.error(`FAIL  external youtube sweep — ${String(err.message).split('\n')[0]}`);
+      console.error('      a live stream published this hour is invisible to this run; '
+        + 'the pipeline\'s own posts are unaffected and the sweep retries next run');
+    }
   }
-  return out;
+  return { results: out, failures };
 }
 
 function collectPosts(opts) {
@@ -151,7 +174,8 @@ function collectPosts(opts) {
   const found = [];
   const cutoff = opts.all ? 0 : Date.now() - opts.hours * 3600 * 1000;
 
-  for (const res of sources(opts)) {
+  const { results, failures: sourceFailures } = sources(opts);
+  for (const res of results) {
     for (const post of res.posts || []) {
       for (const pf of post.platforms || []) {
         if (!opts.platforms.includes(pf.platform)) continue;
@@ -181,7 +205,7 @@ function collectPosts(opts) {
       }
     }
   }
-  return found.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt));
+  return { posts: found.sort((a, b) => a.publishedAt.localeCompare(b.publishedAt)), sourceFailures };
 }
 
 // Second guard, so a lost state file can't double-comment — and so a post that
@@ -197,7 +221,7 @@ async function main() {
   const stamp = new Date().toISOString();
 
   events.initRun({ source: 'first-comment' });
-  const posts = collectPosts(opts);
+  const { posts, sourceFailures } = collectPosts(opts);
   const pending = posts.filter((p) => !state[p.key] || isRetryable(state[p.key]));
   console.log(`[${stamp}] ${posts.length} post(s) in window across ${opts.platforms.join(', ')}, ${pending.length} without a recorded first comment`);
 
@@ -210,7 +234,9 @@ async function main() {
     return;
   }
 
-  let failures = 0;
+  // A source that could not be read starts the count, so a run that swept only
+  // half of what it should still exits non-zero and still marks the heartbeat.
+  let failures = sourceFailures;
   for (const target of pending) {
     try {
       // The link is already in the caption — a comment repeating it is noise.

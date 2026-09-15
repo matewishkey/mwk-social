@@ -606,3 +606,75 @@ test('a chosen code skips the attribute dedupe, or he would not get the one he a
   assert.match(fn, /is already taken, and it points somewhere else/,
     'a taken code must say so rather than silently hand over somebody else\'s');
 });
+
+/*
+ * A TRANSIENT 503 ON THE OPTIONAL SWEEP TOOK THE WHOLE RUN DOWN (2026-09-15
+ * 02:00 UTC). analytics:posts is read for YouTube live streams alone, and its
+ * failure exited before a single pipeline post was looked at — so every
+ * Instagram, Facebook, LinkedIn and Threads post published that hour went
+ * uncommented over a dependency none of them uses.
+ *
+ * Driven through a zernio shim rather than by reading the source, because the
+ * thing under test is what the process DOES: that it carries on, and that it
+ * still exits non-zero. A text match would pass on a file that logged the
+ * warning and then threw anyway.
+ */
+test('a failing youtube sweep degrades the run instead of ending it, and still fails', () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { spawnSync } = require('node:child_process');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-zernio-'));
+  const script = path.join(__dirname, '..', 'scripts', 'first-comment.js');
+
+  // One published Instagram post, already carrying the CTA so nothing is
+  // commented on and no network is touched beyond the shim.
+  const listed = JSON.stringify({ posts: [{
+    content: `already ours ${require('../config/voice.json').marker}`,
+    publishedAt: new Date().toISOString(),
+    mediaItems: [],
+    platforms: [{ platform: 'instagram', status: 'published', platformPostId: '111',
+      accountId: 'acc1', platformPostUrl: 'https://example.test/p/111' }],
+  }] });
+
+  const run = (analyticsFails) => {
+    const shim = path.join(dir, analyticsFails ? 'zernio-bad' : 'zernio-ok');
+    fs.writeFileSync(shim,
+      '#!/bin/sh\n'
+      + 'case "$1" in\n'
+      + `  posts:list) cat <<'J'\n${listed}\nJ\n    ;;\n`
+      + '  analytics:posts)\n'
+      + (analyticsFails
+        ? '    echo \'{"error":true,"message":"Temporary service issue","status":503}\'; exit 1 ;;\n'
+        : '    echo \'{"posts":[]}\' ;;\n')
+      + '  *) echo \'{"posts":[]}\' ;;\n'
+      + 'esac\n', { mode: 0o755 });
+    return spawnSync(process.execPath, [script, '--dry-run', '--platforms', 'instagram,youtube'], {
+      encoding: 'utf8',
+      env: { ...process.env,
+        MWK_ZERNIO_CLI: shim,
+        MWK_COMMENT_STATE: path.join(dir, 'state.json'),
+        MWK_EVENT_DIR: path.join(dir, 'events') },
+    });
+  };
+
+  try {
+    // The positive control comes first: with both sources healthy the same
+    // invocation exits clean. Without it, an assertion on the failing case
+    // would pass on a script that was broken for some entirely other reason.
+    const ok = run(false);
+    assert.equal(ok.status, 0, `healthy run should exit 0:\n${ok.stdout}\n${ok.stderr}`);
+    assert.match(ok.stdout, /post\(s\) in window/, 'and it swept');
+
+    const bad = run(true);
+    assert.match(bad.stderr, /external youtube sweep/,
+      'the degrade is announced by name, never silent — a silent skip is what cost nine streams their CTA');
+    assert.match(bad.stdout, /post\(s\) in window/,
+      'the run must reach the pipeline posts: they do not depend on the analytics sweep');
+    assert.equal(bad.status, 1,
+      'and it still exits non-zero, so the heartbeat and the journal both say a source was missed');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

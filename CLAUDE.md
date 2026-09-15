@@ -657,6 +657,18 @@ The invariants:
   in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job never fails
   because the alerting did. A test drives it through a curl shim. The Healthchecks project has to
   exist first — it is mate's account to create it in.
+- **A FLAKY OPTIONAL SOURCE TOOK THE WHOLE SWEEP DOWN, AND THE ALERT COULD NOT FIRE BECAUSE THE
+  THROW CAME FIRST** (2026-09-15 02:00 UTC). `first-comment.js` reads `analytics:posts` for YouTube
+  live streams alone; a transient Zernio 503 there exited before a single pipeline post was looked
+  at, so Instagram, Facebook, LinkedIn and Threads went uncommented for an hour over a dependency
+  none of them uses — and the heartbeat ping sits at the END of `main()`, so the one alert path
+  stayed silent about it. `sources()` now returns `{ results, failures }`: `posts:list` stays fatal
+  (nothing to do without it), the optional sweep degrades **loudly** and its failure is counted, so
+  the exit code and the heartbeat both still say a source was missed. **A silent skip there is the
+  nine-streams bug exactly** — the run would report success while the only source that can see a
+  live stream never ran, and `--hours` eventually carries that stream out of the window for good.
+  Driven in the suite through `MWK_ZERNIO_CLI`, a shim for the CLI path, with a healthy run as the
+  positive control.
 - **A HUNG JOB IS A TIMER THAT NEVER FIRES AGAIN, AND NOTHING WOULD SAY SO.** systemd refuses to
   start a oneshot while its last run is still active, so one wedged `yt-dlp` or `ffmpeg` stops that
   job for good — and with no alert path the only sign is a dashboard number that quietly stops
