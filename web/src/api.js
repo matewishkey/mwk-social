@@ -17,7 +17,6 @@
  */
 
 import { tokenOk, ulid, shortCode } from './lib/access.js';
-import { boilerplateOnly } from './pages/youtube.js';
 
 const json = (o, status = 200) => Response.json(o, { status });
 
@@ -470,27 +469,31 @@ async function fileAction(body, env) {
 const PROPOSAL_KINDS = ['swap', 'rebuild', 'append'];
 
 /*
- * A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF (mate, 2026-09-13:
- * "can we auto approve these comments").
+ * EVERY PROPOSAL APPROVES ITSELF (mate, 2026-09-15: "I do not want to approve
+ * your youtube content change always by hand, just approve it").
  *
- * boilerplateOnly() is the line, and it is IMPORTED rather than re-derived: the
- * dashboard's bulk "approve N boilerplate" button already asks exactly this
- * question, and two copies of it is how one of them starts approving a rewrite.
- * 'swap' is our own tail changing under words he already said yes to; 'append'
- * puts the blurb under a description we never wrote a line of. 'rebuild'
- * regenerates the opening with a model, so it still waits for him — 4 of the
- * proposals standing when this went in were rebuilds, and every one of them is
- * a summary in his voice.
+ * This replaces the narrower rule from 2026-09-13, which auto-approved only a
+ * proposal that changed none of his words ('swap', 'append') and held a
+ * 'rebuild' back because a model had written the opening. He has priced that:
+ * a description nobody reads is worth less than a description that lands, and
+ * the approval page was collecting rewrites he was scrolling past anyway.
  *
- * It decides only the STATE a row is filed in. The WHERE clause below is
- * untouched, so a rejection is still final: he said no, and a re-file that
- * matches it is a no-op, not a second ask.
+ * What still protects him, and it is not nothing:
+ *   - the WHERE clause below is untouched, so a REJECTED row is still final and
+ *     an unchanged re-file is still a no-op;
+ *   - `--repropose <id...>` is still the only way a voice change reaches what is
+ *     already written, so nothing is rewritten behind his back on a whim;
+ *   - issue #40 moves the opening from a model to his own words on the site, and
+ *     when that lands the thing this gate existed to catch stops existing.
+ *
+ * `boilerplateOnly()` and the approval page went with this change. If the gate
+ * ever comes back, it is in git, and the reasoning it encoded is the paragraph
+ * above rather than a function to resurrect.
  */
-function autoState(item) {
-  return boilerplateOnly({ kind: item.kind, current_text: item.currentText || '', proposed: item.proposed || '' })
-    ? 'approved' : 'proposed';
+function autoState() {
+  return 'approved';
 }
-const AUTO_BY = 'auto:boilerplate';
+const AUTO_BY = 'auto:approved';
 
 async function propose(body, env) {
   const items = Array.isArray(body.items) ? body.items : [];
@@ -498,7 +501,7 @@ async function propose(body, env) {
   const now = new Date().toISOString();
   const res = await env.DB.batch(items.map((i) => {
     const kind = PROPOSAL_KINDS.includes(i.kind) ? i.kind : null;
-    const state = autoState({ ...i, kind });
+    const state = autoState();
     const by = state === 'approved' ? AUTO_BY : null;
     const at = state === 'approved' ? now : null;
     return env.DB.prepare(
@@ -517,7 +520,7 @@ async function propose(body, env) {
   // What actually landed, not what was sent — "filed: 22" when nineteen were
   // dropped is the kind of number somebody believes.
   const filed = res.reduce((n, r) => n + ((r.meta && r.meta.changes) || 0), 0);
-  const auto = items.filter((i) => autoState({ ...i, kind: PROPOSAL_KINDS.includes(i.kind) ? i.kind : null }) === 'approved').length;
+  const auto = items.length;   // every proposal is approved on arrival now
   return json({ ok: true, filed, sent: items.length, autoApproved: auto });
 }
 

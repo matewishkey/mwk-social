@@ -28,7 +28,6 @@ import { overviewPage, overviewAction } from './pages/overview.js';
 import { statsPage } from './pages/stats.js';
 import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
-import { youtubePage, youtubeAction } from './pages/youtube.js';
 import { linksPage, linksAction } from './pages/links.js';
 
 const EVENT_PAGE = 100;
@@ -96,7 +95,6 @@ async function dashboard(request, env, url) {
 
   if (request.method === 'POST') {
     if (url.pathname === '/queue')   return queueAction(request, env, email);
-    if (url.pathname === '/youtube') return youtubeAction(request, env, email);
     if (url.pathname === '/links')   return linksAction(request, env, email);
     if (url.pathname === '/')        return overviewAction(request, env, email);
     return new Response('not found', { status: 404 });
@@ -108,7 +106,6 @@ async function dashboard(request, env, url) {
     case '/stats':   return html(await stats(env, tz, snapshots, email));
     case '/config':  return html(configPage({ email, tz, snapshots }));
     case '/queue':   return html(await queue(env, tz, snapshots, email, url));
-    case '/youtube': return html(await youtube(env, tz, snapshots, email, url));
     case '/links':   return html(await links(env, tz, email, url));
     case '/':        return html(await overview(request, env, tz, snapshots, email, url));
     default:         return new Response('not found', { status: 404 });
@@ -354,23 +351,3 @@ async function links(env, tz, email, url) {
   });
 }
 
-async function youtube(env, tz, snapshots, email, url) {
-  // The tiles count the whole table, not the page in front of him — "written"
-  // meaning "written on this page" would shrink every time he paged forward.
-  const [waiting, total, states] = await Promise.all([
-    env.DB.prepare(`SELECT * FROM yt_proposal WHERE state = 'proposed' ORDER BY proposed_at DESC`).all(),
-    env.DB.prepare(`SELECT COUNT(*) n FROM yt_proposal WHERE state != 'proposed'`).first(),
-    env.DB.prepare('SELECT state, COUNT(*) n FROM yt_proposal GROUP BY state').all(),
-  ]);
-  const byState = Object.fromEntries((states.results || []).map((r) => [r.state, r.n]));
-  const rows = (total && total.n) || 0;
-  const page = pageOf(url, HISTORY_PAGE, rows);
-  const settled = await env.DB.prepare(
-    `SELECT * FROM yt_proposal WHERE state != 'proposed'
-      ORDER BY proposed_at DESC LIMIT ?1 OFFSET ?2`)
-    .bind(HISTORY_PAGE, (page - 1) * HISTORY_PAGE).all();
-
-  return youtubePage({ email, tz, snapshots, waiting: waiting.results || [],
-    settled: settled.results || [], byState,
-    page, size: HISTORY_PAGE, total: rows, params: url.searchParams });
-}

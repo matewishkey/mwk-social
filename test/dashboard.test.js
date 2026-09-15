@@ -639,27 +639,7 @@ test('queued text cannot inject markup either', async () => {
   assert.ok(!html.includes('<img src=x'), 'the raw tag must not survive');
 });
 
-/* -------------------------------------------------------------- youtube -- */
-
-test('a description proposal shows both versions and does nothing on its own', async () => {
-  const { youtubePage } = await src('pages/youtube.js');
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, snapshots: {}, settled: [], total: 0,
-    waiting: [{ video_id: 'abc123', title: 'Episode 3', current_text: 'old words',
-      proposed: 'new words', state: 'proposed', proposed_at: new Date().toISOString() }] });
-  assert.match(html, /old words/);
-  assert.match(html, /new words/);
-  assert.match(html, /Use the new one/);
-  assert.match(html, /Keep what's there|Keep what&#39;s there/);
-});
-
 // Auto-fill must not ship my paraphrase of the show to the channel.
-test('auto-fill announces itself as paused until the blurb is chosen', async () => {
-  const { youtubePage } = await src('pages/youtube.js');
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting: [], settled: [], total: 0,
-    snapshots: { voice: { body: { blurbChosen: false } } } });
-  assert.match(html, /Auto-fill is paused/);
-});
-
 /* --------------------------------------------------------------- pager -- */
 
 /*
@@ -917,66 +897,6 @@ const PROP = (over = {}) => ({ video_id: 'abc', title: 'A video', state: 'propos
   proposed_at: new Date().toISOString(), current_text: 'one\ntwo\nthree',
   proposed: 'one\nTWO\nthree', ...over });
 
-test('one changed line is a boilerplate swap; anything else is a rewrite', async () => {
-  const { tailOnly } = await src('pages/youtube.js');
-  assert.equal(tailOnly(PROP()), true, 'a single changed line should count as a swap');
-  assert.equal(tailOnly(PROP({ proposed: 'one\nTWO\nTHREE' })), false, 'two changed lines is a rewrite');
-  assert.equal(tailOnly(PROP({ proposed: 'one\ntwo\nthree\nfour' })), false, 'an added line is a rewrite');
-  assert.equal(tailOnly(PROP({ proposed: 'one\nthree' })), false, 'a removed line is a rewrite');
-  assert.equal(tailOnly(PROP({ proposed: 'one\ntwo\nthree' })), false, 'no change is not a swap');
-  assert.equal(tailOnly(PROP({ current_text: '', proposed: 'anything' })), false,
-    'filling an empty description is not a one-line swap');
-});
-
-test('the bulk buttons count the swaps and the rewrites separately', async () => {
-  const { youtubePage } = await src('pages/youtube.js');
-  const waiting = [PROP({ video_id: 'a' }), PROP({ video_id: 'b' }),
-    PROP({ video_id: 'c', proposed: 'wholly\ndifferent\nwords\nhere' })];
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting, settled: [],
-    snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
-  assert.match(html, /Approve the 2 boilerplate changes/);
-  assert.match(html, /Approve all 3, rewrites included/);
-  assert.match(html, /value="approve-tails"/);
-  assert.match(html, /value="approve-all"/);
-  // The pill is what tells him WHICH is which before he clicks either.
-  assert.equal((html.match(/>boilerplate</g) || []).length, 2);
-  assert.equal((html.match(/>rewritten</g) || []).length, 1);
-});
-
-test('a single proposal gets no bulk bar at all', async () => {
-  const { youtubePage } = await src('pages/youtube.js');
-  const html = youtubePage({ email: 'm@x.com', tz: TZ, waiting: [PROP()], settled: [],
-    snapshots: { voice: { body: { blurbChosen: true } } }, byState: {} });
-  assert.ok(!html.includes('approve-tails'), 'one proposal does not need approving in bulk');
-});
-
-/*
- * `kind` beats the diff, and this is why the diff cannot be the only answer.
- *
- * The line-count proxy is right only while the boilerplate happens to be one
- * line. The brand update on 2026-08-24 made the blurb's opening three lines, so
- * every proposal became a multi-line diff — while each video's own summary was
- * untouched. Labelling those "rewritten" lies in the expensive direction: he
- * clicks through 23 diffs to approve nothing he needed to read, or stops
- * trusting the label and approves everything without looking.
- */
-test('the box says which kind it is, and that beats the diff', async () => {
-  const { boilerplateOnly } = await src('pages/youtube.js');
-  const multiline = { current_text: 'a\nb\nc', proposed: 'X\nY\nc' };
-  assert.equal(boilerplateOnly({ ...multiline }), false,
-    'without a kind, a multi-line diff is a rewrite — the fallback');
-  assert.equal(boilerplateOnly({ ...multiline, kind: 'swap' }), true,
-    'a swap is boilerplate however many lines the blurb spans');
-  assert.equal(boilerplateOnly({ current_text: 'a\nb', proposed: 'a\nZ', kind: 'rebuild' }), false,
-    'a rebuild is a rewrite even when it happens to touch one line');
-});
-
-test('a swap filed with no kind still reads as boilerplate', async () => {
-  const { boilerplateOnly } = await src('pages/youtube.js');
-  // Every row filed before the column existed. The fallback must keep working.
-  assert.equal(boilerplateOnly({ current_text: 'one\ntwo\nthree', proposed: 'one\nTWO\nthree' }), true);
-});
-
 /*
  * The site-wide "engagement rate" divided actions from every channel by reach
  * from the three that report it — seven channels on top, three underneath. On
@@ -1036,24 +956,6 @@ test('every proposal kind the box files is one the door accepts', () => {
     assert.ok(accepted.includes(kind),
       `yt-description.js files kind '${kind}' and api.js drops it to null`);
   }
-});
-
-/*
- * An append is what a video gets when YouTube never captioned it: there is no
- * transcript, so there is no summary to write, and his own words stay exactly
- * as they are with the show blurb added underneath. Nothing of his is replaced.
- */
-test('an appended blurb keeps his words, so it is not a rewrite', async () => {
-  const { boilerplateOnly, tailOnly } = await src('pages/youtube.js');
-  const append = { current_text: 'his own words', kind: 'append',
-    proposed: 'his own words\n\nWhy let others solve your problems with AI?\nPrompt it yourself!' };
-  assert.equal(boilerplateOnly(append), true);
-  // The positive control is the fallback disagreeing: added lines read as a
-  // rewrite to the diff, which is why the label has to be believed over it.
-  assert.equal(tailOnly(append), false,
-    'the diff proxy calls this a rewrite — the kind is what makes it right');
-  // And his words must genuinely survive, or "append" is the wrong word for it.
-  assert.ok(append.proposed.startsWith(append.current_text));
 });
 
 test('the sharing card counts real opens and says what it cannot tell him', async () => {
@@ -1150,13 +1052,13 @@ test('website button presses are their own card and never in the social click nu
 /* ------------------------------------------------- auto-approved proposals -- */
 
 /*
- * A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF (mate, 2026-09-13).
+ * EVERY PROPOSAL APPROVES ITSELF (mate, 2026-09-15: "just approve it").
  *
- * The line is boilerplateOnly(), imported by api.js rather than re-derived —
- * the dashboard's own "approve N boilerplate" button asks the same question,
- * and two copies is how one of them starts approving a rewrite. So the test
- * that matters is the PAIR: a swap goes in approved, a rebuild goes in waiting,
- * and both halves come from the one function.
+ * The narrower rule it replaces held a 'rebuild' back because a model had
+ * written the opening. What this test has to pin now is the pair that is left:
+ * every kind goes in approved, AND the decision is still stamped as automatic
+ * rather than as his. The second half is the one that would rot quietly — a row
+ * that claims HE approved it is a lie the next reader cannot detect.
  */
 const proposeVia = async (items) => {
   const { api } = await src('api.js');
@@ -1175,24 +1077,50 @@ const proposeVia = async (items) => {
   return { rows, body: await res.json() };
 };
 
-test('a tail swap files itself approved; a rewrite still waits for him', async () => {
+test('every kind files itself approved, and says a machine did it', async () => {
   const { rows, body } = await proposeVia([
     { videoId: 'swp', kind: 'swap', currentText: 'his words\n\nold tail', proposed: 'his words\n\nnew tail' },
     { videoId: 'apd', kind: 'append', currentText: 'his words', proposed: 'his words\n\nthe blurb' },
     { videoId: 'rbd', kind: 'rebuild', currentText: 'his words', proposed: 'a model wrote this' },
+    { videoId: 'non', kind: 'nonsense', currentText: 'x', proposed: 'y' },
   ]);
-  assert.equal(rows.length, 3);
+  assert.equal(rows.length, 4);
 
   const state = (i) => rows[i].args[4];
   const decidedBy = (i) => rows[i].args[8];
-  assert.equal(state(0), 'approved', 'a swap changes our tail under words he already said yes to');
-  assert.equal(state(1), 'approved', 'an append adds the blurb and replaces nothing');
-  assert.equal(state(2), 'proposed', 'a rebuild is a summary in his voice — he decides');
+  const decidedAt = (i) => rows[i].args[7];
 
-  // An automatic decision must not read as his. The page prints decided_by.
-  assert.match(String(decidedBy(0)), /^auto:/);
-  assert.equal(decidedBy(2), null, 'nothing decided it, so nobody decided it');
-  assert.equal(body.autoApproved, 2, 'the response says how many went straight through');
+  for (let i = 0; i < 4; i++) {
+    assert.equal(state(i), 'approved', `row ${i} should go straight through now`);
+    // An automatic decision must never read as his: the stamp is what a later
+    // reader uses to tell "he said yes" from "nobody looked".
+    assert.match(String(decidedBy(i)), /^auto:/, `row ${i} must be stamped automatic`);
+    assert.ok(decidedAt(i), `row ${i} needs a decided_at or it is approved at no time at all`);
+  }
+  assert.equal(body.autoApproved, 4, 'the response says how many went straight through');
+
+  // The control that keeps this test honest: it fails for the intended reason
+  // if the stamp is ever set to something that reads like a person.
+  assert.notEqual(decidedBy(0), 'mate', 'a machine decision must not wear his name');
+});
+
+/*
+ * REJECTION IS STILL FINAL, AND THAT IS THE ONLY GATE LEFT.
+ *
+ * With every kind auto-approving, the WHERE clause on the upsert is the whole
+ * of his remaining protection: a row he said no to must not come back on the
+ * next sync wearing 'approved'. This reads the SQL rather than the state,
+ * because the state is now always the same and would pass either way.
+ */
+test('a rejected row is still excluded from the re-file', async () => {
+  const { rows } = await proposeVia([
+    { videoId: 'v1', kind: 'swap', currentText: 'a', proposed: 'b' },
+  ]);
+  const sql = rows[0].sql.replace(/\s+/g, ' ');
+  assert.match(sql, /ON CONFLICT\(video_id\) DO UPDATE/, 'still an upsert');
+  assert.match(sql, /WHERE yt_proposal\.state = 'proposed'/, 'a waiting row may be replaced');
+  assert.ok(!/state = 'rejected'/.test(sql) && !/'rejected'/.test(sql),
+    'nothing in the WHERE clause may let a rejected row be revived');
 });
 
 /*
