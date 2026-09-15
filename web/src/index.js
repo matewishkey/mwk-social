@@ -166,8 +166,16 @@ async function stats(env, tz, snapshots, email) {
    * figure below excludes platform = 'website'; the website gets its own card.
    */
   const SOCIAL = "l.platform IS NOT 'website'";
+  /*
+   * The revision trail, for the two trend windows only. It is what lets seen
+   * and actions be compared at a matched age instead of young-against-settled
+   * (stats.js, `THE SETTLE TABLE WAS RECORDED FOR THREE WEEKS`). Bounded to 16
+   * days rather than the whole table: it grows by roughly a row per platform
+   * per sync and the page only ever asks about a fortnight.
+   */
+  const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
   const [daily, followers, clicks, targets, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince, website] = await Promise.all([
+    followerHistory, clicksByDay, platformSince, accountSince, website, revisions] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -233,6 +241,11 @@ async function stats(env, tz, snapshots, email) {
     env.DB.prepare(
       `SELECT l.code, l.note, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
         WHERE c.at >= ? AND l.platform = 'website' AND ${counted('c')} GROUP BY l.code ORDER BY n DESC`).bind(from).all(),
+    env.DB.prepare(
+      `SELECT date, platform, reach, impressions, views, likes, comments, shares, saves,
+              written_at, superseded_at
+         FROM daily_metric_revision WHERE date >= ? ORDER BY date, platform, superseded_at`)
+      .bind(trendFrom).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -250,7 +263,8 @@ async function stats(env, tz, snapshots, email) {
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
     website: website.results || [],
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
-    accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])) });
+    accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
+    revisions: revisions.results || [] });
 }
 
 // What is still waiting is never paged — it is short, and it is the half he

@@ -1010,12 +1010,15 @@ test('the site-wide views tile is wired to the same guard, and only when youtube
   assert.match(s, /ytViewsBlocked/, 'the site-wide total needs its own blocked value');
   assert.match(s, /r\.platform === 'youtube' && r\.views/,
     'it must check youtube actually reported views in the older window');
-  // The tile carries no arrow since 2026-09-14 (views keep settling); the
-  // week-on-week row is where the guard lives now, and it must still win over
-  // the generic "still settling" — naming the unit change is the more specific
-  // truth, and a reader deciding whether to trust a views trend needs it.
-  assert.match(s, /'video views', recent\.views, prior\.views, num, ytViewsBlocked \|\| SETTLING/,
-    'the week-on-week row must pass it first, or the guard is declared and never read');
+  // The week-on-week row is where the guard lives. Since 2026-09-15 the views
+  // row is AGE-MATCHED rather than blocked as "still settling", so the unit
+  // change is the only thing left that can block it — and it still must, because
+  // age-matching fixes a maturity difference and cannot fix a change of unit.
+  // Those are two different lies and only one of them has been dealt with.
+  assert.match(s, /'video views', viewsM\.now, viewsM\.before, num, ytViewsBlocked\)/,
+    'the views row must still pass the unit guard, on the age-matched numbers');
+  assert.ok(!/ytViewsBlocked \|\| SETTLING/.test(s),
+    'the generic settling note no longer applies to views — the age match replaced it');
   assert.ok(!/change\(recent\.views, prior\.views/.test(s),
     'the views tile no longer draws a trend at all');
 });
@@ -1144,4 +1147,121 @@ test('the proposal insert binds what it declares, and a rejection stays final', 
   assert.match(sql, /yt_proposal\.proposed <> excluded\.proposed/, 'the churn guard must survive');
   assert.ok(!/state\s*=\s*'rejected'|'rejected'/.test(sql.split('WHERE')[1] || ''),
     'the WHERE clause never reopens a rejected row');
+});
+
+/* --------------------------------------------- age-matched seen and actions -- */
+
+/*
+ * THE SETTLE ARTEFACT, AND THE PROOF THAT AGE-MATCHING REMOVES IT.
+ *
+ * The reason seen and actions lost their arrow on 14 Sep: daily_metric keeps
+ * climbing for weeks, so the recent window is read younger than the one before
+ * it and a flat channel reads as a fall. These tests build a channel that is
+ * EXACTLY FLAT in truth, with a settle curve on top, and assert that the naive
+ * sum shows the fake fall while the age-matched sum does not. Without the first
+ * half the second proves nothing: a test that only checks the fix passes just
+ * as happily when there was never a bug to fix.
+ */
+
+/** A series that truly did 100, read at 60% on day one and 100% by day seven. */
+const settling = (date, finalValue) => ({
+  current: { date, platform: 'facebook', reach: finalValue, updated_at: `${date}T00:00:01Z` },
+  revisions: [
+    // was 0, replaced 6h in
+    { date, platform: 'facebook', reach: 0, written_at: `${date}T00:00:01Z`, superseded_at: `${date}T06:00:00Z` },
+    // was 60% of final, replaced at 24h + a bit — so the value live AT 24h is this one
+    { date, platform: 'facebook', reach: Math.round(finalValue * 0.6), written_at: `${date}T06:00:00Z`,
+      superseded_at: `${date}T30:00:00Z`.replace('T30', 'T23') },
+    { date, platform: 'facebook', reach: Math.round(finalValue * 0.6), written_at: `${date}T23:00:00Z`,
+      superseded_at: new Date(Date.parse(`${date}T00:00:00Z`) + 2 * 86400_000).toISOString() },
+  ],
+});
+
+test('a value is read at the age asked for, not at its final level', async () => {
+  const { valueAtAge, cutFor } = await src('pages/stats.js');
+  const s = settling('2026-09-01', 100);
+  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 0.1), 'reach'), 0,
+    'six hours in it was still zero');
+  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 1), 'reach'), 60,
+    'at one day old it stood at 60');
+  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 9), 'reach'), 100,
+    'nothing superseded it after that, so the current row is the answer');
+});
+
+test('a day that did not exist yet is unknown, never zero', async () => {
+  const { valueAtAge, cutFor } = await src('pages/stats.js');
+  const s = settling('2026-09-01', 100);
+  // The whole trail was written from 00:00:01 onward; ask before that.
+  assert.equal(valueAtAge(s.revisions, s.current, '2026-08-31T12:00:00Z', 'reach'), null,
+    'nothing had been written yet, so there is no value to report');
+  // And a never-superseded row we only learned about later is unknown too.
+  assert.equal(valueAtAge([], { reach: 5, updated_at: '2026-09-05T00:00:00Z' },
+    cutFor('2026-09-01', 1), 'reach'), null,
+    'the only write we know of is after the cut, so it cannot be claimed for then');
+  assert.equal(valueAtAge([], { reach: 5, updated_at: '2026-09-01T00:30:00Z' },
+    cutFor('2026-09-01', 1), 'reach'), 5,
+    'written before the cut and never moved since — that IS the value at that age');
+});
+
+test('age-matching removes the settle artefact that killed the seen trend', async () => {
+  const { ageMatchedTotal, TREND_AGE_DAYS } = await src('pages/stats.js');
+
+  // Two weeks, identical in truth: every day really did 100 reach.
+  const recent = ['2026-09-08', '2026-09-09', '2026-09-10'];
+  const prior  = ['2026-09-01', '2026-09-02', '2026-09-03'];
+  const byKey = {};
+  for (const d of [...recent, ...prior]) byKey[`${d}|facebook`] = settling(d, 100);
+
+  // The PRIOR week has had time to settle; the RECENT week has not. Simulate
+  // exactly that by reading prior at its final level and recent at one day.
+  const naiveRecent = recent.reduce((n, d) => n + 60, 0);   // what a young read sees
+  const naivePrior  = prior.reduce((n) => n + 100, 0);      // what a settled read sees
+  const naivePct = ((naiveRecent - naivePrior) / naivePrior) * 100;
+  assert.ok(naivePct < -30,
+    `the artefact is real: a flat channel reads ${naivePct.toFixed(0)}% without age-matching`);
+
+  // Age-matched: both weeks read at the same age.
+  const days = (list) => list.map((date) => ({ date, platform: 'facebook' }));
+  const r = ageMatchedTotal(days(recent), byKey, 'reach', TREND_AGE_DAYS);
+  const p = ageMatchedTotal(days(prior), byKey, 'reach', TREND_AGE_DAYS);
+  assert.equal(r.total, p.total, 'read at the same age, a flat channel is flat');
+  assert.equal(r.usedDays, 3);
+  assert.equal(p.usedDays, 3);
+  assert.equal(r.droppedDays, 0);
+});
+
+test('a day it cannot answer is dropped and counted, not silently summed as nothing', async () => {
+  const { ageMatchedTotal } = await src('pages/stats.js');
+  const byKey = {
+    '2026-09-08|facebook': settling('2026-09-08', 100),
+    // present in the table but first written days later — unknowable at age 1
+    '2026-09-09|facebook': { current: { reach: 500, updated_at: '2026-09-20T00:00:00Z' }, revisions: [] },
+    // not in the table at all
+  };
+  const out = ageMatchedTotal(
+    [{ date: '2026-09-08', platform: 'facebook' },
+     { date: '2026-09-09', platform: 'facebook' },
+     { date: '2026-09-10', platform: 'facebook' }], byKey, 'reach', 1);
+  assert.equal(out.total, 60, 'only the day it could actually read');
+  assert.equal(out.usedDays, 1);
+  assert.equal(out.droppedDays, 2, 'both the unknowable one and the missing one are counted');
+});
+
+/*
+ * A CAVEAT WITH THE WRONG NUMBER IN IT IS STILL WRONG. Whether a platform-day
+ * can be read at an age is a fact about the row existing, not about which
+ * column you ask for — so counting it once per metric reported 44 missing days
+ * where there were 11, and a page claiming to have dropped 44 of 50 days looks
+ * broken. This reads the source, because the bug was in how the caller folded
+ * four identical counts together and the function itself was right all along.
+ */
+test('dropped days are counted once, not once per metric', () => {
+  const s = require('node:fs').readFileSync(
+    require('node:path').join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'), 'utf8');
+  assert.ok(!/dropped \+= a\.droppedDays \+ b\.droppedDays/.test(s),
+    'summing the drop across metrics multiplies it by the metric count');
+  assert.match(s, /if \(dropped === null\) dropped = a\.droppedDays \+ b\.droppedDays/,
+    'it must be taken from the first metric and then left alone');
+  assert.match(s, /Math\.max\(seenM\.dropped, viewsM\.dropped, actM\.dropped\)/,
+    'and folded across the three pairs with max, not a sum');
 });

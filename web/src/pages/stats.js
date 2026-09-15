@@ -144,6 +144,86 @@ function spark(series, label = '') {
  * arrows: a click is stamped when it happens and a day we posted is a fact by
  * midnight. Followers keep theirs: a level, read the same way both ends.
  */
+/*
+ * THE SETTLE TABLE WAS RECORDED FOR THREE WEEKS AND READ BY NOTHING. THIS READS
+ * IT (2026-09-15, mate: "I want to see some trends").
+ *
+ * The reason seen and actions lost their arrow on 14 Sep was never that the
+ * numbers were wrong. It was that the two windows were measured at different
+ * MATURITIES: daily_metric is lifetime accrual attributed to a publish date and
+ * it keeps climbing for weeks, so last week is ~85% settled against the week
+ * before at ~97%, and a channel doing exactly the same reads -10 to -20%.
+ *
+ * `daily_metric_revision` fixes that, because it is the same number at every
+ * age. Read every day at ONE age and the two windows become comparable: a day
+ * from last week at 24 hours old against a day from the week before at 24 hours
+ * old. The settle curve cancels instead of being subtracted.
+ *
+ * AGE 1 DAY, and the choice is forced rather than tuned. The youngest day in
+ * the recent window is yesterday, so one day is the most maturity every day in
+ * both windows is guaranteed to have. Asking for more would silently drop the
+ * newest day and quietly shorten the window.
+ *
+ * Three ways this can still lie, all closed below:
+ *   - A SERIES THAT DID NOT EXIST YET IS NOT A ZERO. If the first write landed
+ *     after the cut, the value at that age is unknown and the day is dropped
+ *     from BOTH sides, never counted as nothing.
+ *   - A DAY MISSING FROM ONE WINDOW MUST BE MISSING FROM THE OTHER, or the
+ *     comparison is seven days against six. The pair is assembled per platform
+ *     and a day is used only when both windows can answer at the same age.
+ *   - THE AGE IS PRINTED ON THE PAGE. A trend whose method is invisible is one
+ *     nobody can challenge, and this one has already been wrong once.
+ */
+export const TREND_AGE_DAYS = 1;
+
+/**
+ * The value a metric held at a given instant, read out of the revision trail.
+ *
+ * A revision row holds the value that WAS live and was replaced at
+ * `superseded_at`. So the value live at T is the first revision superseded
+ * AFTER T; if nothing was superseded after T the current row has never moved
+ * since and is the answer.
+ *
+ * @returns {number|null} null means "not knowable at that age", never zero.
+ */
+export function valueAtAge(revs, current, atIso, metric) {
+  const ordered = [...revs].sort((a, b) => a.superseded_at.localeCompare(b.superseded_at));
+  // Nothing existed yet: the earliest value we hold was WRITTEN after the cut.
+  if (ordered.length && ordered[0].written_at > atIso) return null;
+  const after = ordered.find((r) => r.superseded_at > atIso);
+  if (after) return after[metric] || 0;
+  if (!current) return null;
+  // Never superseded after the cut. If the only write we know of is itself
+  // later than the cut, we cannot claim it existed then.
+  if (!ordered.length && current.updated_at > atIso) return null;
+  return current[metric] || 0;
+}
+
+/** `date` + n days, as the UTC instant the revision trail is stamped in. */
+export const cutFor = (date, ageDays) =>
+  new Date(Date.parse(`${date}T00:00:00Z`) + ageDays * 86400_000).toISOString();
+
+/**
+ * Age-matched totals for one metric over a set of days, per platform.
+ *
+ * Returns `{ total, usedDays, droppedDays }`. A day is used only when it can be
+ * answered at the requested age; the count of the ones that could not is
+ * returned rather than swallowed, because "7 days" and "4 days we could read"
+ * are different claims.
+ */
+export function ageMatchedTotal(days, byKey, metric, ageDays) {
+  let total = 0; const used = []; const dropped = [];
+  for (const { date, platform } of days) {
+    const key = `${date}|${platform}`;
+    const entry = byKey[key];
+    if (!entry) { dropped.push(key); continue; }
+    const v = valueAtAge(entry.revisions || [], entry.current, cutFor(date, ageDays), metric);
+    if (v === null) { dropped.push(key); continue; }
+    total += v; used.push(key);
+  }
+  return { total, usedDays: used.length, droppedDays: dropped.length };
+}
+
 const SETTLING = 'still settling';
 
 function change(now, before, blocked = null) {
@@ -184,7 +264,8 @@ function totals(rows) {
 
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   targets = [], split = [], links = 0, days = WINDOW_DAYS,
-  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [] }) {
+  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [],
+  revisions = [] }) {
   const platformTable = ((snapshots.platforms || {}).body || {}).flows || [];
   const metricsFor = Object.fromEntries(platformTable.map((f) => [f.platform, (f.capabilities || {}).metrics || {}]));
 
@@ -565,6 +646,54 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       that existed; calling them people would be a guess.` : ''}</p>`
     : '<p class="empty">No traffic yet.</p>';
 
+  /*
+   * ---- age-matched seen and actions --------------------------------------
+   * The pair the settle curve used to make meaningless. Every day on both
+   * sides is read at TREND_AGE_DAYS old, so the curve cancels rather than
+   * being subtracted from the newer week. A day that cannot be answered at
+   * that age is dropped from BOTH windows, never counted as a zero, and the
+   * number of dropped days is printed rather than hidden.
+   */
+  const byKey = {};
+  for (const r of daily) byKey[`${r.date}|${r.platform}`] = { current: r, revisions: [] };
+  for (const r of revisions) {
+    const k = `${r.date}|${r.platform}`;
+    if (!byKey[k]) byKey[k] = { current: null, revisions: [] };
+    byKey[k].revisions.push(r);
+  }
+  const daysIn = (a, b) => daily.filter((r) => within(r.date, a, b))
+    .map((r) => ({ date: r.date, platform: r.platform }));
+  const recentDays = daysIn(recentFrom, recentTo);
+  const priorDays = daysIn(priorFrom, priorTo);
+
+  /*
+   * `dropped` is counted ONCE, not once per metric. Whether a platform-day can
+   * be read at an age is a fact about the row existing, not about which column
+   * you ask for, so summing it across four action metrics reported 44 missing
+   * days where there were 11. A number four times too big in a caveat is still
+   * a wrong number, and this one would have made the page look unusable.
+   */
+  const matchedPair = (metrics) => {
+    let now = 0; let before = 0; let dropped = null;
+    for (const m of metrics) {
+      const a = ageMatchedTotal(recentDays, byKey, m, TREND_AGE_DAYS);
+      const b = ageMatchedTotal(priorDays, byKey, m, TREND_AGE_DAYS);
+      now += a.total; before += b.total;
+      if (dropped === null) dropped = a.droppedDays + b.droppedDays;
+    }
+    return { now, before, dropped: dropped || 0 };
+  };
+  const seenM = matchedPair(['reach']);
+  const impM = matchedPair(['impressions']);
+  const viewsM = matchedPair(['views']);
+  const actM = matchedPair(['likes', 'comments', 'shares', 'saves']);
+  // Reach where we have it, impressions where we do not, the same way the
+  // unmatched row already chose.
+  const seenNow = seenM.now || impM.now;
+  const seenBefore = seenM.before || impM.before;
+  // Same days for every metric, so the largest single count is the answer.
+  const matchedDropped = Math.max(seenM.dropped, viewsM.dropped, actM.dropped);
+
   // ---- week on week, as a table ------------------------------------------
   const wowRow = (name, now, before, fmt = num, blocked = null) => `<tr>
     <td>${esc(name)}</td>
@@ -578,21 +707,25 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <th class="num">${esc(short(priorFrom))}–${esc(short(priorTo))}</th>
       <th class="num">change</th></tr></thead>
     <tbody>
-      ${wowRow('reach, summed', recent.reach || recent.impressions, prior.reach || prior.impressions, num, SETTLING)}
-      ${wowRow('video views', recent.views, prior.views, num, ytViewsBlocked || SETTLING)}
-      ${wowRow('likes, comments, shares, saves',
-        recent.likes + recent.comments + recent.shares + recent.saves,
-        prior.likes + prior.comments + prior.shares + prior.saves, num, SETTLING)}
-      ${wowRow('actions per post', perPostNow, perPostBefore, (v) => v.toFixed(1), SETTLING)}
+      ${wowRow('reach, summed', seenNow, seenBefore, num)}
+      ${wowRow('video views', viewsM.now, viewsM.before, num, ytViewsBlocked)}
+      ${wowRow('likes, comments, shares, saves', actM.now, actM.before, num)}
+      ${wowRow('actions per post', cadenceNow ? actM.now / Math.max(recent.posts, 1) : 0,
+        cadenceBefore ? actM.before / Math.max(prior.posts, 1) : 0, (v) => v.toFixed(1))}
       ${wowRow('link clicks from social (people)', clicksNow, clicksBefore, (v) => String(v))}
       ${wowRow('days we posted', cadenceNow, cadenceBefore, (v) => `${v}/7`)}
     </tbody></table></div>
-  <p class="note">Both columns are seven whole days. Today is in neither — it is still in
-    progress, and putting a morning against a full week draws a fall that is only the clock.
-    Reach, views and actions keep moving for weeks after a post goes out (a Facebook day is
-    three-quarters of its final number at midnight, LinkedIn two-thirds), so the recent column is
-    always lower than it will end up and an arrow on it would point down every week. Those rows
-    get no arrow. Clicks and days posted are final by midnight and keep theirs.</p>`;
+  <p class="note">Both columns are seven whole days and today is in neither, because putting a
+    morning against a full week draws a fall that is only the clock.
+    <b>Reach, views and actions are read at ${TREND_AGE_DAYS} day old on both sides.</b> Those numbers
+    keep climbing for weeks after a post goes out, so comparing last week as it stands against the
+    week before as it ended made a flat channel read ten to twenty per cent down every time. Reading
+    every day at the same age cancels that instead of subtracting it, which is what the revision
+    trail has been recorded for. It also means these four rows are lower than the totals above:
+    they are the same days caught younger, on purpose.${matchedDropped
+      ? ` ${matchedDropped} platform-day${matchedDropped === 1 ? '' : 's'} could not be read at that age and
+        ${matchedDropped === 1 ? 'was' : 'were'} left out of both columns rather than counted as nothing.` : ''}
+    Clicks and days posted are final by midnight and need none of this.</p>`;
 
   const body = `
 <h1>Stats</h1>
