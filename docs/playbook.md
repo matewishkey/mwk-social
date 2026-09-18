@@ -320,11 +320,14 @@ status page must never do.
 
 ## Being driven by something else
 
-Mate is building a CMS on the fleet's server to hold website data and recordings, and this pipeline
-has to be easy to drive from it. **The seam is one row: the CMS inserts a `queue_item` and
-everything else happens.** Nothing else needs to be exposed — the box claims it, probes the media,
-composes per platform, publishes, comments and records the outcome, and the dashboard shows all of
-it. `scripts/queue-add.js` is that same insert done from a terminal, and it is the worked example.
+**The seam is one row: insert a `queue_item` and everything else happens.** Nothing else needs to
+be exposed — the box claims it, probes the media, composes per platform, publishes, comments and
+records the outcome, and the dashboard shows all of it.
+
+Two things drive it today, and both are that same insert: the **`/queue` form on the dashboard**,
+which is how mate puts a clip in in his own words, and **`scripts/queue-add.js`** from a terminal,
+which is the worked example. Anything else that ever wants to supply this pipeline writes the same
+row; it does not need a new interface, and it should not get one.
 
 Deliberately NOT part of the seam: deciding when. The pace is the box's and stays there, or two
 things would eventually disagree about what today already holds.

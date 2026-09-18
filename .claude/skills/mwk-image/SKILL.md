@@ -54,13 +54,12 @@ the array, do not eyeball the numbers.
 
 ## 4. The branding is not ours to draw
 
-**We do not make pictures here** (mate, 2026-08-26). Image work for the show moved to the CMS,
-and the two requests this repo had open against `mwk-og-image-generator` — pad-instead-of-crop
-and the 4:5 / 9:16 shapes — were withdrawn on the same day. There is no requester behind them
-any more.
+**We do not make pictures here** (mate, 2026-08-26). The two requests this repo had open against
+`mwk-og-image-generator` — pad-instead-of-crop and the 4:5 / 9:16 shapes — were withdrawn the same
+day. There is no requester behind them any more.
 
-So a picture reaches this pipeline **already branded**. If one arrives without the band, that is
-a question for the CMS, not a job to do here: **never redraw the band by hand and never
+So a picture reaches this pipeline **already branded**. If one arrives without the band, ask him
+where it should come from rather than drawing one: **never redraw the band by hand and never
 regenerate one**, because a band drawn twice is a band that drifts.
 
 What is still ours is everything either side of it — the aspect and format checks above, and

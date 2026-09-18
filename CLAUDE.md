@@ -398,7 +398,10 @@ had already published were jargon the rule rejects.
 - **A/B testing thumbnails has no API and would not conclude here.** Test & Compare is Studio-only,
   excludes Shorts, and a variant wants 1,000–5,000 impressions to settle — our best long-form video
   has 95 views lifetime. Do not re-research until a video clears four figures.
-- **Image work moved to the CMS** (mate, 2026-08-26). Do not rebuild card generation here.
+- **We do not make the show's pictures here** (mate, 2026-08-26). A picture reaches this pipeline
+  already branded; what is ours is the aspect and format checks either side of it. Do not rebuild
+  card generation for the show here. (`scripts/reality-check/` is a separate thing and stays —
+  it renders its own cards from the brand, and its README says so.)
 
 ## The platform table — wire it or do not add it
 
@@ -824,8 +827,14 @@ The invariants:
 This repo is PUBLIC, so only the public connections are named here:
 
 - **`matewishkey/mwk-og-image-generator`** (public) — the AI image studio the show builds and posts
-  about. Its `gpt2` alias is `openai/gpt-image-2`, OpenAI's newest image model; Replicate is the
-  pipe, not the model. **Image work for the show moved to the CMS on 2026-08-26.**
+  about, and where the brand tokens, the RedBlock mark and the fonts are read from. Its `gpt2`
+  alias is `openai/gpt-image-2`, OpenAI's newest image model; Replicate is the pipe, not the
+  model. **Image work for the show is not done in this repo** (mate, 2026-08-26).
+- **`mergodon/matewishkey-web`** — the website. It publishes `matewishkey.com/api/content.json`
+  (contract: `API.md` in that repo), which is the editorial record of the show: episodes with
+  their number, chapters, outcomes and topics, and the guests with their portraits. **Nothing
+  here reads it yet** — this pipeline's only read off the site is `rss.xml`. It is also where
+  the brand page lives.
 
 Connected **private** repos are named in the internal state note, not in this file. Read that note
 before filing a cross-repo issue, and file with `gh issue create -R <owner>/<repo>`. Never edit
