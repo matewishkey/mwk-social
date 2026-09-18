@@ -227,6 +227,8 @@ had already published were jargon the rule rejects.
   `mmm` or an error, never somebody else's).
   - **`decodeURIComponent` BEFORE normalising**, then fold accents to ASCII, or `Ödön` stores as
     `c3-96d-c3-b6n`. Found by curling the live redirect with a real name; an ASCII test passes.
+    **The folding is not a compromise to be undone**: no accents anywhere, on anything (mate,
+    2026-09-18), so the ASCII form IS the spelling and this is the house rule, not a limitation.
   - **It says the link labelled natalie was opened, NOT that Natalie opened it.** Links get
     forwarded. Do not let a summary quietly upgrade it.
 - **`bot = 0` WAS NOT ENOUGH, AND IT OVERSTATED EVERY CLICK NUMBER BY ABOUT FOUR TIMES**
