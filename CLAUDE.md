@@ -265,14 +265,20 @@ had already published were jargon the rule rejects.
   - That last rule exists because a left-over stream title put a guest in a video he is not in:
     `_6zckinR5VI` is titled "Istvan David: Exploring Light" and its notes credited Istvan with
     mate's own projects. 1,368 words of transcript, no mention of him.
-- **A PROPOSAL THAT REPLACES NONE OF HIS WORDS APPROVES ITSELF** (mate, 2026-09-13: *"can we auto
-  approve these comments"*). `propose()` files a `swap` or an `append` as **approved**, stamped
-  `decided_by: auto:boilerplate`, and the next run applies it — a `rebuild` regenerates the opening
-  with a model and still waits for him. The line is `boilerplateOnly()`, **imported** by `api.js`
-  from the dashboard page rather than re-derived: the bulk "approve N boilerplate" button asks
-  the identical question, and two copies is how one of them starts approving a rewrite.
-  **It decides the STATE a row is filed in and nothing else** — the WHERE clause is untouched, so
-  a rejection is still final and an unchanged re-file is still a no-op.
+- **EVERY PROPOSAL APPROVES ITSELF, AND THE PAGE THAT COLLECTED APPROVALS IS GONE** (mate,
+  2026-09-15: *"I do not want to approve your youtube content change always by hand, just approve
+  it"* and *"remove that page from social.matewishkey.com it is boring"*). This widened the
+  2026-09-13 rule, which approved only a `swap` or an `append` and held a `rebuild` back because a
+  model had written the opening. `autoState()` now returns `'approved'` unconditionally, stamped
+  `decided_by: auto:approved`. **`boilerplateOnly()`, `tailOnly()` and `web/src/pages/youtube.js`
+  went with it** — nothing reads them once `autoState` stops asking; the route, the POST action and
+  the nav entry went too. Git has them if the gate ever comes back.
+  **The WHERE clause is untouched, and it is now the whole of his protection**: a REJECTED row is
+  still excluded from the re-file, so a no stays a no, and an unchanged re-file is still a no-op.
+  A test reads the SQL rather than the state to pin that, because with every kind approving the
+  state would pass either way.
+  ⚠ **The 14-day expiry below is now inert**, not wrong: nothing is ever filed `proposed`, so
+  there is nothing for it to expire. It is left in as the safety net if the gate is reinstated.
 - **A REWRITE HE HAS NOT ANSWERED IN 14 DAYS IS A NO, AND AN UNDECIDED ONE IS NEVER RE-DRAFTED**
   (2026-09-14). Four `rebuild` proposals were re-built by the model nightly for a week and re-filed
   with `proposed_at` reset, so "drafted hours ago" sat on proposals he had scrolled past for weeks.
@@ -356,7 +362,10 @@ had already published were jargon the rule rejects.
 - **A test stream is still a video on the channel.** Five carried the placeholder title *Watch Me
   Work* and the description *Testing desktop view*, two of them a duplicate pair of the same
   5-hour stream. The description sync files a proposal; **nothing here writes a TITLE**, so a
-  placeholder title is his to fix and no automation will notice it.
+  placeholder title is his to fix and no automation will notice it. **That is our gap, not the
+  API's** (measured 2026-09-15): `posts:update-metadata` takes `--title`, and also `--tags`,
+  `--categoryId`, `--privacyStatus`, `--thumbnailUrl`, `--madeForKids` and `--playlistId`. Five
+  videos were still called *Watch Me Work* three weeks on because no code had ever set one.
 
 ## Thumbnails
 
@@ -490,6 +499,14 @@ most repeated failure in this repo.
   all in the journal) and `claim()` marks it **failed with a note, never re-queued**: it may have
   published before it died. Before this it sat at `claimed` for ever, skipped by every claim and
   invisible to the waiting count.
+- **QUEUEING IS ONLY A REVIEW GATE IF SOMETHING IS WAITING, AND ON A QUIET DAY NOTHING IS**
+  (2026-09-15, learned by publishing). "Post it means queue it" assumes the queue holds it long
+  enough for him to look. With `pace.status().why === null` the next `mwk-queue` tick is at most
+  five minutes away, so an item queued and announced in the same breath is live before he reads the
+  message — it happened, and four of five platforms had to be unpublished, with Instagram
+  permanently stuck because it has no delete API. **`--at` is day-granularity only**, so there is
+  no way to hold for an hour today. Either check the pace before calling a queue a gate, or say
+  plainly that it goes out at the next tick. **His own dictated words need no gate**; drafts do.
 - **A dry run hands its item back as `released`, not `queued`** — `queued` counts as an attempt,
   and three dry runs used to mark a good item failed.
 - **`--no-first-comment` used to hold for about an hour** — post.js sent none, then the watcher
@@ -632,6 +649,22 @@ The invariants:
   on any platform but TikTok, not by +7 days on four of six. **And on 2026-09-15 the table stopped
   being read by nothing** — age-matching is exactly the use it was kept for, and it is now what the
   seen/actions trend rests on. `valueAtAge()` in `stats.js` is the reader.
+- **THE FUNNEL IS THREE STAGES WE CAN SEE AND ONE WE CANNOT, AND THE LAST IS UNMEASURED RATHER
+  THAN ZERO** (2026-09-15). A social click is somebody leaving a post; a press on one of the two
+  `campaign = 'book'` codes is somebody already on /show opening the booking calendar. What happens
+  inside Google's calendar is not instrumented and will not be. **Writing 0 there would be
+  inventing a measurement to complete a picture** — "nobody booked" is his to say, "we cannot see
+  bookings" is ours. Measured that day, counted clicks: **57 presses, 43 public show and 14
+  private, across 19 separate days** against 38 social clicks all-time. **The social row is NOT a
+  parent of the booking rows** — the buttons are on his own site and most pressers never touched
+  one of our links, so 43 over 38 is not a conversion rate and the page carries no percentage
+  between the stages.
+- **A LINK'S CLICK COUNT IS ALL TIME AND GETS READ AS "RECENTLY"**, so `/links` carries both now
+  (`human` and `human_recent`, the 30-day window computed as `date('now','-30 days')` in SQLite
+  because the optional campaign filter shifts every placeholder number). ⚠ **Two identical columns
+  are a short record, not a finding** — the first click ever recorded is 2026-08-21, so all-time
+  and last-30 are nearly the same window and the page says so, with a control that removes the
+  caveat once the record outgrows it.
 - **Trend guards, each with a positive control**: today is in neither window; a channel younger than
   the older window gets its start date (`platformSince` is queried over the WHOLE table, not the
   rendered thirty days); **connecting an account is not growth** — the follower total counts only
@@ -786,3 +819,11 @@ another repo directly.
   cap; consent flags required per post; no comments/DMs/FYP analytics via API.
 - **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails;
   impressions/CTR exist only in Studio's UI, not in any API.
+- **PLAYLISTS ARE ASSIGN-ONLY: you can put a video IN one, and you cannot ask which exist**
+  (measured 2026-09-15). `posts:update-metadata --playlistId` works and was verified at YouTube's
+  end, not by the API's echo. **`/v1/youtube/playlists` and `/v1/playlists` both answer *"No such
+  API endpoint"***, with `/v1/accounts` returning 200 on the same key in the same minute as the
+  control. So the ids have to come from Studio by hand, once; after that it automates. The
+  addressing is the same trick descriptions use: `POST /posts/_/update-metadata` with
+  `{platform, videoId, accountId, ...}` — **the Zernio `_id` from `analytics:posts` 404s here**,
+  because an external video is not a post.
