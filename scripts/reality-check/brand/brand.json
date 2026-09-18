@@ -34,7 +34,7 @@
   "title": {
     "$comment": "Display heading / wordmark. Fraunces 700 per the design system. Wrap a word in *asterisks* to set it in red \u2014 that is how the 'Mate *Wish* Key' wordmark is written.",
     "family": "Fraunces",
-    "file": "brand/fonts/Fraunces[SOFT,WONK,opsz,wght].ttf",
+    "file": "brand/fonts/Fraunces.ttf",
     "size": 38,
     "weight": 700,
     "gap": 28
@@ -42,7 +42,7 @@
   "kicker": {
     "$comment": "LABEL/KICKER: JetBrains Mono 700, uppercase, 0.16em tracking, red-deep \u2014 the only red allowed at body size.",
     "family": "JetBrains Mono",
-    "file": "brand/fonts/JetBrainsMono[wght].ttf",
+    "file": "brand/fonts/JetBrainsMono.ttf",
     "size": 15,
     "weight": 700,
     "trackingEm": 0.16,
@@ -51,7 +51,7 @@
   "tagline": {
     "$comment": "Standfirst under the wordmark. Manrope at body weight in --mute, per the design system's rule that Manrope is body copy and mute carries standfirsts.",
     "family": "Manrope",
-    "file": "brand/fonts/Manrope[wght].ttf",
+    "file": "brand/fonts/Manrope.ttf",
     "size": 19,
     "weight": 500,
     "gapAbove": 9

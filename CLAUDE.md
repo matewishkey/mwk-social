@@ -1,7 +1,9 @@
 # mwk-social — Zernio social-media integration
 
 Agent notes for working in this repo. (This repo is public — keep this file free of account
-IDs, billing details, and internal URLs; that state lives outside the repo.)
+IDs, billing details and secrets; that state lives outside the repo. **The three custom
+hostnames are not covered by that**: they are in `web/wrangler.toml`, which is committed here,
+so naming them costs nothing and pretending otherwise just makes the doc unusable.)
 
 **What belongs here:** the things that cost a debugging session, and the ones that looked right
 and were not. **What does not:** procedure a skill already carries, history git already holds, and
@@ -418,8 +420,9 @@ most repeated failure in this repo.
   `platforms.galleryFor()` collapses a set with any non-image in it back to one item rather than
   half-publishing a mixed post. Verified live on the first use: 3 `mediaItems` on facebook+linkedin,
   instagram+threads and twitter alike.
-  - **`imageMax` is the cap and `galleryFor()` is its ONLY reader** — the field and its reader
-    landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
+  - **`imageMax` is the cap, and it has THREE readers** — `galleryFor()` caps the set,
+    `galleryProblems()` asserts the table agrees with itself, and the config page renders it.
+    The field and the first reader landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
     **X 4** (Zernio's own platform pages, 2026-08-27). `galleryProblems()` asserts the table agrees
     with itself, the way `linkProblems()` does.
   - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is the
@@ -501,9 +504,10 @@ most repeated failure in this repo.
   invisible to the waiting count.
 - **QUEUEING IS ONLY A REVIEW GATE IF SOMETHING IS WAITING, AND ON A QUIET DAY NOTHING IS**
   (2026-09-15, learned by publishing). "Post it means queue it" assumes the queue holds it long
-  enough for him to look. With `pace.status().why === null` the next `mwk-queue` tick is at most
-  five minutes away, so an item queued and announced in the same breath is live before he reads the
-  message — it happened, and four of five platforms had to be unpublished, with Instagram
+  enough for him to look. With `pace.status().why === null` the next `mwk-queue` tick is
+  **minutes away**: the timer is `*:05,10,...,45`, so five minutes for most of the hour and up to
+  twenty between `:45` and `:05`. Either way an item queued and announced in the same breath is
+  live before he reads the message — it happened, and four of five platforms had to be unpublished, with Instagram
   permanently stuck because it has no delete API. **`--at` is day-granularity only**, so there is
   no way to hold for an hour today. Either check the pace before calling a queue a gate, or say
   plainly that it goes out at the next tick. **His own dictated words need no gate**; drafts do.
@@ -641,7 +645,8 @@ The invariants:
   16 of 16 in the week the tile read "16 link clicks (people)": every social click query carries
   `l.platform IS NOT 'website'` now, and the buttons get their own card, called what they are.
 
-- **The settle curve is being RECORDED and read by nothing, on purpose, from 2026-08-26.**
+- **The settle curve was RECORDED and read by nothing for three weeks, and since 2026-09-15 it is
+  what the seen/actions trend rests on.**
   `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
   "is the last complete day settled?" had no answer and the trend excluded today on instinct. A
   `BEFORE UPDATE` trigger now keeps the superseded value in `daily_metric_revision`, with both
@@ -745,8 +750,9 @@ The invariants:
   stay wired** for a still HE hands us; what is declined is the pipeline choosing one.
 - **Stories**: postable via API but they get no stickers/links/music (Meta limit) — post manually.
   An Instagram story shared onward to Facebook has no API analytics on the Facebook side.
-- **Native/past posts**: `analytics:posts --source external` picks up app-made posts on a ~90 min
-  sync. **YouTube is the one platform that still reads it** (`first-comment.js`'s `sources()`) —
+- **Native/past posts**: `analytics:posts` picks up app-made posts on a ~90 min sync, and
+  `--source late|external|all` narrows it. **YouTube is the one platform we still sweep**
+  (`first-comment.js`'s `sources()`, which runs `--platform youtube` and passes no `--source`) —
   see *Live streams* above. Anywhere else a post made outside the pipeline is handled by hand.
 
 ## X: follows only

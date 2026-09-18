@@ -367,7 +367,8 @@ function linkDeadFor(name, probe) {
  * be mixed either), so a list of clips is never a gallery — it is separate
  * posts, which is what landscapeOk already routes.
  *
- * `imageMax` is read HERE and nowhere else. It went onto the table on
+ * `imageMax` is read by `galleryFor()` below, by `galleryProblems()` further
+ * down, and by the dashboard's config page. It went onto the table on
  * 2026-08-27 with a gallery to feed, deliberately: this repo has shipped
  * linkPlacement, landscapeOk, hashtagsInCaption and shortsAreDead as fields
  * declared and read by nothing, and a config page that renders an unread field

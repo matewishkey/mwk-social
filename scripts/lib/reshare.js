@@ -1,12 +1,14 @@
 /*
- * LinkedIn quote-reshare: the company page posts it, the personal account
- * shares it with a thought on top.
+ * LinkedIn quote-reshare: HIS OWN PROFILE posts it, the page and the other
+ * profile repost it. Reversed on 2026-09-14 — it ran the other way for a month,
+ * the 30-follower page holding the native post while the two profiles carrying
+ * 7,222 between them merely reshared, and `linkedinAccounts()` at the bottom of
+ * this file is the authority on the shape, not this paragraph.
  *
  * This is the one platform where resharing is possible through an API at all —
  * Facebook personal timelines are impossible by Meta's rules, and nothing else
- * exposes it. It matters here because the personal account is the only one with
- * a real audience (thousands against the company page's handful), and the goal
- * is to move that engagement onto the page.
+ * exposes it. It matters because the audience is on the profiles, so the native
+ * post belongs where the people are.
  *
  * Two shapes, and the difference matters:
  *

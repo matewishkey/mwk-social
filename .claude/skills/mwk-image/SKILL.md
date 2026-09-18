@@ -123,7 +123,7 @@ points at the bio.
 ## Where the knowledge lives
 
 - Platform rules: `scripts/lib/platforms.js` — `imageOk`, `imageAspectRange`, `imageMax`
-  (the gallery cap; `galleryFor()` is its only reader).
+  (the gallery cap; `galleryFor()`, `galleryProblems()` and the config page read it).
 - What a file actually is: `scripts/lib/media.js` — `probe()` sets `isImage` off ffprobe's
   container name; `check()` branches on it.
 - Everything we say out loud: `config/voice.json`.
