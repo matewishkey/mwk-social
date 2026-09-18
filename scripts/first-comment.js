@@ -78,6 +78,22 @@ const shortened = (composed) => {
   return gave.length ? ` — gave up ${gave.join(' and ')} to fit` : '';
 };
 
+/*
+ * A FAILURE ON ONE RUN AND A FAILURE THAT IS STUCK LOOK IDENTICAL FROM HERE,
+ * AND ONLY ONE OF THEM WANTS A HUMAN (#36, filed 2026-08-26 and earned twice
+ * since). A Zernio 500 on a comment READ on 2026-08-26 turned the unit red for
+ * an hour over a comment that was already on the post; the over-length Threads
+ * body on 2026-09-18 was genuinely stuck and looked exactly the same in
+ * `systemctl --user list-timers`. So a post carries its own consecutive-run
+ * count and the unit goes red only once one of them reaches STUCK_RUNS — by
+ * which time "the next run fixes it" has been disproved three times.
+ *
+ * A SOURCE failure is deliberately not softened this way: a sweep that could
+ * not read one of its sources missed posts it never saw, so it stays loud on
+ * the first run (the 2026-09-15 rule, and the nine-streams bug underneath it).
+ */
+const STUCK_RUNS = Number(process.env.MWK_COMMENT_STUCK_RUNS || 3);
+
 /** Is this state entry still owed another look? */
 const isRetryable = (entry) =>
   Boolean(entry && entry.retryUntil && Date.parse(entry.retryUntil) > Date.now());
@@ -247,7 +263,10 @@ async function main() {
   // A source that could not be read starts the count, so a run that swept only
   // half of what it should still exits non-zero and still marks the heartbeat.
   let failures = sourceFailures;
+  let softFailures = 0;
+  const failing = () => (state.__failing = state.__failing || {});
   for (const target of pending) {
+    let failed = false;
     try {
       // The link is already in the caption — a comment repeating it is noise.
       if (carriesCta(target.content)) {
@@ -404,20 +423,64 @@ async function main() {
         data: { variant: composed.variant, index: composed.index, tags: topicTags } });
       console.log(`post  ${target.key} — commented [${composed.variant}/${composed.index}]${shortened(composed)} (${target.url})`);
     } catch (err) {
-      failures++;
-      events.emit('comment.failed', { message: err.message, level: 'error', platform: target.platform,
-        postKey: target.key, url: target.url, dedupeKey: `comment.failed|${target.key}` });
-      console.error(`FAIL  ${target.key} — ${err.message}`);
+      failed = true;
+      softFailures++;
+      const before = failing()[target.key];
+      const runs = (before ? before.runs : 0) + 1;
+      if (!opts.dryRun) {
+        failing()[target.key] = { runs, firstAt: before ? before.firstAt : stamp, lastAt: stamp, message: err.message };
+        saveState(state);
+      }
+      const stuck = runs >= STUCK_RUNS;
+      if (stuck) failures++;
+      events.emit('comment.failed', { message: err.message, level: stuck ? 'error' : 'warn',
+        platform: target.platform, postKey: target.key, url: target.url,
+        dedupeKey: `comment.failed|${target.key}`, data: { runs, stuckAfter: STUCK_RUNS, stuck } });
+      console.error(`FAIL  ${target.key} (${runs}/${STUCK_RUNS}${stuck ? ', stuck' : ', retrying next run'}) — ${err.message}`);
+    } finally {
+      // A `continue` above skips the rest of the body but not this, which is
+      // why the count is cleared here: every path that did not throw is a post
+      // that is no longer failing.
+      if (!failed && !opts.dryRun && failing()[target.key]) {
+        delete state.__failing[target.key];
+        saveState(state);
+      }
     }
   }
 
-  events.finishRun({ inWindow: posts.length, pending: pending.length, failures });
+  /*
+   * A post that failed its way OUT of the collection window can never be
+   * retried by this job — --hours carried it off, the same way it carried off
+   * the nine live streams. Report it once, loudly, and drop it: leaving the
+   * entry behind would keep the unit red for ever with nothing able to clear
+   * it. Only for platforms this run actually swept, or a narrowed
+   * `--platforms` run would abandon everything it was not looking at.
+   */
+  const inPlay = new Set(pending.map((t) => t.key));
+  for (const [k, f] of Object.entries(state.__failing || {})) {
+    if (inPlay.has(k) || !opts.platforms.includes(k.split(':')[0])) continue;
+    if (!opts.dryRun) { delete state.__failing[k]; saveState(state); }
+    failures++;
+    const window = opts.all ? 'sweep' : `${opts.hours}h window`;
+    events.emit('comment.failed', { message: `gave up after ${f.runs} run(s): out of the ${window}`,
+      level: 'error', platform: k.split(':')[0], postKey: k,
+      dedupeKey: `comment.gaveup|${k}`, data: { runs: f.runs, lastError: f.message } });
+    console.error(`GONE  ${k} — failed ${f.runs} run(s) and has left the ${window} (${f.message})`);
+  }
+
+  if (softFailures && !failures) {
+    console.log(`note  ${softFailures} failure(s) this run, none of them stuck yet — the unit stays green until one reaches ${STUCK_RUNS} runs`);
+  }
+
+  events.finishRun({ inWindow: posts.length, pending: pending.length, failures, softFailures });
 
   // There was a private MWK_COMMENT_HC_URL here, set nowhere for a month. The
   // alerting is lib/health.js now; a comment run with failures marks the
   // heartbeat check failed so the email names it, and the next clean ship-events
   // run clears it.
-  if (failures && !opts.dryRun) health.ping('heartbeat', { ok: false, message: `first-comment: ${failures} failure(s)` });
+  // Only a STUCK failure pages: `failures` no longer counts a post that may
+  // well be fine on the next run, which is what made this hook worth having.
+  if (failures && !opts.dryRun) health.ping('heartbeat', { ok: false, message: `first-comment: ${failures} stuck failure(s)` });
 
   process.exit(failures ? 1 : 0);
 }

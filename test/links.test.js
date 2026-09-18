@@ -678,3 +678,98 @@ test('a failing youtube sweep degrades the run instead of ending it, and still f
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+
+/*
+ * A TRANSIENT FAILURE AND A STUCK ONE LOOKED IDENTICAL, AND THE UNIT WENT RED
+ * FOR BOTH (#36). On 2026-08-26 a Zernio 500 on a comment READ failed the
+ * hourly unit over a post that already carried its comment and read fine an
+ * hour later; on 2026-09-18 a Threads post really was stuck and looked exactly
+ * the same in the journal. The unit goes red only once one post has failed
+ * STUCK_RUNS runs in a row — by which time "the next run fixes it" has been
+ * disproved three times.
+ *
+ * Driven end to end, across four separate runs sharing one state file, because
+ * what is under test is what the PROCESS does over time — no text match shows
+ * that. The fake API runs in its own process on purpose: spawnSync blocks this
+ * one's event loop, so a server listening here could never answer the child.
+ */
+test('one failing run stays green, three in a row go red', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const { spawn, spawnSync } = require('node:child_process');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mwk-stuck-'));
+  const script = path.join(__dirname, '..', 'scripts', 'first-comment.js');
+  const state = path.join(dir, 'state.json');
+  const failFlag = path.join(dir, 'fail');
+  const portFile = path.join(dir, 'port');
+
+  // The comment READ 500s while the flag file exists, which is the 2026-08-26
+  // failure exactly; the reply always succeeds.
+  const api = path.join(dir, 'api.js');
+  fs.writeFileSync(api, `const http = require('http'), fs = require('fs');
+const s = http.createServer((req, res) => {
+  if (req.method === 'GET' && fs.existsSync(${JSON.stringify(failFlag)})) {
+    res.writeHead(500, { 'content-type': 'application/json' });
+    return res.end('{"error":true,"message":"error"}');
+  }
+  res.writeHead(200, { 'content-type': 'application/json' });
+  res.end(req.method === 'GET' ? '{"status":"success","comments":[]}'
+    : '{"status":"success","comment":{"id":"c1"}}');
+});
+s.listen(0, '127.0.0.1', () => fs.writeFileSync(${JSON.stringify(portFile)}, String(s.address().port)));
+`);
+
+  // One published Instagram post with no CTA in its caption, so the run gets as
+  // far as the comment read — which is where the failure lives.
+  const listed = JSON.stringify({ posts: [{
+    content: 'his words, no link',
+    publishedAt: new Date().toISOString(),
+    mediaItems: [],
+    platforms: [{ platform: 'instagram', status: 'published', platformPostId: '222',
+      accountId: 'acc1', platformPostUrl: 'https://example.test/p/222' }],
+  }] });
+  const shim = path.join(dir, 'zernio');
+  fs.writeFileSync(shim, `#!/bin/sh\ncase "$1" in\n  posts:list) cat <<'J'\n${listed}\nJ\n    ;;\n`
+    + "  *) echo '{\"posts\":[]}' ;;\nesac\n", { mode: 0o755 });
+
+  fs.writeFileSync(failFlag, '');
+  const server = spawn(process.execPath, [api], { stdio: 'ignore' });
+  for (let i = 0; i < 100 && !fs.existsSync(portFile); i++) await new Promise((r) => setTimeout(r, 50));
+  assert.ok(fs.existsSync(portFile), 'the fake API never came up');
+  const port = fs.readFileSync(portFile, 'utf8').trim();
+
+  const run = () => spawnSync(process.execPath, [script, '--no-topics', '--platforms', 'instagram'], {
+    encoding: 'utf8', timeout: 30000,
+    env: { ...process.env,
+      ZERNIO_API_KEY: 'test', ZERNIO_API_URL: `http://127.0.0.1:${port}/api`,
+      MWK_ZERNIO_CLI: shim, MWK_COMMENT_STATE: state, MWK_EVENT_DIR: path.join(dir, 'events'),
+      MWK_LOG_URL: '', MWK_HC_HEARTBEAT_URL: '' },
+  });
+
+  try {
+    const first = run();
+    assert.match(first.stderr, /FAIL {2}instagram:222 \(1\/3, retrying next run\)/, first.stderr);
+    assert.equal(first.status, 0, 'one failure is what "the next run fixes it" looks like');
+    assert.match(first.stdout, /none of them stuck yet/, 'and it says so rather than going quiet');
+
+    assert.match(run().stderr, /\(2\/3, retrying next run\)/);
+    const third = run();
+    assert.match(third.stderr, /\(3\/3, stuck\)/, third.stderr);
+    assert.equal(third.status, 1, 'three runs in a row is what a human has to look at');
+
+    // The positive control and the recovery in one: the read comes back, the
+    // post gets its comment, and the count is cleared rather than left to page.
+    fs.rmSync(failFlag);
+    const healed = run();
+    assert.equal(healed.status, 0, `${healed.stdout}\n${healed.stderr}`);
+    assert.match(healed.stdout, /post {2}instagram:222/, 'it should have commented once the API came back');
+    assert.ok(!(JSON.parse(fs.readFileSync(state, 'utf8')).__failing || {})['instagram:222'],
+      'a recovered post must not keep its failure count');
+  } finally {
+    server.kill();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

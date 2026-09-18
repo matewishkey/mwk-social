@@ -711,6 +711,18 @@ The invariants:
 
 ## Alerting and the box's state
 
+- **A RED UNIT MEANT NOTHING WHILE ONE TRANSIENT ERROR COULD PAINT IT** (#36, closed 2026-09-18).
+  A Zernio 500 on a comment READ failed the hourly watcher over a post that already had its comment
+  and read fine an hour later; the over-length Threads body on 2026-09-18 was genuinely stuck and
+  looked identical in `systemctl --user list-timers`. A post now carries its own consecutive-run
+  count in `__failing` inside the comment state, and only `MWK_COMMENT_STUCK_RUNS` (3) failures in a
+  row exit non-zero or mark the heartbeat — everything under that logs `(n/3, retrying next run)`
+  and stays green. **A SOURCE failure is deliberately still loud on the first run**: a sweep that
+  could not read a source missed posts it never saw (the 2026-09-15 rule). A post that fails its way
+  out of the `--hours` window is reported once as `GONE` and dropped, because an entry nothing can
+  retry would hold the unit red for ever. Driven in the suite across four runs against a fake API in
+  its own process — `spawnSync` blocks the test's event loop, so a server in the test process can
+  never answer the child.
 - **THERE WAS NO ALERT PATH AT ALL UNTIL 2026-09-14.** The product review measured 6,895 timer runs
   in a week, two self-healed failures, zero errors — and nothing that would tell anybody the box
   was off, a token had expired, or the queue had stopped. `scripts/lib/health.js` is the one path:
