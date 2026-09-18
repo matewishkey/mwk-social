@@ -381,6 +381,16 @@ had already published were jargon the rule rejects.
   API's** (measured 2026-09-15): `posts:update-metadata` takes `--title`, and also `--tags`,
   `--categoryId`, `--privacyStatus`, `--thumbnailUrl`, `--madeForKids` and `--playlistId`. Five
   videos were still called *Watch Me Work* three weeks on because no code had ever set one.
+  **The title write is EXERCISED now, not merely documented** (2026-09-18): `title` and
+  `thumbnailUrl` went out in ONE `POST /posts/_/update-metadata`, addressed by `{platform, videoId,
+  accountId}`, onto an `isExternal: true` live VOD, and both were read back off YouTube. What is
+  still true is the *gap*: no code path sets a title on its own, so it stays a by-hand fix.
+- **A STREAM WENT OUT UNDER THE PREVIOUS EPISODE'S CARD, AND NOTHING HERE COULD NOTICE**
+  (2026-09-18). `gUAo3DSGf-o` — Adrienn, E010 — was live for 3h40m carrying E009's Detti card and a
+  hand-typed title. **Nothing here reads either field**: the description sync files a proposal and
+  never looks at the title or the picture, so a wrong guest's face sits there until he sees it.
+  How the old card reached the new broadcast was NOT established — do not write down a mechanism
+  nobody measured.
 
 ## Thumbnails
 
@@ -390,8 +400,20 @@ had already published were jargon the rule rejects.
   the served `maxresdefault.jpg` changed bytes.
   - **Round-tripping a video's OWN current thumbnail is the safe positive control**: the byte
     change proves the write, the picture never moves.
+  - **`i.ytimg.com` SERVES THE OLD BYTES FOR MINUTES, SO THAT CONTROL RETURNS A FALSE NEGATIVE**
+    (2026-09-18). A plain re-fetch of `maxresdefault.jpg` was byte-identical for over three minutes
+    after a write that had in fact landed. **Bust the cache** (`?cb=$RANDOM`), and **never compare
+    against the file you uploaded** — YouTube re-encodes that URL to 1280x720, so a correct write is
+    a different hash from a correct source. Compare against the BEFORE bytes. The tell that it had
+    landed: yt-dlp reported `maxresdefault` as 1920x1080 while the CDN still handed back 720p.
   - **Shorts cannot take one** — 14 of 28 videos. YouTube and Zernio agree; not write-tested,
     because the only harmless test would be a visible change if it landed.
+- **THE CARD IS DRAWN IN THE WEBSITE REPO AND IS ALREADY ON THE SHARE — do not draw one here.**
+  `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes
+  `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`: the upload size, inside
+  Zernio's 2 MB cap. `scripts/episode-card.mjs`'s header carries every rule with the date it was
+  asked for — read it there, never edit that repo. **The episode's own `title` IS the card's
+  headline**, so a YouTube title that disagrees with the card means one of the two was set by hand.
 - **YouTube's own spec** (not a blog): 3840×2160 recommended now, min width 640, 16:9, JPG or PNG,
   2 MB mobile / 50 MB desktop — but **Zernio's own 2 MB cap is what binds us**. The account must be
   verified, and ours is. **YouTube publishes no safe-zone guidance at all**; the "1100×620" and
