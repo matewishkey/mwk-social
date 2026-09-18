@@ -101,6 +101,17 @@ this file loads every session whether it is relevant or not.
   must not move the rotation on. Roughly `episodeMixRatio` of comments quote a real guest wish from
   the RSS feed. **Freshness must never block a comment** — an unreachable feed falls back to a
   plain variant.
+- **A ZERNIO 502 ON A COMMENT WAS OUR OWN OVER-LONG BODY, AND IT READ AS THEIRS TWICE**
+  (2026-09-18). An episode variant quotes a guest's wish verbatim off the feed, so its length is
+  whatever the guest said — **580 characters against Threads' 500**, which Zernio answers with a
+  `502` (a `400` on 2026-08-24, same shape). Both times it was written off as a platform having a
+  bad minute; the 24 Aug post kept its CTA only because the feed happened to be unreachable an hour
+  later and a plain variant fit. **`platforms.commentMax` is the cap and `voice.firstComment({
+  maxLength })` composes within it**, giving up **the tags first, then the quote, and the link
+  never** — nothing is truncated, because half a url published under a post is worse than one loud
+  failure and an hourly retry. **The comment cap is NOT the caption cap**: LinkedIn 1,250 against a
+  post's 3,000, YouTube 10,000 against a description's 5,000; Threads is 500 either way. Zernio's
+  own `validate:post-length` is where the caption numbers come from.
 - **AN EPISODE IS A GUEST SHOW; A LIVE STREAM IS NOT ONE, AND THE `/episodes/` FILTER IS WHAT KEEPS
   THAT TRUE IN CODE.** `latestEpisodes()` drops any feed item whose link does not match
   `/\/episodes\//` (`voice.js`), which is the whole reason the `firstComment.episode` variants can
@@ -392,7 +403,9 @@ had already published were jargon the rule rejects.
 ## The platform table — wire it or do not add it
 
 **Five fields have shipped declared-and-never-read**: `linkPlacement`, `landscapeOk`,
-`hashtagsInCaption`, `shortsAreDead`, `captionMax` — all wired now. (`verifiable` and
+`hashtagsInCaption`, `shortsAreDead`, `captionMax` — all wired now. (`commentMax` landed already
+wired, with `commentProblems()` asserting the table agrees with itself and a test reading both
+composition call sites for it.) (`verifiable` and
 `mediaUrlAvailable` were on this list too and no longer exist at all; they went with the mirror.)
 The config page renders every field, which makes an unread one look implemented. This is the single
 most repeated failure in this repo.

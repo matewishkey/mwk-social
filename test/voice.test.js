@@ -876,3 +876,102 @@ test('every check has exactly the job that pings it', () => {
   assert.match(read('ship-stats.js'), /health\.ping\('accounts', \{ ok: !broken\.length/);
   assert.doesNotMatch(read('first-comment.js'), /process\.env\.MWK_COMMENT_HC_URL/, 'the private hook set nowhere is gone');
 });
+
+/* ------------------------------------------------ the comment has to fit */
+
+/*
+ * AN EPISODE VARIANT QUOTES A GUEST VERBATIM, SO ITS LENGTH IS WHATEVER THE
+ * GUEST SAID — 580 characters against Threads' 500 on 2026-09-18. Zernio
+ * answers an over-length reply with a 502, which reads like a platform having
+ * a bad minute, so it was written off as theirs twice before anybody measured
+ * the body. These drive the composition against a LOCAL feed (curl reads
+ * file://) so the fixture is the wish, not whatever the show published today.
+ */
+const capFixture = (wish, extra = {}) => {
+  const fs = require('fs');
+  const os = require('os');
+  const path = require('path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'voice-cap-'));
+  const feed = path.join(dir, 'feed.xml');
+  fs.writeFileSync(feed, `<rss><channel><item>` +
+    `<title>An episode</title><link>https://matewishkey.com/episodes/fixture/</link>` +
+    `<description><![CDATA[${wish} — the rest of the blurb]]></description>` +
+    `</item></channel></rss>`);
+  const cfg = JSON.parse(JSON.stringify(voice.config()));
+  cfg.feed = `file://${feed}`;
+  cfg.firstComment.episodeMixRatio = 1;          // force the quote path
+  Object.assign(cfg.firstComment, extra);
+  const file = path.join(dir, 'voice.json');
+  fs.writeFileSync(file, JSON.stringify(cfg));
+  return file;
+};
+
+// Composition runs in a child process because MWK_VOICE_CONFIG is read once,
+// at require time — the same reason the bad-config test above spawns one.
+const compose = (configPath, opts) => {
+  const { execFileSync } = require('child_process');
+  const out = execFileSync(process.execPath,
+    ['-e', 'const v=require(process.env.V);' +
+      'process.stdout.write(JSON.stringify(v.firstComment(process.env.KEY, JSON.parse(process.env.OPTS))))'],
+    { env: { ...process.env, MWK_VOICE_CONFIG: configPath, V: require.resolve('../scripts/lib/voice'),
+      KEY: 'threads:18026309231883654', OPTS: JSON.stringify(opts) }, stdio: 'pipe', encoding: 'utf8' });
+  return JSON.parse(out);
+};
+
+test('an over-long quote gives up the quote, never the link', () => {
+  const file = capFixture(`"${'She wanted her invoices filed by themselves. '.repeat(12).trim()}"`);
+  // The positive control, in the same fixture: uncapped, this composition IS
+  // over the cap. Without it a shortening test passes on a wish that fits.
+  const uncapped = compose(file, { platform: 'threads' });
+  assert.strictEqual(uncapped.variant, 'episode', 'the fixture stopped taking the quote path');
+  assert.ok(uncapped.text.length > 500, `the fixture is only ${uncapped.text.length} characters — it proves nothing`);
+
+  const capped = compose(file, { platform: 'threads', maxLength: 500 });
+  assert.ok(capped.text.length <= 500, `composed ${capped.text.length} characters for a 500 cap`);
+  assert.strictEqual(capped.variant, 'plain', 'it kept the quote and blew the cap');
+  assert.ok(capped.fellBack, 'gave up the quote without saying so');
+  assert.ok(capped.text.includes(voice.marker()), 'shortening cost the comment its CTA');
+});
+
+test('the tags are given up before the quote is', () => {
+  const file = capFixture('"A short wish, quoted back."');
+  const withTags = compose(file, { platform: 'threads', topicTags: ['Invoices', 'Paperwork'] });
+  assert.strictEqual(withTags.variant, 'episode');
+  assert.ok(/#/.test(withTags.text), 'the fixture never carried tags to give up');
+
+  // A cap between the two lengths: the quote survives, the tag line does not.
+  const noTagsLength = withTags.text.split('\n\n').slice(0, -1).join('\n\n').length;
+  const capped = compose(file, { platform: 'threads', topicTags: ['Invoices', 'Paperwork'],
+    maxLength: withTags.text.length - 1 });
+  assert.strictEqual(capped.variant, 'episode', 'dropped the quote when dropping the tags was enough');
+  assert.ok(capped.droppedTags, 'dropped the tags without saying so');
+  assert.ok(!/#/.test(capped.text));
+  assert.strictEqual(capped.text.length, noTagsLength);
+});
+
+test('a cap nothing fits is refused rather than truncated', () => {
+  const file = capFixture('"A short wish, quoted back."');
+  assert.throws(() => compose(file, { platform: 'threads', maxLength: 40 }),
+    /refusing to truncate/, 'a truncated comment can carry half a url');
+});
+
+test('every platform we can comment on says how long a comment may be', () => {
+  const platforms = require('../scripts/lib/platforms');
+  assert.deepStrictEqual(platforms.commentProblems(), []);
+  // Threads is the one that has actually bitten, and its cap is Zernio's own
+  // number from validate:post-length (read 2026-09-18), not a blog's.
+  assert.strictEqual(platforms.get('threads').commentMax, 500);
+  for (const name of Object.keys(platforms.PLATFORMS).filter(platforms.commentWatched)) {
+    assert.ok(platforms.get(name).commentMax > 0, `${name} is watched with no comment cap`);
+  }
+});
+
+test('both paths that compose a comment hand it the cap', () => {
+  const fs = require('fs');
+  for (const file of ['../scripts/first-comment.js', '../scripts/post.js']) {
+    const src = fs.readFileSync(require.resolve(file), 'utf8');
+    const call = src.slice(src.indexOf('voice.firstComment('));
+    const body = call.slice(0, call.indexOf('});') + 3);
+    assert.ok(/maxLength:/.test(body), `${file} composes a comment without a length budget`);
+  }
+});

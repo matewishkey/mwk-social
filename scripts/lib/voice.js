@@ -158,10 +158,11 @@ const unescapeXml = (s) => s
  * @param {number} opts.avoidIndex   variant index used last on this platform
  * @param {boolean} opts.noEpisode   force a plain variant
  * @param {number} opts.variantIndex pin one plain variant instead of rotating
- * @returns {{text: string, variant: string, index: number}}
+ * @param {number} opts.maxLength    the platform's comment cap, or null for none
+ * @returns {{text: string, variant: string, index: number, droppedTags: boolean, fellBack: boolean}}
  */
 function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
-  variantIndex = null, showUrl = null, noTags = false, linkLive = true } = {}) {
+  variantIndex = null, showUrl = null, noTags = false, linkLive = true, maxLength = null } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
 
@@ -187,38 +188,89 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   const wantEpisode = episodes.length > 0 &&
     (hash(key, 'mix') % 1000) / 1000 < (fc.episodeMixRatio ?? 0);
 
-  const pool = usable(wantEpisode ? fc.episode : fc.plain);
-  let index;
-  if (pinned) {
-    if (variantIndex < 0 || variantIndex >= pool.length) {
-      throw new Error(`no such comment variant: ${variantIndex} (0-${pool.length - 1})`);
+  const plainPool = usable(fc.plain);
+  const pool = wantEpisode ? usable(fc.episode) : plainPool;
+  const chooseIndex = (candidates) => {
+    if (pinned) {
+      if (variantIndex < 0 || variantIndex >= candidates.length) {
+        throw new Error(`no such comment variant: ${variantIndex} (0-${candidates.length - 1})`);
+      }
+      return variantIndex;
     }
-    index = variantIndex;
-  } else {
-    index = hash(key, platform || '') % pool.length;
-    if (pool.length > 1 && index === avoidIndex) index = (index + 1) % pool.length;
-  }
+    const i = hash(key, platform || '') % candidates.length;
+    return (candidates.length > 1 && i === avoidIndex) ? (i + 1) % candidates.length : i;
+  };
+  const index = chooseIndex(pool);
 
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
-  let text = pool[index]
-    .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : profileCta(platform))
-    .replace(/\{wish\}/g, episode ? episode.wish : '')
-    .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
-    .replace(/\{episodeUrl\}/g, episode ? episode.url : '')
-    .replace(/\{episodes\}/g, cfg.links.episodes || '');
+  const render = (candidates, idx, withTags) => {
+    let text = candidates[idx]
+      .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : profileCta(platform))
+      .replace(/\{wish\}/g, episode ? episode.wish : '')
+      .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
+      .replace(/\{episodeUrl\}/g, episode ? episode.url : '')
+      .replace(/\{episodes\}/g, cfg.links.episodes || '');
+    // noTags is for a platform whose CAPTION already carries them — repeating the
+    // list under the post shows it twice, and on Instagram would spend the cap
+    // twice. Defensive, not a stated Instagram rule — see CLAUDE.md, corrected 2026-08-24.
+    const tags = (withTags && !noTags) ? tagLine(platform, topicTags) : '';
+    return tags ? `${text}\n\n${tags}` : text;
+  };
 
-  // noTags is for a platform whose CAPTION already carries them — repeating the
-  // list under the post shows it twice, and on Instagram would spend the cap
-  // twice. Defensive, not a stated Instagram rule — see CLAUDE.md, corrected 2026-08-24.
-  const tags = noTags ? '' : tagLine(platform, topicTags);
-  if (tags) text += `\n\n${tags}`;
+  /*
+   * THE COMPOSED COMMENT HAS TO FIT THE PLATFORM, AND FOR THREE WEEKS NOTHING
+   * CHECKED (found 2026-09-18). An episode variant quotes a guest's wish
+   * verbatim off the feed, so its length is whatever the guest said — 580
+   * characters against Threads' 500 on 2026-09-18, and the same shape on
+   * 2026-08-24. Zernio answers an over-length reply with a 502 (and once a
+   * 400), which reads exactly like a platform having a bad minute, so both
+   * times it was written off as theirs. The post kept its CTA only because the
+   * feed happened to be unreachable an hour later and the plain variant fit.
+   *
+   * The order of surrender matches captionForPlatform(): the tags go first,
+   * then the quote, and the link never does — a comment without the CTA is the
+   * one thing this job exists to prevent. NOTHING IS EVER TRUNCATED: cutting a
+   * quote mid-sentence or, worse, cutting the url would publish something we
+   * cannot take back, where a throw is one loud failure and an hourly retry.
+   */
+  const fits = (text) => !maxLength || text.length <= maxLength;
+  const tries = [
+    { candidates: pool, idx: index, withTags: true, variant: wantEpisode ? 'episode' : 'plain' },
+    { candidates: pool, idx: index, withTags: false, variant: wantEpisode ? 'episode' : 'plain' },
+  ];
+  // An episode variant that will not fit falls back to the plain pool: its own
+  // rotation index first, then the rest in order, so the choice stays
+  // deterministic for a given post rather than depending on the feed.
+  if (wantEpisode && plainPool.length) {
+    const first = chooseIndex(plainPool);
+    for (const withTags of [true, false]) {
+      for (let n = 0; n < plainPool.length; n += 1) {
+        tries.push({ candidates: plainPool, idx: (first + n) % plainPool.length, withTags, variant: 'plain' });
+      }
+    }
+  }
 
+  const rendered = tries.map((t) => ({ ...t, text: render(t.candidates, t.idx, t.withTags) }));
+  const attempt = rendered.find((t) => fits(t.text));
+  if (!attempt) {
+    const shortest = Math.min(...rendered.map((t) => t.text.length));
+    throw new Error(`no first comment variant fits ${platform}'s ${maxLength}-character comment cap ` +
+      `(the shortest of ${rendered.length} tried was ${shortest}) — refusing to truncate`);
+  }
+
+  const text = attempt.text;
   // Any known marker will do: with a short link the text carries mwkshow.com/…
   // rather than the long URL, and both must count as "this is ours".
   if (!carriesCta(text)) {
     throw new Error(`composed comment carries none of the markers ${cfg.markers.join(', ')} — refusing to post`);
   }
-  return { text, variant: wantEpisode ? 'episode' : 'plain', index };
+  return {
+    text,
+    variant: attempt.variant,
+    index: attempt.idx,
+    droppedTags: !noTags && !attempt.withTags,
+    fellBack: attempt.variant !== (wantEpisode ? 'episode' : 'plain'),
+  };
 }
 
 /**

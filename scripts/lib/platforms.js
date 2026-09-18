@@ -8,6 +8,18 @@
  */
 'use strict';
 
+/*
+ * THE COMMENT CAP IS NOT THE CAPTION CAP, and where it is, it is a coincidence.
+ * Threads caps a reply at the same 500 as a post; LinkedIn caps a comment at
+ * 1,250 against a post's 3,000; YouTube's comment runs to 10,000 where its
+ * description stops at 5,000. voice.firstComment() composes within this number,
+ * so an episode variant quoting a long guest wish gives up its tags and then
+ * the quote rather than being refused by the platform. Sources: the caption
+ * numbers and Threads' 500 are Zernio's own `validate:post-length` (read
+ * 2026-09-18); the LinkedIn and YouTube comment numbers are the platforms'
+ * published limits and have NOT been exercised from here — they are both lower
+ * than anything we compose, so they cost nothing if they are a little wrong.
+ */
 const PLATFORMS = {
   instagram: {
     landscapeOk: false,           // aspectRange rejects it outright — reels are vertical
@@ -16,6 +28,7 @@ const PLATFORMS = {
     metrics: { views:'yes', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'rare', saves:'partial', clicks:'no', watchTime:'yes' },
     captionMax: 2200,
+    commentMax: 2200,              // a comment gets the same 2,200 as a caption
     foldAt: 125,
     hashtagsInCaption: 0,          // never spend the 5-cap twice (defensive, not a stated rule)
     // NOTHING is clickable on Instagram — not the caption, not a comment, not a
@@ -44,6 +57,7 @@ const PLATFORMS = {
     metrics: { views:'yes', reach:'no', impressions:'yes', likes:'no', comments:'partial',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 500,               // the #1 cross-posting failure
+    commentMax: 500,               // a reply IS a post here — same 500 (Zernio validate:post-length)
     hashtagsInCaption: 0,
     // Threads is an Instagram-shaped surface that does NOT share Instagram's
     // link rule: a url in a post or a reply is a live link. It is the only Meta
@@ -106,6 +120,7 @@ const PLATFORMS = {
     metrics: { views:'no', reach:'no', impressions:'yes', likes:'no', comments:'no',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 280,               // Premium raises this, but 280 keeps it portable
+    commentMax: 280,               // a reply is a tweet; unused, X is not watched
     hashtagsInCaption: 1,
     linkClickable: { caption: true, comment: true, profile: true },
     /*
@@ -162,6 +177,7 @@ const PLATFORMS = {
     metrics: { views:'partial', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'yes', saves:'no', clicks:'yes', watchTime:'no' },
     captionMax: 63206,
+    commentMax: 8000,              // a comment is capped far below a post
     hashtagsInCaption: 'all',
     // A url in a Facebook post or comment is a live link. Reach is the
     // constraint here, not clickability — hence the comment rather than the body.
@@ -179,6 +195,7 @@ const PLATFORMS = {
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'yes',
                shares:'no', saves:'no', clicks:'no', watchTime:'no' },
     captionMax: 5000,
+    commentMax: 10000,             // a comment runs to twice the description
     hashtagsInCaption: 'all',
     // TRUE FOR LONG-FORM ONLY. YouTube makes urls in SHORTS descriptions and
     // SHORTS comments non-clickable, deliberately, to cut spam — its own help
@@ -200,6 +217,7 @@ const PLATFORMS = {
     metrics: { views:'no', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
                shares:'partial', saves:'no', clicks:'rare', watchTime:'no' },
     captionMax: 3000,
+    commentMax: 1250,              // NOT the post cap — a comment stops at 1,250
     hashtagsInCaption: 'all',
     linkClickable: { caption: true, comment: true, profile: true },
     linkPlacement: 'comment',      // links in the body cut reach 40-50%
@@ -439,5 +457,25 @@ function linkProblems() {
   return out;
 }
 
+/*
+ * Every way the table can contradict itself about comment length. Empty means
+ * consistent, and a test asserts it — commentMax is wired into
+ * voice.firstComment() in the same change that declares it, because a declared
+ * and never-read field is this repo's single most repeated failure.
+ */
+function commentProblems() {
+  const out = [];
+  for (const name of Object.keys(PLATFORMS)) {
+    const p = PLATFORMS[name];
+    if (p.commentsApi && !(Number.isFinite(p.commentMax) && p.commentMax > 0)) {
+      out.push(`${name}: has a comments API but no commentMax — say how long a comment may be`);
+    }
+    if (!p.commentsApi && p.commentMax !== undefined) {
+      out.push(`${name}: no comments API, yet it declares a commentMax of ${p.commentMax}`);
+    }
+  }
+  return out;
+}
+
 module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
-  linkDeadFor, linkProblems, galleryFor, galleryProblems, SLOT };
+  linkDeadFor, linkProblems, galleryFor, galleryProblems, commentProblems, SLOT };

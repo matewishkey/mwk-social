@@ -68,6 +68,16 @@ const CAPTION_GRACE_HOURS = Number(process.env.MWK_CAPTION_GRACE_HOURS || 24);
  */
 const COMMENTS_403_RETRY_HOURS = Number(process.env.MWK_COMMENTS_403_RETRY_HOURS || 24);
 
+/*
+ * Say so in the log when the comment had to give something up to fit. Silence
+ * would make "the quote went out" and "the quote was dropped for length"
+ * indistinguishable, and the second one is worth knowing about a platform.
+ */
+const shortened = (composed) => {
+  const gave = [composed.fellBack && 'the quote', composed.droppedTags && 'the tags'].filter(Boolean);
+  return gave.length ? ` — gave up ${gave.join(' and ')} to fit` : '';
+};
+
 /** Is this state entry still owed another look? */
 const isRetryable = (entry) =>
   Boolean(entry && entry.retryUntil && Date.parse(entry.retryUntil) > Date.now());
@@ -347,6 +357,9 @@ async function main() {
         platform: target.platform, postKey: target.key, label: target.url || null,
         campaign: 'clip', medium: 'comment',
       });
+      // The platform's own cap on a comment, which is NOT its caption cap.
+      // Composing past it is what a Threads 502 looks like from here.
+      const commentMax = platformTable.get(target.platform).commentMax || null;
       const composed = override
         ? { text: override, variant: 'override', index: -1 }
         : voice.firstComment(target.key, {
@@ -354,6 +367,7 @@ async function main() {
             topicTags,
             showUrl,
             linkLive: live,
+            maxLength: commentMax,
             // A caption that already carries the tags must not get them again
             // underneath. On Instagram both would spend the 5-cap twice, since
             // we never spend its 5 twice (defensive; not a stated Instagram rule).
@@ -361,9 +375,15 @@ async function main() {
             avoidIndex: state.__lastVariant?.[target.platform] ?? -1,
           });
       const body = composed.text;
+      // A hand-written --message gets the same measurement and no shortening:
+      // they are somebody's exact words, so the honest answer is to refuse.
+      if (override && commentMax && body.length > commentMax) {
+        throw new Error(`--message is ${body.length} characters and ${target.platform} takes ${commentMax}`);
+      }
 
       if (opts.dryRun) {
-        console.log(`DRY   ${target.key} — would comment [${composed.variant}/${composed.index}] (${target.url})`);
+        console.log(`DRY   ${target.key} — would comment [${composed.variant}/${composed.index}]` +
+          `${commentMax ? ` ${body.length}/${commentMax} chars` : ''}${shortened(composed)} (${target.url})`);
         console.log(`      ${body.replace(/\n+/g, ' | ').slice(0, 150)}`);
         if (summary) console.log(`      about: ${summary}`);
         continue;
@@ -382,7 +402,7 @@ async function main() {
         platform: target.platform, postKey: target.key, url: target.url, accountId: target.accountId,
         dedupeKey: `comment.posted|${target.key}`,
         data: { variant: composed.variant, index: composed.index, tags: topicTags } });
-      console.log(`post  ${target.key} — commented [${composed.variant}/${composed.index}] (${target.url})`);
+      console.log(`post  ${target.key} — commented [${composed.variant}/${composed.index}]${shortened(composed)} (${target.url})`);
     } catch (err) {
       failures++;
       events.emit('comment.failed', { message: err.message, level: 'error', platform: target.platform,
@@ -402,4 +422,8 @@ async function main() {
   process.exit(failures ? 1 : 0);
 }
 
-main().catch((err) => { console.error(err.message); process.exit(1); });
+// Guarded, like post.js: without it a bare require() of this file PUBLISHES —
+// which is exactly how the fix above got exercised on 2026-09-18.
+if (require.main === module) {
+  main().catch((err) => { console.error(err.message); process.exit(1); });
+}

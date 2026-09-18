@@ -218,6 +218,10 @@ async function commentFor(platform, text, opts) {
     variantIndex: opts.commentVariant,
     showUrl,
     linkLive: live,
+    // The platform's cap on a COMMENT, not on a caption — the native path
+    // hands this to Zernio to post, so it overflows exactly the same way the
+    // watcher's did (2026-09-18, Threads 502 on 580 characters).
+    maxLength: platformTable.get(platform).commentMax || null,
     avoidIndex: state.__lastVariant?.[platform] ?? -1,
   });
 
