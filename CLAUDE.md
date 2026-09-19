@@ -391,6 +391,20 @@ had already published were jargon the rule rejects.
   never looks at the title or the picture, so a wrong guest's face sits there until he sees it.
   How the old card reached the new broadcast was NOT established — do not write down a mechanism
   nobody measured.
+- **`content.json`'s `raw.url` IS the episode-to-video join, and it is a field rather than a guess**
+  (exercised 2026-09-19). Every episode names its own uncut recording, so the channel can be synced
+  to the site without matching anything by hand: nine videos took the site's title and that
+  episode's redrawn card in one `update-metadata` call each, all nine verified off YouTube. The
+  card comes from `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`.
+  - **GROUPING VIDEOS BY TITLE IS THE WRONG TEST, AND IT INVENTED A TWIN.** Two videos sharing a
+    title were called a Restream pair; one was 6 minutes and three days later — a separate video
+    wearing a left-over title, not a mirror. **Duration and upload date settle it**, and a real
+    Restream pair matches on both to within seconds.
+  - **THE SITE NAMES THE VERTICAL COPY OF A PAIR, WHICH IS THE OPPOSITE OF WHAT ANYONE ASSUMES.**
+    E008 and E009's `raw.url` point at the 1080x1920 upload, so deleting "the vertical duplicate"
+    would leave both episode pages linking to a dead video. Repoint first, then delete.
+  - **Of 21 vertical videos on the channel, 17 are this pipeline's own short clips.** "Delete the
+    verticals" is never a channel-wide query — measure the groups before acting on one.
 
 ## Thumbnails
 
