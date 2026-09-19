@@ -403,8 +403,18 @@ had already published were jargon the rule rejects.
   - **THE SITE NAMES THE VERTICAL COPY OF A PAIR, WHICH IS THE OPPOSITE OF WHAT ANYONE ASSUMES.**
     E008 and E009's `raw.url` point at the 1080x1920 upload, so deleting "the vertical duplicate"
     would leave both episode pages linking to a dead video. Repoint first, then delete.
-  - **Of 21 vertical videos on the channel, 17 are this pipeline's own short clips.** "Delete the
-    verticals" is never a channel-wide query — measure the groups before acting on one.
+  - **THE VERTICAL HALF OF A RESTREAM PAIR IS NOT WANTED, AND NO MORE ARE BEING RECORDED**
+    (mate, 2026-09-19). Four existed — two episode VODs, two `Watch Me Work` — and they are being
+    deleted by hand, since no API deletes a YouTube video. **Before deleting one, check what names
+    it**: `content.json`'s `raw.url` pointed at the VERTICAL copy of E008 and E009, so the site had
+    to be repointed first. Both landscape copies were given the title and card so either half was
+    safe to keep.
+  - **A DUPLICATE-PAIR SEARCH MUST HAVE NO LENGTH FLOOR.** Pairs were matched on duration within 5s
+    and opposite orientation, but filtered to over three minutes to keep the short clips out — and
+    that hid a 2m47s vertical sitting beside its 2m51s landscape. The floor was a proxy for "is
+    this a session", and it was not one. Re-run without it: four pairs, not three.
+  - **Of 21 vertical videos on the channel, 17 are this pipeline's own short clips** — they have no
+    landscape partner, which is the test. "Delete the verticals" is never a channel-wide query.
 
 ## Thumbnails
 
@@ -897,11 +907,18 @@ another repo directly.
   cap; consent flags required per post; no comments/DMs/FYP analytics via API.
 - **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails;
   impressions/CTR exist only in Studio's UI, not in any API.
-- **PLAYLISTS ARE ASSIGN-ONLY: you can put a video IN one, and you cannot ask which exist**
-  (measured 2026-09-15). `posts:update-metadata --playlistId` works and was verified at YouTube's
-  end, not by the API's echo. **`/v1/youtube/playlists` and `/v1/playlists` both answer *"No such
-  API endpoint"***, with `/v1/accounts` returning 200 on the same key in the same minute as the
-  control. So the ids have to come from Studio by hand, once; after that it automates. The
-  addressing is the same trick descriptions use: `POST /posts/_/update-metadata` with
-  `{platform, videoId, accountId, ...}` — **the Zernio `_id` from `analytics:posts` 404s here**,
-  because an external video is not a post.
+- **PLAYLISTS CAN BE LISTED AND ASSIGNED; ONLY CREATING ONE IS MANUAL.** `posts:update-metadata
+  --playlistId` assigns, verified at YouTube's end rather than by the API's echo, and
+  **`zernio connect:get-youtube-playlists <accountId>`** returns every playlist with its id, title,
+  privacy and `itemCount`. The addressing is the same trick descriptions use: `POST
+  /posts/_/update-metadata` with `{platform, videoId, accountId, ...}` — **the Zernio `_id` from
+  `analytics:posts` 404s here**, because an external video is not a post.
+  ⚠ **"You cannot ask which exist" was WRONG for three days** (written 2026-09-15, corrected
+  2026-09-19). `/v1/youtube/playlists` and `/v1/playlists` really do answer *"No such API
+  endpoint"* — but the working route is under `connect:`, and nothing had run `zernio --help |
+  grep playlist`. **A 404 on the route you guessed is not an absent capability**; grep the CLI's
+  own command list before recording one as impossible. There is still no create — that one is
+  Studio, once.
+  ⚠ **An empty playlist is invisible from the public side.** `@channel/playlists` and yt-dlp both
+  showed one playlist where the account had two; the empty one only appears through the API. Do not
+  conclude a playlist is missing from a logged-out read.
