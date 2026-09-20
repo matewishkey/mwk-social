@@ -193,7 +193,14 @@ async function reshareAll(postUrl, comment, { lagMinutes = RESHARE_LAG_MINUTES,
         }
       }
       const post = await quoteReshare(postUrl, speaksForHim ? comment : null, who, delay, cta);
+      // The repost's OWN native id, when Zernio already has one (a repost sent
+      // now does; a scheduled one has nothing yet). run-queue.js records it
+      // in queue_item.result so a watcher code minted under the repost can
+      // name its clip — until 2026-09-20 only the Zernio _id was kept, which
+      // is the one id nothing downstream can resolve.
+      const pf = ((post && post.platforms) || [])[0] || {};
       results.push({ account: name, ok: true, id: post && post._id, delayMinutes: delay,
+        postId: pf.platformPostId || null, url: pf.platformPostUrl || null,
         cta: Boolean(cta), plain: !speaksForHim,
         at: delay ? new Date(Date.now() + delay * 60000).toISOString() : null });
     } catch (err) {

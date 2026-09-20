@@ -194,16 +194,33 @@ const isStory = (post, pf) =>
  * good. Failing loudly costs one retry an hour; failing quietly costs a stream.
  */
 function sources(opts) {
-  const out = [zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)])];
+  const out = [{ res: zernio(['posts:list', '--status', 'published', '--limit', String(opts.limit)]), external: null }];
   let failures = 0;
   if (opts.platforms.includes('youtube')) {
     try {
-      out.push(zernio(['analytics:posts', '--platform', 'youtube', '--limit', String(opts.limit)]));
+      out.push({ res: zernio(['analytics:posts', '--platform', 'youtube', '--limit', String(opts.limit)]), external: 'youtube' });
     } catch (err) {
       failures++;
       console.error(`FAIL  external youtube sweep — ${String(err.message).split('\n')[0]}`);
       console.error('      a live stream published this hour is invisible to this run; '
         + 'the pipeline\'s own posts are unaffected and the sweep retries next run');
+    }
+  }
+  /*
+   * Facebook too, since 2026-09-20 — VIDEOS ONLY, and collectPosts() enforces
+   * that. Restream mirrors a live stream to Facebook as a Reel in the same
+   * minute it lands on YouTube, and for a week that copy needed its comment
+   * by hand because this sweep could not see it. Still not a loop over every
+   * platform: a hand-made image post on the page is his, not a stream, and
+   * the mirror-era "is a copy already over there?" net stays gone.
+   */
+  if (opts.platforms.includes('facebook')) {
+    try {
+      out.push({ res: zernio(['analytics:posts', '--platform', 'facebook', '--limit', String(opts.limit)]), external: 'facebook' });
+    } catch (err) {
+      failures++;
+      console.error(`FAIL  external facebook sweep — ${String(err.message).split('\n')[0]}`);
+      console.error('      a Reel mirrored from a live stream this hour is invisible to this run; retries next run');
     }
   }
   return { results: out, failures };
@@ -215,8 +232,14 @@ function collectPosts(opts) {
   const cutoff = opts.all ? 0 : Date.now() - opts.hours * 3600 * 1000;
 
   const { results, failures: sourceFailures } = sources(opts);
-  for (const res of results) {
+  for (const { res, external } of results) {
     for (const post of res.posts || []) {
+      // The Facebook sweep exists for the video Restream mirrors there. An
+      // image or text post found on the page outside the pipeline is his own
+      // hand, and gets nothing from us.
+      const hasVideo = post.mediaType === 'video'
+        || (post.mediaItems || []).some((m) => m && m.type === 'video');
+      if (external === 'facebook' && !hasVideo) continue;
       for (const pf of post.platforms || []) {
         if (!opts.platforms.includes(pf.platform)) continue;
         if (pf.status !== 'published') continue;
@@ -239,7 +262,7 @@ function collectPosts(opts) {
           url: pf.platformPostUrl || post.platformPostUrl || '',
           content: post.content || '',
           videoUrl: (video && video.url) || null,
-          isVideo: Boolean(video) || pf.platform === 'youtube',
+          isVideo: Boolean(video) || pf.platform === 'youtube' || post.mediaType === 'video',
           publishedAt: new Date(publishedAt).toISOString(),
         });
       }

@@ -38,11 +38,16 @@ test('Instagram and TikTok are the platforms with no clickable link in a post', 
     const c = platforms.get(p).linkClickable;
     return !c.caption && !c.comment;
   });
-  assert.deepStrictEqual(dead.sort(), ['instagram', 'tiktok']);
+  // Pinterest is in this list and is NOT dead: a url in a pin's description or
+  // comment is plain text, but the pin itself carries a destination field, so
+  // its placement is 'link' and that slot is live (linkProblems() checks it).
+  assert.deepStrictEqual(dead.sort(), ['instagram', 'pinterest', 'tiktok']);
   for (const p of dead) {
-    assert.ok(['profile', 'none'].includes(platforms.get(p).linkPlacement),
-      `${p} must point at the bio or say nothing, never print a url nobody can follow`);
+    assert.ok(['profile', 'none', 'link'].includes(platforms.get(p).linkPlacement),
+      `${p} must point at the bio, say nothing, or use a live field — never print a url nobody can follow`);
   }
+  assert.equal(platforms.get('pinterest').linkPlacement, 'link');
+  assert.ok(platforms.linkIsLive('pinterest'), 'the pin\'s destination field is a live link');
   // Instagram's bio IS a live link, so it says so. TikTok's is not — a personal
   // account under 1,000 followers renders it as plain text (checked in the app,
   // 2026-09-14) — so it says nothing about a link at all. Three weeks of captions
@@ -182,7 +187,7 @@ test('every place post.js mints a link names where the link is going', () => {
   // shortlink directly and carries its medium there.
   assert.ok(invocations.length >= 1, `expected linkFor to be called at least once, found ${invocations.length}`);
   for (const c of invocations) {
-    assert.match(c, /,\s*'(caption|comment|profile)'\)$/, `${c} does not name a medium`);
+    assert.match(c, /,\s*'(caption|comment|profile|link)'\)$/, `${c} does not name a medium`);
   }
 });
 
@@ -374,10 +379,19 @@ test('the watcher still reaches a YouTube live stream, which never enters posts:
   assert.match(fn, /posts:list/, 'the pipeline\'s own posts are the first source and must stay');
   assert.match(fn, /'analytics:posts', '--platform', 'youtube'/,
     'a live stream reaches us only through the external sweep');
-  // YouTube alone. Widening it back to every platform is what the mirror
-  // removal was right to do, and a loop over opts.platforms is how it returns.
+  // And Facebook, since 2026-09-20: Restream mirrors a stream there as a Reel
+  // the same minute. VIDEOS ONLY — collectPosts() drops an image or text post
+  // from that source, because a hand-made post on the page is his, not a stream.
+  assert.match(fn, /'analytics:posts', '--platform', 'facebook'/,
+    'the Reel Restream mirrors to Facebook reaches us only through its own sweep');
+  const collect = src.slice(src.indexOf('function collectPosts('), src.indexOf('async function alreadyCommented('));
+  assert.match(collect, /external === 'facebook' && !hasVideo\) continue/,
+    'the Facebook sweep must be limited to videos, or every hand-made post gets a comment');
+  // Two named sweeps, never a loop. Widening to every platform is what the
+  // mirror removal was right to undo, and a loop over opts.platforms is how
+  // the mirror-era "is a copy already over there?" net comes back.
   assert.ok(!/for \(const platform of opts\.platforms\)/.test(fn),
-    'the sweep is YouTube-only — a per-platform loop is the mirror-era net coming back');
+    'the sweep names its platforms — a per-platform loop is the mirror-era net coming back');
 });
 
 test('every code the watcher mints names its campaign and its placement', () => {

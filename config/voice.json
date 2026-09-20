@@ -32,9 +32,10 @@
       "tiktok": null,
       "threads": null,
       "facebook": null,
-      "youtube": null
+      "youtube": null,
+      "pinterest": 3
     },
-    "_caps": "null = no meaningful cap. Instagram's 5 counts the caption AND the comments together.",
+    "_caps": "null = no meaningful cap. Instagram's 5 counts the caption AND the comments together. Pinterest's 3 is ours: its search reads the words, and a wall of tags in an 800-character description reads as spam.",
     "_blocked": "A hard stop, whatever the model returns. Three groups: the AI/tech category words that would appear on every video and say nothing; the engagement bait; and — added 2026-08-21 — DEVELOPER AND INFRASTRUCTURE VOCABULARY. That last group is the rule mate stated outright: tags are for normal humans, never for tech people. #Xero is fine because shop owners know it; #Cloudflare is not, because only we do.",
     "blocked": [
       "ai",

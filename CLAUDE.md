@@ -212,8 +212,9 @@ had already published were jargon the rule rejects.
     then prove it by re-minting one key and getting the same code back.
   - **A `post_key` with no queue item behind it is null BY NATURE, not orphaned** — an external
     YouTube VOD, a `manual:`/`new:`/`reality-check:` code, and the four pre-pipeline Threads
-    posts. A LinkedIn *reshare* is a third case: `result` records the native post id only, so a
-    watcher code on a reshare has nothing to resolve to.
+    posts. A LinkedIn *reshare* WAS a third case until 2026-09-20 — `result` recorded the native
+    post alone; it now carries each repost's own id too (*LinkedIn reshares*, below), so only a
+    repost that was still `scheduled` when the item was written stays unresolvable.
   - ⚠ **A FACEBOOK POST ID CONTAINS `_`, WHICH IS A LIKE WILDCARD.** Unescaped, the lookup matches
     ids it is not. The test carries a decoy row differing only at that position, and asserts the
     unescaped needle matches BOTH before asserting the escaped one matches one.
@@ -287,6 +288,19 @@ had already published were jargon the rule rejects.
 
 ## YouTube descriptions
 
+- **AN EPISODE IS WRITTEN FROM THE SITE, NOT FROM THE TAPE** (#40, live 2026-09-20 on all ten).
+  `scripts/lib/show-notes.js` renders the description from `content.json`: the `E00N - UNCUT -
+  with <guest>` line, his `outcome` verbatim, the topic links, the wishes read off
+  `wishes[].episodes[]`, the chapter list with `0:00 Start` prepended (YouTube ignores a list
+  that does not start there), `MORE WITH <GUEST>` off the OTHER episodes' `guests[]`, previous
+  and next by `number`, the UNCUT line off `raw.minutes`, then the tail and the tags. No model,
+  so it is the same bytes every run and the sync **converged on the third run** (`0 proposed`).
+  **In `sync()` the episode branch comes BEFORE the swap path** — every episode already carried
+  our tail, so `ours === tail` would have said "nothing to do" for ever; a test pins the order.
+  **`learned[]` is deliberately not printed**: paragraphs, not lines, and the cap is 5,000
+  (E010 renders at 4,265 with 34 chapters). Its optional `at` is therefore never touched.
+  Over the cap, `render()` throws naming the episode rather than truncating. The doc is fetched
+  with `curl -4` — Cloudflare answers on IPv6 and this box has no route.
 - **The tail is written from `matewishkey.com/brand`** — not a paraphrase of it. First person, the
   viewer as the subject, plain language, the host never an expert or teacher, never
   "free"/"guaranteed"/"safe", never a claim that anyone became a developer.
@@ -388,10 +402,13 @@ had already published were jargon the rule rejects.
   Its comments are closed too. Both are expected; neither is a fault to chase.
 - **RESTREAM IS BACK (2026-09-13), AND THE EXTERNAL SWEEP ONLY REACHES YOUTUBE.** A Restream reel
   lands as a Facebook Reel *and* a YouTube Short in the same minute; `sources()` sees the Short
-  (~90 min behind, via `analytics:posts`) and is blind to the Reel for ever, so the Facebook copy
-  needs a comment by hand. Widening that sweep is a decision, not a fix — a test pins it to
-  YouTube on purpose. **Restream also mirrors a live stream as TWO YouTube videos**, one vertical
-  and one landscape, same title and duration; both are public and both want the CTA.
+  (~90 min behind, via `analytics:posts`) and, until 2026-09-20, was blind to the Reel for ever,
+  so the Facebook copy needed a comment by hand. **The sweep now reads Facebook too, VIDEOS
+  ONLY**: `collectPosts()` drops an image or text post from that source, because a hand-made post
+  on the page is his, not a stream. Two named sweeps, never a loop over `opts.platforms` — the
+  test pins both the Facebook literal and the video filter. **Restream also mirrors a live stream
+  as TWO YouTube videos**, one vertical and one landscape, same title and duration; both are
+  public and both want the CTA.
 - **A test stream is still a video on the channel.** Five carried the placeholder title *Watch Me
   Work* and the description *Testing desktop view*, two of them a duplicate pair of the same
   5-hour stream. The description sync files a proposal; **nothing here writes a TITLE**, so a
@@ -666,6 +683,11 @@ most repeated failure in this repo.
   cost the others, and none of it may turn an already-published post into a failed one.
 - **A repost with no commentary needs `content` OMITTED, not empty.** `queue_item.reshare` is a
   separate flag from `reshare_text` for exactly this.
+- **The reposts are RECORDED on the item since 2026-09-20** — `queue_item.result` gains one entry
+  per repost (`role: 'repost'`, the account, the native `postId` when Zernio has one, `scheduled`
+  when it does not yet). That is what lets `resolveClipId()` name the clip behind a watcher code
+  minted under the page's repost; ten such codes had nothing to resolve to before. The item's
+  status and note are re-sent unchanged, so `verdict()` is not re-run over the extended list.
 
 ## The dashboard
 
@@ -702,6 +724,12 @@ most repeated failure in this repo.
 **The reasoning lives in the header of `web/src/pages/stats.js` — read it there, do not restate it.**
 The invariants:
 
+- **HIS OWN LIKE AND REPOST COME OFF EVERY POST** (mate, 2026-09-20). No platform says who
+  liked, so it is the flat deduction he named: `OWN_ACTIONS` in `stats.js`, 2 likes and 2 shares
+  per platform-post, applied to `daily` AND `revisions` before anything is summed, clamped at
+  zero, a row with no posts untouched. Comments are not deducted — he did not ask, and the first
+  comment is already explained where the number is shown. **The deduction is on the PAGE, not in
+  the table**: `daily_metric` still holds what the platforms said, so the raw number is recoverable.
 - **"Seen" is three different measurements.** Ours report reach (facebook, instagram, linkedin),
   views (youtube, tiktok) or impressions (twitter). A percentage built on them cannot be ranked
   across channels, so every row names its own denominator inline.
@@ -926,9 +954,9 @@ This repo is PUBLIC, so only the public connections are named here:
   model. **Image work for the show is not done in this repo** (mate, 2026-08-26).
 - **`mergodon/matewishkey-web`** — the website. It publishes `matewishkey.com/api/content.json`
   (contract: `API.md` in that repo), which is the editorial record of the show: episodes with
-  their number, chapters, outcomes and topics, and the guests with their portraits. **Nothing
-  here reads it yet** — this pipeline's only read off the site is `rss.xml`. It is also where
-  the brand page lives.
+  their number, chapters, outcomes and topics, and the guests with their portraits.
+  **`scripts/lib/show-notes.js` reads it** (since 2026-09-20, #40) to write every episode's
+  YouTube description; `rss.xml` is the other read. It is also where the brand page lives.
 
 Connected **private** repos are named in the internal state note, not in this file. Read that note
 before filing a cross-repo issue, and file with `gh issue create -R <owner>/<repo>`. Never edit
@@ -947,7 +975,19 @@ another repo directly.
 - **Instagram**: business account required; media mandatory; caption folds at ~125 chars; no
   delete/edit via API. Image aspect 0.75–1.91:1, and one at *exactly* 1.91:1 gets rejected (float
   edge, bitten live) — pad wide screenshots to ~1.78:1 with the screenshot's own bg colour instead
-  of cropping. Tall grabs pad up to 4:5.
+  of cropping. Tall grabs pad up to 4:5. **A single video IS a Reel and Zernio caps it at 90
+  seconds** — the table said 900 until 2026-09-20 and nothing over 90 s was ever sent, so raise it
+  only after a longer clip has actually published.
+- **Pinterest** (connected 2026-09-20 as `mate4671`, his to rename): every pin needs a board, and
+  **`zernio connect:get-pinterest-boards <id>` answers 405** while `GET
+  /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the REST route. The account
+  had no board, so `POST` to the same route created *Mate Wish Key Show* (exercised). The link is
+  `platformSpecificData.link`, the pin's own destination — `linkPlacement: 'link'`, its own SLOT,
+  minted with medium `link`; a url in the description is plain text. Title is the first line of
+  his words, 100 max. 2:3, 1:1 or 9:16 only, so `landscapeOk: false`. No comments, no DMs, no
+  delete exercised. Analytics: impressions, saves, clicks. **`--media-key` on `queue-add.js`
+  re-queues a clip already in R2 to a platform it has not run on; `--priority -1` keeps a backfill
+  behind anything he writes today.**
 - **TikTok**: `accounts:tiktok-creator-info <accountId> --mediaType <video|photo>` returns the live
   privacy options and posting limits — read it instead of guessing. API posts have their own daily
   cap; consent flags required per post; no comments/DMs/FYP analytics via API.

@@ -331,6 +331,44 @@ async function linkFor(platform, opts, medium) {
 }
 
 /*
+ * The fields a PIN carries beside its description (Pinterest, since
+ * 2026-09-20): `link`, the destination a tap opens — the only link slot on
+ * the platform, minted with its own medium so a click says "the pin" —
+ * `title`, the first line of his words under the platform's cap, and
+ * `boardId`, without which Zernio pins to whichever board Pinterest lists
+ * first. Boards are read off the account at publish time; MWK_PINTEREST_BOARD
+ * names one by title, otherwise the first is taken. Null for every other
+ * platform, so the caller can spread it without checking.
+ */
+const boardsSeen = new Map();
+async function boardFor(accountId) {
+  if (!boardsSeen.has(accountId)) {
+    // REST, not the CLI: `zernio connect:get-pinterest-boards <id>` answered
+    // 405 Method Not Allowed on 2026-09-20 while this GET returned the list.
+    const res = await api('GET', `/accounts/${accountId}/pinterest-boards`);
+    boardsSeen.set(accountId, res.boards || res.data || []);
+  }
+  const boards = boardsSeen.get(accountId);
+  if (!boards.length) throw new Error('Pinterest requires a board and the account has none — create one in Pinterest first');
+  const want = (process.env.MWK_PINTEREST_BOARD || '').trim().toLowerCase();
+  const chosen = want ? boards.find((b) => String(b.name || '').toLowerCase() === want) : null;
+  if (want && !chosen) throw new Error(`no Pinterest board named "${process.env.MWK_PINTEREST_BOARD}" — have ${boards.map((b) => b.name).join(', ')}`);
+  return (chosen || boards[0]).id;
+}
+
+async function pinFields(account, opts) {
+  let p;
+  try { p = platformTable.get(account.platform); } catch { return null; }
+  if (p.linkPlacement !== 'link') return null;
+  const firstLine = String(opts.text || '').split('\n')[0].trim();
+  return {
+    link: await linkFor(account.platform, opts, 'link'),
+    title: firstLine.slice(0, p.titleMax || 100),
+    boardId: await boardFor(account.id),
+  };
+}
+
+/*
  * How long is this caption where it is going?
  *
  * X counts every url as 23 characters however long it is — t.co wraps them all
@@ -428,6 +466,8 @@ async function publish(opts) {
       if (wantComment && FIRST_COMMENT_PLATFORMS.has(a.platform)) {
         entry.platformSpecificData = { firstComment: await commentFor(a.platform, opts.text, opts) };
       }
+      const pin = await pinFields(a, opts);
+      if (pin) entry.platformSpecificData = { ...(entry.platformSpecificData || {}), ...pin };
       b.platforms.push(entry);
     }
     const tt = accts.find((a) => a.platform === 'tiktok');

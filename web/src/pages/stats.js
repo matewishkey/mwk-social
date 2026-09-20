@@ -53,6 +53,35 @@ const WINDOW_DAYS = 30;
 const TREND_DAYS = 7;
 
 /*
+ * OUR OWN HANDS COME OFF THE SCOREBOARD (mate, 2026-09-20: "remove our shares,
+ * so when I reshare or like with my normal account... or if it is not possible
+ * just deduct always 2 likes and 2 reshares from every post, that is a safe way").
+ *
+ * It is not possible the honest way: no platform's analytics say WHO liked or
+ * shared, so his own like and repost from his personal account are
+ * indistinguishable from a stranger's. So it is the flat deduction he named,
+ * applied per platform-post to every row before anything on this page adds
+ * them up — the tiles, the channel table, the age-matched trend and the
+ * revision trail all inherit it. Clamped at zero: a post nobody but him
+ * touched reads 0, never negative. Comments are NOT deducted here — the first
+ * comment is ours too, but he did not ask for that one and the number is
+ * already explained as "including our own first comment" where it is shown.
+ */
+export const OWN_ACTIONS = { likes: 2, shares: 2 };
+export function withoutOwnActions(rows) {
+  return rows.map((r) => {
+    const posts = r.post_count || 0;
+    if (!posts) return r;
+    const out = { ...r };
+    for (const k of Object.keys(OWN_ACTIONS)) {
+      if (out[k] == null) continue;
+      out[k] = Math.max(0, out[k] - OWN_ACTIONS[k] * posts);
+    }
+    return out;
+  });
+}
+
+/*
  * THE DAY YOUTUBE CHANGED WHAT A VIEW IS.
  *
  * Per YouTube's own Help Centre, from 24 August 2026 a view is counted the
@@ -266,6 +295,10 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   targets = [], split = [], links = 0, days = WINDOW_DAYS,
   followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [],
   revisions = [], funnel = [] }) {
+  // Before anything is summed: see OWN_ACTIONS.
+  daily = withoutOwnActions(daily);
+  revisions = withoutOwnActions(revisions);
+
   const platformTable = ((snapshots.platforms || {}).body || {}).flows || [];
   const metricsFor = Object.fromEntries(platformTable.map((f) => [f.platform, (f.capabilities || {}).metrics || {}]));
 
@@ -448,7 +481,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
    * which is the practice the engagement-rate literature recommends for exactly
    * this reason.
    */
-  const ORDER = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter'];
+  const ORDER = ['facebook', 'instagram', 'youtube', 'linkedin', 'tiktok', 'threads', 'twitter', 'pinterest'];
   const SEEN_NOUN = { reach: 'unique people', views: 'plays', impressions: 'times on screen' };
   const trackedFor = Object.fromEntries(clicks.map((c) => [c.platform, c.n]));
 

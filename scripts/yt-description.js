@@ -42,6 +42,7 @@ const voice = require('./lib/voice');
 const shortlink = require('./lib/shortlink');
 const platforms = require('./lib/platforms');
 const { youtubeProbe } = require('./lib/media');
+const showNotes = require('./lib/show-notes');
 
 /*
  * The YouTube account id, resolved from the connection list rather than baked in
@@ -212,10 +213,33 @@ async function tailFor(id, title = null) {
 
 async function build(id) {
   const title = currentTitle(id);
+  const tail = await tailFor(id, title);
+
+  /*
+   * AN EPISODE IS WRITTEN FROM THE SITE, NOT FROM THE TAPE (issue #40, wired
+   * 2026-09-20). content.json names each episode's uncut recording in
+   * `raw.url`, so a video that is one gets the editorial description: his
+   * outcome verbatim, the hand-written chapters, the wishes, the guest chain.
+   * No model, no transcript wait — deterministic, so the sync loop converges.
+   * The transcript is still read for the hashtag line when it is already
+   * cached, and skipped without complaint when it is not: an episode never
+   * waits on captions.
+   */
+  const episode = showNotes.episodeFor(id);
+  if (episode) {
+    let tags = '';
+    try {
+      const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
+      if (topics) tags = voice.tagLine('youtube', topics.tags);
+    } catch (err) {
+      console.log(`note  ${id} — no tags (${String(err.message).split('\n')[0]})`);
+    }
+    return { title, description: showNotes.render(episode, { tail, tags }), editorial: true };
+  }
+
   const topics = await topicsFor(`youtube:${id}`, { youtubeId: id });
   if (!topics) throw new Error('no transcript available (YouTube has not captioned it yet)');
 
-  const tail = await tailFor(id, title);
   const opening = await summarise(topics.transcript, title);
   const tags = voice.tagLine('youtube', topics.tags);
   return { title, description: `${opening}\n\n${tail}\n\n${tags}` };
@@ -287,6 +311,32 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
     try {
       if (skipSet.has(id)) { console.log(`hold  ${id} — a proposal is waiting on him, or he said no`); continue; }
       const existing = currentDescription(id);
+
+      /*
+       * An episode comes BEFORE the swap path below, and that order is the
+       * point. Every episode already carried our tail, so `ours === tail`
+       * would have said "current, nothing to do" and the editorial description
+       * could never have landed on the ten videos it was written for. The
+       * build is deterministic, so "already what we would write" is a plain
+       * string compare, and a tail change reaches an episode the same way.
+       */
+      if (showNotes.episodeFor(id)) {
+        const built = await build(id);
+        if (built.description.trim() === existing.trim()) continue;
+        if (!existing.trim()) {
+          if (!blurbChosen()) { console.log(`hold  ${id} — empty, but the show blurb is still PENDING`); continue; }
+          if (dryRun) { console.log(`DRY   ${id} — empty episode, would fill it in`); continue; }
+          backup(id, existing, built.title);
+          await setDescription(id, built.description);
+          filled++;
+          console.log(`wrote ${id} — was empty (episode)`);
+          continue;
+        }
+        proposals.push({ videoId: id, title: built.title, currentText: existing,
+          proposed: built.description, kind: 'rebuild' });
+        console.log(`draft ${id} — episode notes from the site`);
+        continue;
+      }
 
       if (existing.trim()) {
         /*

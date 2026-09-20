@@ -750,7 +750,8 @@ test('the workflows page says where each platform\'s link actually goes', async 
 test('the vertical surfaces are exactly the ones that reject a landscape cut', async () => {
   const { PLATFORMS, get } = require('../scripts/lib/platforms.js');
   const vertical = Object.keys(PLATFORMS).filter((p) => !get(p).landscapeOk);
-  assert.deepStrictEqual(vertical.sort(), ['instagram', 'threads', 'tiktok']);
+  // Pinterest joined on 2026-09-20: a pin is 2:3, 1:1 or 9:16, so the wide cut has no shape there.
+  assert.deepStrictEqual(vertical.sort(), ['instagram', 'pinterest', 'threads', 'tiktok']);
 
   // Instagram is the one the media check enforces independently, so the two
   // statements of the same fact must agree.
@@ -910,12 +911,14 @@ test('the headline quality number cannot mix denominators', async () => {
   const { statsPage } = await src('pages/stats.js');
   // Two channels: one reports reach, one reports nothing but views. Both earn
   // actions. Ten platform-posts, twenty actions => 2.0 per post, whatever each
-  // channel happens to expose.
+  // channel happens to expose. The actions are COMMENTS here on purpose: likes
+  // and shares carry the own-hands deduction (next test), and this test is
+  // about denominators, not about that.
   const rows = [
     { date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
-      views: 0, likes: 10, comments: 0, shares: 0, saves: 0, clicks: 0 },
+      views: 0, likes: 0, comments: 10, shares: 0, saves: 0, clicks: 0 },
     { date: isoDay(-3), platform: 'youtube', post_count: 5, reach: 0, impressions: 0,
-      views: 9999, likes: 10, comments: 0, shares: 0, saves: 0, clicks: 0 },
+      views: 9999, likes: 0, comments: 10, shares: 0, saves: 0, clicks: 0 },
   ];
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [],
     snapshots: {} });
@@ -934,6 +937,30 @@ test('the headline quality number cannot mix denominators', async () => {
   // And the page must not still be claiming a site-wide percentage.
   assert.ok(!/<span>engagement rate<\/span>/.test(html),
     'the mixed-denominator rate is back on the page');
+});
+
+/*
+ * HIS OWN LIKE AND REPOST COME OFF EVERY POST (mate, 2026-09-20). No platform
+ * says who liked, so it is the flat deduction he named: 2 likes and 2 shares
+ * per platform-post, clamped at zero, before anything is summed. Comments are
+ * not touched. The control is the row with no posts, which must pass through
+ * untouched — a deduction on a day nothing was posted would invent a debt.
+ */
+test('two likes and two shares per post are his own and come off, never below zero', async () => {
+  const { withoutOwnActions, statsPage } = await src('pages/stats.js');
+  const rows = withoutOwnActions([
+    { date: '2026-09-01', platform: 'facebook', post_count: 3, likes: 10, shares: 7, comments: 4, saves: 1 },
+    { date: '2026-09-02', platform: 'facebook', post_count: 2, likes: 1, shares: 0, comments: 2, saves: 0 },
+    { date: '2026-09-03', platform: 'facebook', post_count: 0, likes: 5, shares: 5, comments: 0, saves: 0 },
+  ]);
+  assert.deepEqual(rows.map((r) => [r.likes, r.shares, r.comments, r.saves]),
+    [[4, 1, 4, 1], [0, 0, 2, 0], [5, 5, 0, 0]]);
+
+  // And the page inherits it: 5 posts carrying 20 likes read 10, so 2.0 a post.
+  const html = statsPage({ email: 'm@x.com', tz: TZ, followers: [], clicks: [], snapshots: {},
+    daily: [{ date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
+      views: 0, likes: 20, comments: 0, shares: 0, saves: 0, clicks: 0 }] });
+  assert.match(tileFor(html, 'actions per post'), /<b>2\.0<\/b>/, '20 likes over 5 posts is 10 net, 2.0 a post');
 });
 
 /*

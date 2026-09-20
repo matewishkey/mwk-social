@@ -29,7 +29,10 @@ test('a normal reel passes on every target', () => {
 
 test('a clip too long for a platform is caught, per platform', () => {
   const long = { ...REEL, durationSec: 400 };
-  assert.deepEqual(media.check('instagram', long), []);          // 15 minutes is fine
+  // 90 since 2026-09-20: Zernio's Instagram page puts a Reel at 90 s, and a
+  // single video there IS a Reel. The old 900 was never exercised.
+  assert.match(media.check('instagram', long)[0], /over instagram's 90s/);
+  assert.deepEqual(media.check('instagram', { ...REEL, durationSec: 90 }), []);
   assert.match(media.check('threads', long)[0], /over threads's 300s/);
   assert.deepEqual(media.check('tiktok', long), []);             // 10 minutes is fine
 });

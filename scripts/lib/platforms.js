@@ -39,7 +39,13 @@ const PLATFORMS = {
     supportsFirstComment: true,    // native platformSpecificData.firstComment
     deletable: false,              // nothing can be removed via the API — ever
     videoMinSec: 3,
-    videoMaxSec: 900,
+    // 90, not the 900 this said until 2026-09-20. Zernio's Instagram page puts
+    // a Reel at 90 seconds and a single video IS a Reel there (no contentType
+    // makes it one). Nothing over 90 s has ever been sent, so the higher
+    // number was never tested — a 2-minute clip would have passed this check
+    // and failed at Instagram with the item already claimed. Raise it only
+    // after a longer clip has actually published.
+    videoMaxSec: 90,
     aspectRange: [0.5, 1.0],
     imageOk: true,
     imageMax: 10,            // carousel; Zernio's Instagram page, 2026-08-27
@@ -163,6 +169,43 @@ const PLATFORMS = {
     // plus a reply carrying the url at 20c. One tweet, one fee, since
     // 2026-08-24.
     estCostCents: 20,
+  },
+  /*
+   * PINTEREST (added 2026-09-20, ahead of the connection — mate is connecting
+   * it himself). Zernio's Pinterest page is the source for every number here.
+   *
+   * It is a search engine wearing a feed: a pin keeps surfacing for months,
+   * and the thing that drives traffic is `platformSpecificData.link`, the
+   * destination a tap on the pin opens. That is a slot none of the others
+   * have — not the caption (a url in a description is plain text), not a
+   * comment (there is no comments API at all) — so it gets its own
+   * linkPlacement, 'link', and post.js fills it with a tracked code minted
+   * with medium 'link'. The title is the first line of his words, 100 max,
+   * the same rule YouTube already imposes. Every pin needs a board; post.js
+   * reads the account's boards at publish time and takes
+   * MWK_PINTEREST_BOARD by name, or the first one.
+   */
+  pinterest: {
+    imageOk: true,
+    imageMax: 1,             // one image or one video per pin, no carousel
+    landscapeOk: false,      // 2:3, 1:1 or 9:16 — the wide cut has no shape here
+    commentsApi: false,      // Pinterest exposes no comments and no DMs
+    reshare: 'none',
+    metrics: { views:'no', reach:'no', impressions:'yes', likes:'no', comments:'no',
+               shares:'no', saves:'yes', clicks:'yes', watchTime:'no' },
+    captionMax: 800,         // the description; the title is a separate 100
+    titleMax: 100,
+    hashtagsInCaption: 'all',
+    linkClickable: { caption: false, comment: false, profile: true, link: true },
+    linkPlacement: 'link',
+    supportsFirstComment: false,
+    // Not read from the docs either way. A pin's title, media, link and board
+    // cannot be changed after publishing, so treat one as permanent until an
+    // unpublish has been exercised.
+    deletable: false,
+    videoMinSec: 4,
+    videoMaxSec: 900,
+    aspectRange: [0.5, 1.0],
   },
   facebook: {
     imageOk: true,
@@ -296,6 +339,9 @@ function flowFor(name) {
   } else if (p.linkPlacement === 'caption') {
     steps.push({ step: 'the link', how: 'appended to the caption, with its own tracked code',
       note: 'there is nowhere else — no comments API, so a clean caption would be a dead end' });
+  } else if (p.linkPlacement === 'link') {
+    steps.push({ step: 'the link', how: 'the pin\'s own destination field, with its own tracked code',
+      note: 'a tap on the pin opens it; a url in the description would be plain text' });
   } else if (p.linkPlacement === 'reply') {
     steps.push({ step: 'the link', how: 'a second tweet in the same call, with its own tracked code',
       note: 'an out-of-network reply never enters the For You candidate set, so this CTA '
@@ -340,7 +386,10 @@ const commentWatched = (name) => {
  */
 // 'none' is a placement with no slot: the platform has nowhere a link is live,
 // so the post carries no link and makes no claim about one.
-const SLOT = { caption: 'caption', reply: 'caption', comment: 'comment', profile: 'profile', none: null };
+// 'link' is Pinterest's destination field: not text anywhere, a property of
+// the pin itself. It is live by construction, which is why it has its own slot
+// rather than borrowing 'caption'.
+const SLOT = { caption: 'caption', reply: 'caption', comment: 'comment', profile: 'profile', link: 'link', none: null };
 
 /*
  * Is the link we place on this platform a LIVE link, or plain text?

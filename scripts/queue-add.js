@@ -24,7 +24,13 @@
  *                                    Several comma-separated paths make a GALLERY:
  *                                    stills only, one post, capped per platform
  *                                    (LinkedIn 20, FB/IG/Threads 10, X 4)
+ *   --media-key KEY                  reuse a clip ALREADY in R2 (the media_key of an
+ *                                    earlier item) instead of uploading it again —
+ *                                    the same clip to a platform it has not run on
  *   --media-wide PATH|URL            the landscape cut, for the platforms that take one
+ *   --priority N                     default 0; higher jumps the line, NEGATIVE waits
+ *                                    behind everything at 0 — a backfill must never
+ *                                    hold up a post he just wrote
  *   --platforms a,b,c                default: empty, meaning "wherever it fits"
  *   --topics a,b,c                   topic tags, no # needed. GIVE THEM: omitting
  *                                    them means NO topic tags, on every platform
@@ -126,7 +132,13 @@ function parse(argv) {
       // riding with it. Stills only — run-queue collapses a mixed set to the
       // first item rather than half-publishing one.
       case '--media': opt.mediaList = splitList(take(i)); i++; break;
+      case '--media-key': opt.mediaKey = take(i); i++; break;
       case '--media-wide': opt.mediaWide = take(i); i++; break;
+      case '--priority': {
+        const n = Number(take(i)); i++;
+        if (!Number.isInteger(n)) throw new Error(`--priority wants a whole number, got ${argv[i]}`);
+        opt.priority = n; break;
+      }
       case '--platforms': opt.platforms = take(i).split(',').map((s) => s.trim()).filter(Boolean); i++; break;
       case '--topics': opt.topics = take(i).split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean); i++; break;
       case '--comment': opt.comment = take(i); i++; break;
@@ -196,7 +208,7 @@ function sqlFor(opt, id, media, mediaWide, now, extraKeys) {
   not_before)
 VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
   ${lit(JSON.stringify(opt.platforms))},
-  ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${lit(extra)}, ${opt.firstComment}, 0,
+  ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${lit(extra)}, ${opt.firstComment}, ${Number.isInteger(opt.priority) ? opt.priority : 0},
   ${opt.reshare}, NULL, ${lit(opt.comment)},
   ${lit(JSON.stringify(opt.topics))}, ${lit(mediaWide[0])}, ${lit(opt.mediaWideUrl)},
   ${lit(opt.at)});
@@ -216,7 +228,13 @@ function main() {
 
   const [first, ...rest] = opt.mediaList || [];
   let media = [null, null];
-  if (first && isUrl(first)) {
+  if (opt.mediaKey && first) throw new Error('--media or --media-key, not both');
+  if (opt.mediaKey) {
+    // An object already in the bucket. The type comes off the key's extension,
+    // the same way the uploader named it in the first place.
+    media = [opt.mediaKey, TYPE[path.extname(opt.mediaKey).toLowerCase()] || null];
+    if (!media[1]) throw new Error(`--media-key ${opt.mediaKey}: no content type for that extension`);
+  } else if (first && isUrl(first)) {
     opt.mediaUrl = first;
     media = [null, TYPE[path.extname(new URL(first).pathname).toLowerCase()] || null];
   } else if (first) {

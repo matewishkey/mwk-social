@@ -150,6 +150,10 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   comment alike. Instagram's CTA says "link in my bio" and mints nothing; the bio link is the
   tracked one. **TikTok says nothing about a link** (since 2026-09-14): the bio link is plain text
   too on a personal account under 1,000 followers, so the caption is his words and the tags.
+- **Pinterest gets the clip as a video pin** (since 2026-09-20): the first line of his words is
+  the pin's title (100 max), the words plus up to three tags are the description, and the
+  tracked link is the pin's own destination field, so a tap on the pin opens the show. 2:3, 1:1
+  or 9:16 only. No comment, no watcher. A pin cannot be edited or, as far as we know, deleted.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
 - Tags go in the caption **or** the comment, never both. **The 5-cap is Instagram's; "caption and

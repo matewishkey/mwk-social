@@ -425,6 +425,24 @@ async function main() {
             platform: 'linkedin', dedupeKey: `linkedin.reshare-failed|${item.id}|${r.account}` });
         }
       }
+      /*
+       * Record the reposts on the item, beside the native post. The watcher
+       * files a repost under `linkedin:<its own post id>`, and resolveClipId()
+       * in the Worker finds the clip by searching queue_item.result for that
+       * id — so a repost that is not written here is a code with no clip
+       * behind it (ten of them by 2026-09-20). A scheduled repost has no id
+       * yet and is recorded as such; the item's status and note are re-sent
+       * unchanged, this only extends the outcome list.
+       */
+      const reposts = shared.filter((r) => r.ok).map((r) => ({
+        platform: 'linkedin', role: 'repost', account: r.account,
+        status: r.postId ? 'published' : 'scheduled',
+        postId: r.postId || null, url: r.url || null, zernioId: r.id || null, error: null,
+      }));
+      if (reposts.length) {
+        await call('/queue/result', { id: item.id, ...call_.result, result: [...outcome, ...reposts] }, api)
+          .catch((err) => console.error(`could not record the reposts on the item (the reposts themselves are fine): ${err.message}`));
+      }
     }
 
     /*
