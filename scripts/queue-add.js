@@ -46,9 +46,12 @@
  *                                    and nothing describing the clip, and none
  *                                    of those platforms can be edited after.
  *   --comment TEXT                   a custom first comment instead of the rotation
- *   --at YYYY-MM-DD                  hold it until that day. The pace still
-                                   applies on the day; without this it goes as
-                                   soon as the pace allows
+ *   --at YYYY-MM-DD                  hold it until that day. Stored as a full
+                                   timestamp: midnight UTC (10am Brisbane) plus
+                                   a random 0-60 minutes, rolled ONCE here so
+                                   held posts stop all landing at 10:05. The
+                                   pace still applies on the day; without this
+                                   it goes as soon as the pace allows
   --no-first-comment               post it with no CTA comment at all
  *   --no-reshare                     do not repost it from the personal LinkedIn
  *
@@ -159,12 +162,28 @@ function parse(argv) {
   const held = wordProblems(opt.body);
   if (held.length) throw new Error(`not queued — ${held.join('; ')}. His words, in his voice, or it does not go.`);
 
-  // A bare YYYY-MM-DD, so it unlocks at midnight UTC (10am Brisbane) on that
-  // day. A typo here would hold a post for ever with nothing to show for it, so
-  // the shape is checked rather than trusted.
+  /*
+   * A bare YYYY-MM-DD unlocks at midnight UTC, which is 10:00 Brisbane, and the
+   * publish timer fires at :05 — so EVERY held item went out at 10:05. It
+   * happened eleven days running before anyone counted (2026-09-21). The day
+   * is still what he types; what gets stored is that midnight plus a random
+   * 0-60 minutes, so the unlock edge moves.
+   *
+   * Rolled HERE, once, and written to the row. The gap jitter in lib/pace.js
+   * has to be hashed instead, because the pace is recomputed every tick and a
+   * fresh roll each time collapses to the minimum — this value is computed a
+   * single time and stored, so real randomness is correct and simpler.
+   *
+   * It stays a morning: 0-60 minutes past 10:00 Brisbane is what he asked for
+   * when he said "brisbane time in the morning".
+   *
+   * A typo would hold a post for ever with nothing to show for it, so the shape
+   * is checked rather than trusted.
+   */
   if (opt.at !== undefined) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(opt.at)) throw new Error(`--at wants YYYY-MM-DD, got ${opt.at}`);
     if (Number.isNaN(Date.parse(opt.at))) throw new Error(`--at is not a real date: ${opt.at}`);
+    opt.at = unlockAt(opt.at);
   }
 
   // A platform typo would silently post nowhere, since an unknown name simply
@@ -194,6 +213,13 @@ function parse(argv) {
  */
 function splitList(v) {
   return String(v).split(',').map((x) => x.trim()).filter(Boolean);
+}
+
+/** Midnight UTC on that day, plus a rolled-once 0-60 minutes. See --at above. */
+const AT_JITTER_MINUTES = 60;
+function unlockAt(day, roll = Math.random()) {
+  const minutes = Math.floor(roll * (AT_JITTER_MINUTES + 1));
+  return new Date(Date.parse(`${day}T00:00:00.000Z`) + minutes * 60000).toISOString();
 }
 
 /** The INSERT, as text. Separated out so a test can read it without a network. */
@@ -279,4 +305,4 @@ if (require.main === module) {
   try { main(); } catch (e) { console.error(e.message); process.exit(1); }
 }
 
-module.exports = { lit, sqlFor, parse };
+module.exports = { lit, sqlFor, parse, unlockAt, AT_JITTER_MINUTES };

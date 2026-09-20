@@ -77,14 +77,17 @@ test('the defaults are a first comment and a personal repost', () => {
 
 /*
  * A held item. The queue could express "not too fast" and not "not until
- * Monday", so a run laid out over three weeks emptied itself in two days. The
- * hold is a bare date on purpose — see the schema note — and the claim compares
- * it against an ISO now, which only works because the date sorts before every
- * timestamp inside its own day.
+ * Monday", so a run laid out over three weeks emptied itself in two days.
+ *
+ * The hold WAS a bare date, which sorts before every timestamp inside its own
+ * day and so unlocked at midnight UTC. That made 10:05 Brisbane the publish
+ * time of every held item, eleven days running, so since 2026-09-21 it is
+ * stored as a full timestamp with 0-60 minutes rolled into it. The claim still
+ * compares it against an ISO now; a timestamp compares the same way a date did.
  */
 test('--at rides into the insert, and no --at is NULL rather than a date', () => {
   const held = parse(['--body', 'x', '--at', '2026-08-31']);
-  assert.match(sqlFor(held, '01ABC', [null, null], [null, null], 'now'), /'2026-08-31'\)/);
+  assert.match(sqlFor(held, '01ABC', [null, null], [null, null], 'now'), /'2026-08-31T00:\d\d:00\.000Z'\)/);
   const free = parse(['--body', 'x']);
   assert.equal(free.at, undefined);
   assert.match(sqlFor(free, '01ABC', [null, null], [null, null], 'now'), /NULL\);/);

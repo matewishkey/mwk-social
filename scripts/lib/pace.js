@@ -13,6 +13,23 @@
  * The day boundary for that cap is still the AUDIENCE's, never the box's. This
  * machine runs Etc/UTC; counting UTC days would reset the cap twelve hours
  * early against a Brisbane audience.
+ *
+ * A FIXED GAP IS A FINGERPRINT, AND OURS WAS EXACTLY 95 MINUTES (mate,
+ * 2026-09-21: "make sure we are randomizing stuff"). The gap was a constant
+ * 90 and the timer fires every five minutes, so consecutive posts landed 95
+ * minutes apart almost every time, on a handful of minute values: of 42
+ * publishes, 20 landed at :04-:08 past the hour. Nothing about that reads as
+ * a person with a phone. `jitterMinutes` adds 0-60 minutes on top of the
+ * minimum gap.
+ *
+ * IT HAS TO BE DETERMINISTIC, AND THIS IS THE WHOLE TRAP. The pace is
+ * recomputed from scratch every five minutes, so a fresh Math.random() per
+ * tick is not a delay of 0-60 minutes — it is the MINIMUM of a dozen rolls,
+ * which collapses to roughly zero and is biased small. The jitter is hashed
+ * off the LAST POST'S TIMESTAMP instead: the same answer at every tick, a
+ * different one after each publish. A held item's unlock is jittered too,
+ * but at the other end — queue-add.js rolls it once and stores it, because
+ * that value is written a single time and never recomputed.
  */
 'use strict';
 
@@ -21,8 +38,34 @@ const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
 const DEFAULTS = {
   perDay: 6,
   minGapMinutes: 90,
+  jitterMinutes: 60,
   tz: TZ,
 };
+
+/*
+ * FNV-1a, for a stable spread with no dependency. The point is not crypto, it
+ * is that the same seed gives the same answer in this process and the next.
+ */
+function hash(seed) {
+  let h = 2166136261;
+  const str = String(seed);
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
+ * Extra minutes on top of the minimum gap, 0..jitterMinutes inclusive.
+ *
+ * @param {string} seed anything stable between ticks. The caller passes the
+ *   last post's timestamp, so the answer holds until the next publish moves it.
+ */
+function jitterFor(seed, jitterMinutes = DEFAULTS.jitterMinutes) {
+  if (!seed || !jitterMinutes || jitterMinutes < 0) return 0;
+  return hash(seed) % (Math.floor(jitterMinutes) + 1);
+}
 
 /** The calendar day and hour at an instant, as the audience sees them. */
 function zoned(date, tz = TZ) {
@@ -58,8 +101,10 @@ function whyNotNow(events = [], opts = {}, now = new Date()) {
   const last = sent[sent.length - 1];
   if (last) {
     const gap = (now - new Date(last)) / 60000;
-    if (gap < cfg.minGapMinutes) {
-      return `only ${Math.round(gap)} min since the last one (${cfg.minGapMinutes} min minimum)`;
+    const extra = jitterFor(last, cfg.jitterMinutes);
+    if (gap < cfg.minGapMinutes + extra) {
+      return `only ${Math.round(gap)} min since the last one (${cfg.minGapMinutes} min minimum, `
+        + `${extra} min of jitter on this one)`;
     }
   }
   return null;
@@ -71,9 +116,12 @@ function nextSlot(events = [], opts = {}, now = new Date()) {
   const sent = sentTimes(events);
   const last = sent[sent.length - 1];
 
-  // Earliest candidate: the minimum gap after the last post, or now.
+  // Earliest candidate: the minimum gap PLUS this slot's jitter after the last
+  // post, or now. The same jitterFor() call as whyNotNow, or the page would
+  // promise a time the publisher then refuses.
   let at = new Date(Math.max(now.getTime(),
-    last ? new Date(last).getTime() + cfg.minGapMinutes * 60000 : 0));
+    last ? new Date(last).getTime()
+      + (cfg.minGapMinutes + jitterFor(last, cfg.jitterMinutes)) * 60000 : 0));
 
   // Then walk forward over full days. Bounded rather than while(true): a bad
   // timezone or a silly cap must not spin.
@@ -101,6 +149,7 @@ function status(events = [], opts = {}, now = new Date()) {
     perDay: cfg.perDay,
     today,
     minGapMinutes: cfg.minGapMinutes,
+    jitterMinutes: cfg.jitterMinutes,
     tz: cfg.tz,
     why,
     nextAt: next ? new Intl.DateTimeFormat('en-GB', {
@@ -111,4 +160,4 @@ function status(events = [], opts = {}, now = new Date()) {
   };
 }
 
-module.exports = { TZ, DEFAULTS, zoned, whyNotNow, nextSlot, status, sentTimes };
+module.exports = { TZ, DEFAULTS, zoned, whyNotNow, nextSlot, status, sentTimes, jitterFor };

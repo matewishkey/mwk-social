@@ -37,7 +37,24 @@ test('the daily cap counts the audience\'s day', () => {
 test('the minimum gap is what stops five queued things landing at once', () => {
   const one = sent('2026-08-20T23:30:00Z');
   assert.match(pace.whyNotNow(one, CFG, at('2026-08-20T23:35:00Z')), /only 5 min since the last one/);
-  assert.equal(pace.whyNotNow(one, CFG, at('2026-08-21T01:05:00Z')), null);
+  // The gap alone, with the jitter switched off: 95 minutes clears 90.
+  assert.equal(pace.whyNotNow(one, { ...CFG, jitterMinutes: 0 }, at('2026-08-21T01:05:00Z')), null);
+});
+
+/*
+ * And with the jitter on, which is the default since 2026-09-21. A constant 90
+ * put every post exactly 95 minutes after the last one; the extra is hashed off
+ * the last post's timestamp so it holds still between ticks. test/jitter.test.js
+ * pins the mechanism — this pins that the DEFAULT config carries it.
+ */
+test('the default gap is jittered, not a constant 90', () => {
+  const last = '2026-08-20T23:30:00Z';
+  const one = sent(last);
+  const extra = pace.jitterFor(last, pace.DEFAULTS.jitterMinutes);
+  assert.ok(extra > 0, 'this fixture needs a seed that actually jitters');
+  assert.match(pace.whyNotNow(one, CFG, at(new Date(Date.parse(last) + (90 + extra - 1) * 60000).toISOString())),
+    /min of jitter on this one/);
+  assert.equal(pace.whyNotNow(one, CFG, at(new Date(Date.parse(last) + (90 + extra + 1) * 60000).toISOString())), null);
 });
 
 // Only queue.posted counts. The log carries plenty else — comments, failures,

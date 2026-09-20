@@ -590,6 +590,23 @@ most repeated failure in this repo.
 - **There is no time-of-day posting window** (mate, 2026-08-21) — the audience spans timezones, so
   holding for a "good hour" only delays. `lib/pace.js` caps the day and spaces posts ninety minutes
   apart; the day boundary is the audience's timezone, or the cap resets twelve hours early.
+- **A CONSTANT GAP IS A FINGERPRINT, AND OURS WAS 95 MINUTES ON THE DOT** (mate, 2026-09-21:
+  *"make sure we are randomizing stuff"*). Measured over 42 publishes: a constant 90-minute
+  minimum plus the five-minute timer put consecutive posts 95 minutes apart nearly every time,
+  and 20 of the 42 landed at :04-:08 past the hour. Separately **every `--at` item went out at
+  10:05 Brisbane, eleven days running** — a bare date unlocks at 00:00 UTC and :05 is the next
+  tick. Two jitters, and they are different mechanisms **on purpose**:
+  - **The gap is HASHED off the last post's timestamp** (`pace.jitterFor`, 0-60 min on top of
+    the minimum). The pace is recomputed every five minutes, so a fresh `Math.random()` per tick
+    is not a 0-60 minute delay — it is the MINIMUM of a dozen rolls, which collapses to about
+    zero and is biased small. A test walks every tick across the window and fails if an item
+    gets through early.
+  - **An unlock is a real roll, made ONCE and stored** (`queue-add.js unlockAt`): `--at` still
+    takes a plain day and writes `<day>T00:MM:00Z`. A timestamp compares against the claim's ISO
+    now exactly as the bare date did, so the Worker is unchanged — but `not_before` is no longer
+    a date, and the queue page renders it through `when()` in his timezone.
+  - **`nextSlot()` must apply the same jitter as `whyNotNow()`** or the dashboard promises a
+    time the publisher then refuses. A test asserts the instant the page shows is accepted.
 - **An item that has put ANYTHING live is never queued again** (learned expensively). A throw in
   one publish group used to unwind the run and requeue the item: X's media upload failed at 99%
   after five platforms had published, and the next tick reposted everything, three times over.
