@@ -94,9 +94,23 @@ const shortened = (composed) => {
  */
 const STUCK_RUNS = Number(process.env.MWK_COMMENT_STUCK_RUNS || 3);
 
-/** Is this state entry still owed another look? */
-const isRetryable = (entry) =>
-  Boolean(entry && entry.retryUntil && Date.parse(entry.retryUntil) > Date.now());
+/**
+ * Is this state entry still owed another look?
+ *
+ * ⚠ ANY ENTRY CARRYING retryUntil, EXPIRED OR NOT. It read "only while the
+ * window is in the future", and that dropped E010 without a word (2026-09-19):
+ * the 403 from while the stream was live was filed with a 24h window; on every
+ * later run the read SUCCEEDED, so the loop walked past the 403 branch to the
+ * transcript wait and `continue`d without touching state; the moment the window
+ * lapsed this filter read the stale note as a post closed for good. Zero
+ * comments on the video, no GONE line, nothing in the journal — the exact
+ * shape of the nine-streams bug, one layer down.
+ *
+ * An expired window is re-examined and the LOOP decides: still 403 → the
+ * permanent note (written without retryUntil) and it drops out here next run;
+ * open → the stale note is cleared where the door is found open.
+ */
+const isRetryable = (entry) => Boolean(entry && Object.hasOwn(entry, 'retryUntil'));
 
 // TikTok is absent because its API exposes no comments at all. X is absent for
 // a different reason and the distinction has been got wrong twice: it HAS a
@@ -302,6 +316,16 @@ async function main() {
         console.log(`skip  ${target.key} — comments closed${again ? `, retrying until ${retryUntil.toISOString()}` : ' on this post'} (${target.url})`);
         continue;
       }
+      // THE DOOR IS OPEN. If a 403 from an earlier run is still on file (a
+      // stream that was live at the time), clear it HERE — before any later
+      // `continue` on this post can leave it in place. Left there, its window
+      // lapses and isRetryable() reads it as closed for good; that is how E010
+      // sat uncommented through nine hourly runs with the comments wide open.
+      if (state[target.key] && Object.hasOwn(state[target.key], 'retryUntil')) {
+        delete state[target.key];
+        saveState(state);
+        console.log(`open  ${target.key} — comments have reopened, the earlier 403 is cleared`);
+      }
       if (done) {
         state[target.key] = { commentedAt: null, note: 'comment already on the post', url: target.url };
         saveState(state);
@@ -492,6 +516,10 @@ async function main() {
 
 // Guarded, like post.js: without it a bare require() of this file PUBLISHES —
 // which is exactly how the fix above got exercised on 2026-09-18.
+// For the suite. main() only runs under require.main, so requiring this file
+// is inert; what is exported is the one pure decision the E010 bug lived in.
+module.exports = { isRetryable, ALL_PLATFORMS };
+
 if (require.main === module) {
   main().catch((err) => { console.error(err.message); process.exit(1); });
 }

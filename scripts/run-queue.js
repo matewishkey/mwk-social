@@ -151,11 +151,37 @@ function verdict(outcome) {
   };
 }
 
+/** The header comment, verbatim — it is the usage text and the only copy of it. */
+function usage() {
+  const src = fs.readFileSync(__filename, 'utf8');
+  const header = src.slice(src.indexOf('/*'), src.indexOf('*/'));
+  return header.replace(/^\/\*\n?/, '').replace(/^ ?\* ?/gm, '').trimEnd();
+}
+
+/*
+ * STRICT, BECAUSE THIS IS THE ONE SCRIPT THAT PUBLISHES. It used to read its
+ * three flags with `includes()` and ignore everything else, so `--help`,
+ * `--dryrun`, `--dry_run` and `--dry-runn` were all a live publish — and on
+ * 2026-08-27 `--help` claimed a queued item and posted it to Instagram, Threads
+ * and X while somebody was looking up the flag list (#37). Instagram and TikTok
+ * cannot be deleted through the API, so a wrong publish there is permanent.
+ * Every sibling already refuses an unknown argument; this one now does too.
+ */
+const FLAGS = { '--dry-run': 'dryRun', '--scheduled': 'scheduled', '--now': 'ignorePace', '--help': 'help', '-h': 'help' };
+function parseArgs(argv) {
+  const opts = { dryRun: false, scheduled: false, ignorePace: false, help: false };
+  for (const a of argv) {
+    if (!(a in FLAGS)) {
+      throw new Error(`unknown argument: ${a}\n\n${usage()}`);
+    }
+    opts[FLAGS[a]] = true;
+  }
+  return opts;
+}
+
 async function main() {
-  const argv = process.argv.slice(2);
-  const dryRun = argv.includes('--dry-run');
-  const scheduled = argv.includes('--scheduled');
-  const ignorePace = argv.includes('--now');
+  const { dryRun, scheduled, ignorePace, help } = parseArgs(process.argv.slice(2));
+  if (help) { console.log(usage()); return; }
 
   const api = endpoint();
 
