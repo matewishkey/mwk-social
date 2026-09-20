@@ -327,11 +327,49 @@ async function nextInSequence(env, prefix) {
   return highest + 1;
 }
 
+/*
+ * THE WATCHER KNOWS THE POST, NOT THE QUEUE ITEM — SO RESOLVE ONE FROM THE OTHER.
+ *
+ * `first-comment.js` only ever sees a published post, so it minted with no
+ * clipId, and its codes carried no join back to the video that earned the
+ * click. The code there said outright that there was no clip id to give. There
+ * was: `run-queue.js` writes every platform's own post id into
+ * `queue_item.result`, and `post_key` is `<platform>:<that same id>`. Sixteen
+ * Threads codes were orphaned that way, against 82 publisher-minted codes that
+ * all carried one.
+ *
+ * ⚠ clip_id IS PART OF THE DEDUPE KEY in mint(), so filling it in changes what
+ * an existing row matches. The 16 were backfilled BEFORE this shipped — the
+ * other order would have had the watcher mint a second code for every post it
+ * had already commented on, which is the `codePrefix` trap in reverse.
+ *
+ * Returns null, and must, for a post_key with no queue item behind it: an
+ * external YouTube VOD, a manual code, a `reality-check:` card. Those are
+ * absent by nature, not orphaned.
+ *
+ * ⚠ ESCAPE THE UNDERSCORE. A Facebook post id is `<page>_<post>` and `_` is a
+ * single-character wildcard in LIKE, so an unescaped id matches ids it is not.
+ */
+export async function resolveClipId(env, postKey) {
+  if (!postKey || !postKey.includes(':')) return null;
+  // The publisher's own keys already carry a clipId; these never need a lookup.
+  if (/^(queue|reshare|manual|account|new|reality-check):/.test(postKey)) return null;
+  const platformPostId = postKey.slice(postKey.indexOf(':') + 1);
+  if (!platformPostId) return null;
+  const needle = `%"postId":"${platformPostId.replace(/[\\%_]/g, (c) => `\\${c}`)}"%`;
+  const row = await env.DB.prepare(
+    `SELECT id FROM queue_item WHERE result LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT 1`,
+  ).bind(needle).first();
+  return row ? row.id : null;
+}
+
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
   codePrefix = null,
 }) {
+  clipId = clipId || await resolveClipId(env, postKey);
+
   /*
    * A named code is its own identity and does NOT go through the attribute
    * dedupe below. That check answers "have I already got a code for this exact

@@ -369,9 +369,14 @@ async function main() {
       //
       // campaign and medium are part of the MINT KEY, not decoration: without
       // them this path's codes landed with all three attribution columns null
-      // and the click could name a post but never a placement. There is no
-      // clip id to give — this watcher only ever sees a published post, never
-      // the queue item behind it — so post_key stays the only join.
+      // and the click could name a post but never a placement.
+      //
+      // ⚠ "There is no clip id to give" stood here and was WRONG for sixteen
+      // codes. This watcher does only see a published post — but run-queue.js
+      // writes that post's own id into queue_item.result, and post_key carries
+      // the same id, so the Worker resolves the clip itself (resolveClipId in
+      // web/src/api.js). Nothing is passed from here on purpose: the lookup
+      // belongs next to the dedupe key it feeds.
       const showUrl = (override || !live) ? null : await shortlink.mint({
         platform: target.platform, postKey: target.key, label: target.url || null,
         campaign: 'clip', medium: 'comment',
