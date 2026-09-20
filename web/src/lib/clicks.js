@@ -45,6 +45,19 @@
  * description on 30 clicks where the symmetric rule leaves 2. Collapsing a wave
  * to one still counts the wave.
  *
+ * THE SAME FETCHER WALKS SEVERAL CODES, AND PER-CODE ALONENESS CANNOT SEE IT
+ * (2026-09-21). On 19 Sep at 06:49:05-07 five hits landed on five different
+ * codes inside two seconds — the two booking buttons on /show and three
+ * tweets — and every one of them counted, because each code had been hit
+ * exactly once. Measured over the 120 counted hits: the nearest hit on a
+ * DIFFERENT code was 0-2s away for 14 of them, then nothing until 20s. That is
+ * the same shape as the per-code distribution, one level up: a crawler
+ * reading a page full of our links resolves them together. So a click also
+ * has to be alone ACROSS codes, inside CROSS_CODE_SECONDS. What it costs: a
+ * person opening two of our links within ten seconds of each other. The two
+ * booking buttons are the only place that is even plausible, and a calendar
+ * takes longer than that to open.
+ *
  * What it costs: a real person who clicks within a minute of a preview fetch is
  * dropped. That is the safe direction and the same one links.js already chose —
  * understating a real number beats inventing one. If a code ever shows many
@@ -56,6 +69,9 @@
 /* The gap in the measured distribution: past the 46s tail, short of the 94s. */
 export const BURST_SECONDS = 60;
 
+/* Across codes the gap is 2s..20s (measured 2026-09-21); ten sits in it. */
+export const CROSS_CODE_SECONDS = 10;
+
 /**
  * SQL for "this hit arrived alone".
  *
@@ -66,7 +82,10 @@ export const BURST_SECONDS = 60;
 export const alone = (alias = 'c') => `NOT EXISTS (
   SELECT 1 FROM click b
    WHERE b.code = ${alias}.code AND b.id <> ${alias}.id
-     AND ABS((julianday(${alias}.at) - julianday(b.at)) * 86400) < ${BURST_SECONDS})`;
+     AND ABS((julianday(${alias}.at) - julianday(b.at)) * 86400) < ${BURST_SECONDS}) AND NOT EXISTS (
+  SELECT 1 FROM click b
+   WHERE b.code <> ${alias}.code
+     AND ABS((julianday(${alias}.at) - julianday(b.at)) * 86400) < ${CROSS_CODE_SECONDS})`;
 
 /**
  * SQL for "count this hit as a person": flagged human AND arrived alone.

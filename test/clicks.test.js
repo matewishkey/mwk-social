@@ -45,6 +45,21 @@ test('a click counts only if nothing else hit that code on EITHER side', () => {
   assert.match(clicksSrc, /b\.code = \$\{alias\}\.code/, 'the window is per code');
 });
 
+/*
+ * The same fetcher walks several codes: five hits on five codes inside two
+ * seconds on 2026-09-19, every one counted because each code was hit once.
+ * Across codes the measured gap is 2s..20s; the window has to sit in it.
+ */
+test('a click is also alone ACROSS codes, inside the measured cross-code gap', () => {
+  const m = clicksSrc.match(/export const CROSS_CODE_SECONDS = (\d+)/);
+  assert.ok(m, 'CROSS_CODE_SECONDS must be stated');
+  const s = Number(m[1]);
+  assert.ok(s > 2 && s < 20, `CROSS_CODE_SECONDS ${s} is outside the measured gap (2s..20s)`);
+  assert.match(clicksSrc, /b\.code <> \$\{alias\}\.code/, 'the second window is across OTHER codes');
+  const { alone } = evalModule(clicksSrc);
+  assert.equal((alone('c').match(/NOT EXISTS/g) || []).length, 2, 'per-code and cross-code are two separate windows');
+});
+
 test('counted() requires both halves: flagged human AND alone', () => {
   const { counted } = evalModule(clicksSrc);
   const sql = counted('c');

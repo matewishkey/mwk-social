@@ -259,6 +259,12 @@ had already published were jargon the rule rejects.
   the hit came from Facebook's infrastructure, never that a person was holding the phone.
   - **Symmetric, not backward-looking.** Collapsing a wave to its first hit still counts the wave:
     on the real table that is 30 YouTube-description clicks against 2. A test pins the `ABS(`.
+  - **ALONE ON ITS CODE WAS NOT ENOUGH EITHER: ONE FETCHER WALKS EVERY CODE ON A PAGE**
+    (2026-09-21). Five hits on five codes inside two seconds, each code hit once, all five
+    counted — three "X clicks" and both booking buttons in one sweep. The nearest other-code hit
+    sits at 0-2 s for 14 of 120 counted hits and then nothing until 20 s, so `alone()` now also
+    demands no hit on ANY other code within `CROSS_CODE_SECONDS` (10). It took 14 off the
+    all-time count (120 to 106) and 3 off X's week. The test pins both windows and the gap.
   - `click.bot` stays `0 counted, 1 crawler, 2 unknown`; the UA is still read to DECIDE and
     discarded. It is now the first of two filters, never the only one.
 - **A click is attributed platform-first, referer-second, then unattributed.** Referer matching is
