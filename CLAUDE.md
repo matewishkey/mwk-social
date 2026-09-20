@@ -947,6 +947,24 @@ The invariants:
   are good with x"*). 118 follows produced at most 8 followers. **The 500-following / 0.6-ratio
   cliff everyone warns about is DEAD** — `tweepcred` returns 0 hits in the January 2026
   `xai-org/x-algorithm` release (positive control on the same search: `phoenix` 102, `follower` 96).
+- **X HAS AN EXPLICIT BOOST FOR ACCOUNTS UNDER 1,000 FOLLOWERS, AND IT EXCLUDES REPLIES AND
+  REPOSTS** (read off `home-mixer/scorers/author_cold_start.rs`, 2026-09-21). We are at 17
+  followers, so this is the only discovery path that applies to us, and I had just told mate the
+  opposite — *"reply to three people, do not post"* — which is right for building a relationship
+  and wrong for being found. `cold_start_base_eligible()` is three conditions:
+  `in_reply_to_tweet_id.is_none() && retweeted_tweet_id.is_none() && author_followers_count <=
+  ColdStartFollowerCap`. The caller adds `age <= ColdStartMaxPostAgeSecs` and
+  `view_count_on_home < ColdStartImpressionThreshold`. Defaults: cap **1,000 followers**,
+  threshold **1,000 impressions**, age **48 h**, injected at slot **15-16**
+  (`ColdStartSlotMin`/`Max`), `EnableViewerColdStart` **true**.
+  - **So an ORIGINAL post is the only shape that gets in front of a stranger.** A reply and a
+    repost are both disqualified by name, on top of `oon_retweet_reply_filter.rs` already
+    dropping an out-of-network reply from the For You candidate set.
+  - **The boost switches off at 1,000 impressions or 48 hours, whichever comes first** — it is a
+    trial, not a subsidy, and it is what makes a daily original post worth more on X than
+    anything else we could do there.
+  - **Re-read the file before quoting any of it.** These are defaults in a live repo, and this
+    section has already carried a stale ranker claim for weeks.
 - **`config/follow.json` is what survived** — 72 handles from 937 authors, ~5% yield. Nothing reads
   it; it is the record so the next sweep does not re-derive the same names. People, never brands.
 - **X: THE LINK IS IN THE TWEET** (mate, 2026-08-24). It rode in a thread reply before that. The
