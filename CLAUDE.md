@@ -939,8 +939,15 @@ The invariants:
   is reach a non-follower as a feed item.
   - **The penalty the thread dodged is not in the ranker.** Grepped `has_url|url_penalty|
     link_penalty|contains_link|external_link`: only USER dwell-time features and an ads threshold.
-    `open_link_score` is a predicted-engagement term and **its weight is NOT in the repo, so do not
-    quote one.** Positive control: `favorite` hits 68 files.
+    `open_link_score` is a predicted-engagement term, weighted **positive** (`OpenLinkWeight`
+    0.2). Positive control: `favorite` hits 68 files.
+    ⚠ **"Its weight is NOT in the repo" was true when written and is FALSE since the repo was
+    updated** (re-read 2026-09-21): every weight sits in `home-mixer/params/param.rs` with a
+    comment explaining they multiply PREDICTED probabilities, never raw counts. Reply 5.0,
+    quote 5.0, share-via-DM 5.0, copy-link 20.0, follow-author 4.0, repost 1.0, like 0.5,
+    profile click 0.0; a reply from someone who follows you back is boosted 15x on top; out of
+    network is discounted to 0.75; not-interested -43.2, mute -58.8, report -234. **Re-read the
+    file before quoting a number; it has already changed once under this note.**
   - **X's "link penalty" is REPORTING, and this note has been wrong in BOTH directions.** What is
     actually known: two hand-made posts with a link got 1 impression each, on an account with 8
     followers. That is evidence of 8 followers. **Do not rebuild a mechanic on this claim again.**
