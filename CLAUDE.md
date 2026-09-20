@@ -603,6 +603,14 @@ most repeated failure in this repo.
   `processing` when `waitForResults` gives up is unknown the same way. The queue page shows
   *"unknown, check by hand"* and no button. For three weeks this note described a reconciliation no
   code performed, and a slow Zernio was marked failed over content that was live.
+- **A 207 WITH THE POST INSIDE IS A POST, NOT AN ERROR** (2026-09-20, the first Pinterest pin).
+  Zernio answers `207 "Post created but publishing failed"` with `error: true` AND the created
+  post, its platform `pending` and *"video processing timeout after 60s. Will retry with
+  backoff."* `api()` threw on the error flag, so run-queue recorded the item FAILED — the
+  Re-queue state — over a post Zernio was still publishing. `api()` now returns a 207 that
+  carries `post._id`; the caller polls it and a still-pending platform lands as **unknown**, the
+  same rule that protects a timeout. A 207 without a post, and any other `error: true`, still
+  throw. Pinterest transcodes video slowly; expect the first poll to see `pending`.
 - **A claim older than 40 minutes is a run that died** (killed by earlyoom, SIGTERM, a reboot —
   all in the journal) and `claim()` marks it **failed with a note, never re-queued**: it may have
   published before it died. Before this it sat at `claimed` for ever, skipped by every claim and

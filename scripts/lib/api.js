@@ -36,6 +36,18 @@ async function api(method, endpoint, { body, query, timeout = 60000 } = {}) {
   const text = await res.text();
   let json;
   try { json = JSON.parse(text); } catch { throw new Error(`${method} ${endpoint} → ${res.status}: ${text.slice(0, 200)}`); }
+  /*
+   * A 207 WITH A POST IN IT IS A POST, NOT AN ERROR (2026-09-20, the first
+   * Pinterest pin). Zernio answers "Post created but publishing failed" with
+   * `error: true` AND the created post, whose platform sits at `pending` with
+   * "video processing timeout after 60s. Will retry with backoff." Throwing
+   * here made run-queue record the item as FAILED — the state that offers a
+   * Re-queue button — over a post Zernio was still publishing. The post is
+   * handed back so the caller polls it like any other; a pending platform
+   * then lands as unknown, never as failed, which is the rule that already
+   * protects a timeout.
+   */
+  if (res.status === 207 && json.post && json.post._id) return json;
   if (!res.ok || json.error) throw new Error(`${method} ${endpoint} → ${res.status}: ${json.message || 'error'}`);
   return json;
 }
