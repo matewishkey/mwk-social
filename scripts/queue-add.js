@@ -57,6 +57,10 @@ const path = require('path');
 
 const { ulid } = require('./lib/events');
 const { PLATFORMS } = require('./lib/platforms');
+
+// YouTube's title cap. The title is the first line of the caption, so the cap
+// is on his words, not on anything we compose. Zernio's YouTube page, 2026-09-20.
+const YOUTUBE_TITLE_MAX = 100;
 const { wordProblems } = require('./lib/words');
 
 const WEB = path.join(__dirname, '..', 'web');
@@ -156,6 +160,18 @@ function parse(argv) {
   const known = Object.keys(PLATFORMS);
   const wrong = opt.platforms.filter((p) => !known.includes(p));
   if (wrong.length) throw new Error(`not a platform: ${wrong.join(', ')} — have ${known.join(', ')}`);
+
+  // The first line of his words IS the YouTube title (Zernio's YouTube page:
+  // "a public video whose title is the first line of content"), and YouTube
+  // cuts a title at 100. A long opening sentence would go out chopped with
+  // nothing saying so — refuse it here, where it is one line break to fix.
+  // Only when YouTube can be a target: an empty list means "wherever it fits".
+  const youtubeMayCarry = !opt.platforms.length || opt.platforms.includes('youtube');
+  const firstLine = opt.body.split('\n')[0].trim();
+  if (youtubeMayCarry && firstLine.length > YOUTUBE_TITLE_MAX) {
+    throw new Error(`the first line becomes the YouTube title and is ${firstLine.length} characters; `
+      + `YouTube cuts it at ${YOUTUBE_TITLE_MAX}. Break it, or leave youtube out of --platforms`);
+  }
   return opt;
 }
 

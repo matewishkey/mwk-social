@@ -41,6 +41,20 @@ test('a mistyped platform is refused rather than posted nowhere', () => {
   assert.throws(() => parse(['--body', 'x', '--platforms', 'facebok']), /not a platform: facebok/);
 });
 
+/*
+ * The first line of his words is the YouTube title, and YouTube cuts it at
+ * 100. Nothing said so until 2026-09-20; a long opening sentence would have
+ * gone out chopped. The positive control is the same body with youtube left
+ * out of --platforms, which must pass — the cap is YouTube's, not ours.
+ */
+test('a first line over 100 characters is refused when YouTube may carry it', () => {
+  const long = `${'a'.repeat(101)}\nsecond line`;
+  assert.throws(() => parse(['--body', long]), /first line becomes the YouTube title and is 101/);
+  assert.throws(() => parse(['--body', long, '--platforms', 'youtube,facebook']), /YouTube cuts it at 100/);
+  assert.doesNotThrow(() => parse(['--body', long, '--platforms', 'facebook,threads']));
+  assert.doesNotThrow(() => parse(['--body', `${'a'.repeat(100)}\nsecond line`]));
+});
+
 test('no platforms means wherever it fits, not nowhere', () => {
   const opt = parse(['--body', 'x']);
   assert.deepEqual(opt.platforms, []);

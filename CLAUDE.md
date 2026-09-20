@@ -963,8 +963,14 @@ another repo directly.
   2026-09-19). `/v1/youtube/playlists` and `/v1/playlists` really do answer *"No such API
   endpoint"* — but the working route is under `connect:`, and nothing had run `zernio --help |
   grep playlist`. **A 404 on the route you guessed is not an absent capability**; grep the CLI's
-  own command list before recording one as impossible. There is still no create — that one is
-  Studio, once.
+  own command list before recording one as impossible. **"There is still no create" was ALSO
+  wrong** (corrected 2026-09-20): Zernio's YouTube page documents `POST
+  /v1/accounts/{accountId}/youtube-playlists` (`title` required, `privacy` defaults private).
+  Documented, NOT exercised — the only playlist we needed already existed. Exercise it before
+  telling him a playlist needs Studio.
+  **The `With Guests` playlist is the UNCUT one** (he created it; 8 of 10 episodes were in it on
+  2026-09-20 and the missing E008 landscape, E009 and E010 were assigned via `update-metadata`,
+  read back off YouTube). `content.json`'s `raw.url` list is the membership test.
   ⚠ **An empty playlist is invisible from the public side.** `@channel/playlists` and yt-dlp both
   showed one playlist where the account had two; the empty one only appears through the API. Do not
   conclude a playlist is missing from a logged-out read.
