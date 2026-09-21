@@ -1031,6 +1031,16 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   older than 2026-08-21 predates the queue and would come back off YouTube with yt-dlp.
   **The reasoning against it is his supply, not the platforms**: at two a day a backfill item
   eats half a day's output, which is the Pinterest complaint again. Revisit only if he says so.
+  - **PINTEREST IS THE ONE CARVE-OUT** (mate, same day: *"Pinterest is fine, because it was
+    never there"*). His line is the definition of the rule: a clip going somewhere it has
+    NEVER run is not a resend, and Pinterest is the only platform where that is true at scale.
+    Nine clips are pinned; roughly nine more vertical ones have never been. **What he banned
+    was the RATE, not Pinterest** — the two-a-day cap already fixes that, so a pin still costs
+    a slot and still waits for a day with nothing new.
+  - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND THAT IS NOT YET A VERDICT.** All nine pins read
+    **0 impressions, 0 saves, 0 clicks** on 2026-09-21. Pinterest is a search surface that
+    accrues over weeks, so a day proves nothing either way — but do not spend slots on more
+    pins while the answer is unknown. Read it again about a week in.
   - **A HELD ITEM CAN BE A BACKFILL NOBODY CALLED ONE.** `01M16273CVBA0MJP4RMWQ5EC69` — the Adri
     review card, queued 2026-08-29 for X and Threads, held to the 22nd — would have published
     the morning after this decision, and the same card had already run on Instagram on the 20th.
