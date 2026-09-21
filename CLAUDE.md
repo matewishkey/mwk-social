@@ -776,17 +776,13 @@ most repeated failure in this repo.
 
 ## The dashboard
 
-- **`web/`, deployed with `web/deploy.sh` locally, never on push.** One Worker `mwk-social-log`,
-  **three** custom domains — `social.matewishkey.com` (Cloudflare Access, email OTP),
-  `ingest.matewishkey.com` (bearer token) and `mwkshow.com` (public short links, **no Access
-  application, ever**). D1 `mwk-social`, R2 `mwk-social-media`.
-- **`workers_dev = false` is load-bearing**: Access binds to a *hostname*, not a script, so leaving
-  it on would serve the whole dashboard ungated on `*.workers.dev`. The Worker verifies the
-  `Cf-Access-Jwt-Assertion` itself — signature, `aud` **and** expiry; a signature alone accepts a
-  token minted for a different app in the same Access org.
-- **Access gates a HOSTNAME and runs in front of the Worker, so a public path beside the gated
-  dashboard is impossible.** Measured: `/l/<code>` on the dashboard host 302s to the Access login
-  before any Worker code runs. That is *why* short links have their own domain.
+- **The deployment, the three hostnames and the Access reasoning live in `docs/playbook.md` →
+  *The dashboard*** — read it there. It carries the Worker and storage table, **why
+  `workers_dev = false` is load-bearing** (Access binds to a hostname, not a script), the fact
+  that the Worker verifies `Cf-Access-Jwt-Assertion`'s signature, `aud` **and** expiry itself,
+  and the measurement behind separate hostnames (`/l/<code>` on the dashboard host 302s to the
+  Access login before any Worker code runs). **`web/deploy.sh` ships it from this box, never on
+  push** — that one is here because it governs what you do, not what the system is.
 - **Short links: `mwkshow.com/<code>`.** A click stores the code, the time and the referring host:
   **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A miss
   redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must never
