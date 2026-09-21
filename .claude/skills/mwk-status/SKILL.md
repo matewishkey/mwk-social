@@ -62,7 +62,8 @@ node -e 'const p=require("./scripts/lib/pace"),e=require("./scripts/lib/events")
 ```
 
 `why: null` means it could go out this minute, and the timer asks every five minutes from `*:05`
-to `*:45`. There is **no time-of-day window** — only six a day, ninety minutes apart.
+to `*:45`. There is **no time-of-day window** — only **two a day** (since 2026-09-21), ninety
+minutes apart plus a hashed 0-60 minutes of jitter.
 
 ## 4. The accounts
 

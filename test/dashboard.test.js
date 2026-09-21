@@ -1338,10 +1338,20 @@ test('the funnel counts the presses and never divides one stage by another', asy
   assert.ok(!/150%|150 %/.test(html), '43 presses over 38 clicks is not a conversion rate');
 });
 
+/*
+ * RELATIVE FIXTURE, DELIBERATELY. This test read a hard-coded 2026-08-21 as
+ * "recent" and went red on 2026-09-21, the day that date fell out of the
+ * rolling 30-day window — the page was behaving exactly as designed. A test
+ * whose fixture ages against a relative window passes until a date and then
+ * lies, so the first click is anchored to today instead.
+ */
+const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+
 test('two identical columns are called a short record, not a finding', async () => {
   const { statsPage } = await src('pages/stats.js');
+  const recent = [{ ...FUNNEL[0], first_seen: daysAgo(5) }, FUNNEL[1], FUNNEL[2]];
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    snapshots: {}, funnel: FUNNEL });
+    snapshots: {}, funnel: recent });
   assert.match(html, /nearly the same window right now/,
     'all-time and last-30 are the same while the record is this short, and the page must say so');
   // The positive control: with a click older than the window, the note goes away.

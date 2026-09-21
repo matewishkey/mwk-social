@@ -36,7 +36,17 @@
 const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
 
 const DEFAULTS = {
-  perDay: 6,
+  /*
+   * TWO (mate, 2026-09-21: "enable only 2 posts per a day, you spammed
+   * pinterest... only override this one if i say so"). It was six, and the
+   * Pinterest backfill put EIGHT pins out in a single day behind a priority
+   * of -1 — each one legal under the cap and the gap, and the whole day
+   * reading as a machine emptying a list. The cap is the only thing standing
+   * between a backfill and a feed nobody wants to follow. Raising it is HIS
+   * call and he has to say so; passing perDay in an opts object is how a
+   * caller would quietly undo this, so do not.
+   */
+  perDay: 2,
   minGapMinutes: 90,
   jitterMinutes: 60,
   tz: TZ,

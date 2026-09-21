@@ -590,6 +590,14 @@ most repeated failure in this repo.
 - **There is no time-of-day posting window** (mate, 2026-08-21) — the audience spans timezones, so
   holding for a "good hour" only delays. `lib/pace.js` caps the day and spaces posts ninety minutes
   apart; the day boundary is the audience's timezone, or the cap resets twelve hours early.
+- **TWO A DAY, AND IT IS HIS NUMBER** (mate, 2026-09-21: *"enable only 2 posts per a day, you
+  spammed pinterest... only override this one if i say so"*). It was six. The Pinterest backfill
+  put **eight pins out in one day** at `--priority -1`, every one of them legal under the old cap
+  and the gap, and the day read as a machine emptying a list. **The cap is the only thing between
+  a backfill and a feed nobody wants to follow** — a priority below zero orders the queue, it does
+  not slow it down. `test/daily-cap.test.js` pins the DEFAULT rather than a fixture, because the
+  pace tests all pass their own `perDay` and would not notice it moving. Raising it needs him to
+  say so in words.
 - **A CONSTANT GAP IS A FINGERPRINT, AND OURS WAS 95 MINUTES ON THE DOT** (mate, 2026-09-21:
   *"make sure we are randomizing stuff"*). Measured over 42 publishes: a constant 90-minute
   minimum plus the five-minute timer put consecutive posts 95 minutes apart nearly every time,
@@ -828,6 +836,14 @@ The invariants:
   accounts present at BOTH ends, and the ones left out are named.
 
 ## Traps that cost a session
+
+- **A TEST WITH A FIXED FIXTURE AND A RELATIVE WINDOW PASSES UNTIL A DATE, THEN LIES**
+  (2026-09-21). `test/dashboard.test.js` asserted the stats page still calls all-time and
+  last-30 "nearly the same window", off a fixture whose first click was 2026-08-21 — and went
+  red the morning that date left the rolling 30 days. **The page was right and the test was
+  stale**, which is the dangerous direction: the obvious reading is that the change under way
+  broke it. The fixture is anchored to `daysAgo(n)` now. Anywhere a test feeds a literal date
+  into something measured against `now`, ask what happens the day it ages out.
 
 - **THIS FILE WAS EMPTY ON `main` FOR AN HOUR (2026-09-20, `beb3a41`) BECAUSE OF
   `open(p,'w').write(open(p).read()...)`.** Python opens the write handle — truncating the file —

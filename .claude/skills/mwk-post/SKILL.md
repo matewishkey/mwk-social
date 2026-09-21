@@ -140,7 +140,10 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 
 ## 5. Say what will actually happen
 
-- The pace releases it: six a day, ninety minutes apart, **no time-of-day window**.
+- The pace releases it: **two a day** (mate, 2026-09-21, after a Pinterest backfill put eight
+  out in one day), ninety minutes apart **plus 0-60 minutes of jitter**, and **no time-of-day
+  window**. Two is his number and only he changes it — say what the cap will do to a batch
+  rather than working around it.
 - The CTA lands as a first comment on Facebook, Instagram, LinkedIn, YouTube (natively at publish)
   and Threads (the hourly watcher).
 - **X takes the link IN THE TWEET** (changed 2026-08-24). It rode in a thread reply for three days;

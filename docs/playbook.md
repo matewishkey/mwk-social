@@ -220,7 +220,7 @@ Every unit is `Type=oneshot` and runs through `scripts/with-secrets.sh`, because
 `EnvironmentFile` can read neither `~/.secrets` nor the sops-encrypted project env.
 
 **The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb heartbeat and
-`whyNotNow()` says no most of the time — six a day, ninety minutes apart. Under `--scheduled` it
+`whyNotNow()` says no most of the time — two a day, ninety minutes apart plus 0-60 of jitter. Under `--scheduled` it
 says so silently, or nine refusals an hour would drown the log. Keeping it in one module
 means a run by hand obeys the same rules, and it counts `queue.posted` events so there is one
 budget rather than one per caller.
@@ -249,7 +249,7 @@ correct, DST included.
 
 **Why it does not fit, in the order the reasons bite:**
 
-1. **It is a timetable, not a pace.** Our rule is six a day, ninety minutes apart, at *any* hour.
+1. **It is a timetable, not a pace.** Our rule is two a day, ninety minutes apart, at *any* hour.
    A queue is precisely the time-of-day window that was deleted on 2026-08-21. Expressing "any
    time, min ninety minutes apart" needs ~112 hand-maintained slots and still does not enforce a
    daily cap.

@@ -14,6 +14,8 @@ const test = require('node:test');
 const assert = require('node:assert');
 const pace = require('../scripts/lib/pace.js');
 
+// A fixture, deliberately not the default: these tests are about the shape of
+// the rules, and pinning the live cap is test/daily-cap.test.js's job.
 const CFG = { perDay: 6, minGapMinutes: 90, tz: 'Australia/Brisbane' };
 const at = (iso) => new Date(iso);
 const sent = (...isos) => isos.map((ts) => ({ kind: 'queue.posted', ts }));
