@@ -1034,7 +1034,9 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   - **PINTEREST IS THE ONE CARVE-OUT** (mate, same day: *"Pinterest is fine, because it was
     never there"*). His line is the definition of the rule: a clip going somewhere it has
     NEVER run is not a resend, and Pinterest is the only platform where that is true at scale.
-    Nine clips are pinned; roughly nine more vertical ones have never been. **What he banned
+    **Nine of the channel's nineteen Shorts are pinned and ten are not** (counted
+    2026-09-21), the ten including the biggest: the 1,100-view *secret exposed* and the 504,
+    397, 387 and 361 clips. **What he banned
     was the RATE, not Pinterest** — the two-a-day cap already fixes that, so a pin still costs
     a slot and still waits for a day with nothing new.
   - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND THAT IS NOT YET A VERDICT.** All nine pins read
