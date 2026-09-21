@@ -24,12 +24,17 @@ test('the default cap is two a day, and changing it is his call', () => {
 test('a third post is refused on the default config', () => {
   const day = (iso) => ({ kind: 'queue.posted', ts: iso });
   // Two Brisbane-day posts, far enough apart that only the CAP can refuse.
-  const two = [day('2026-09-20T22:10:00Z'), day('2026-09-21T01:00:00Z')];
-  const why = pace.whyNotNow(two, {}, new Date('2026-09-21T06:00:00Z'));
+  // All three instants are INSIDE the 07:00-11:00 Brisbane window, so the cap
+  // is the only thing that can refuse: 21:10Z and 23:00Z are 07:10 and 09:00
+  // on the 21st, and 00:30Z is 10:30 the same Brisbane day.
+  const two = [day('2026-09-20T21:10:00Z'), day('2026-09-20T23:00:00Z')];
+  const why = pace.whyNotNow(two, {}, new Date('2026-09-21T00:30:00Z'));
   assert.match(why, /2 already went out today/);
 });
 
 test('two still get through, or the cap would be one', () => {
-  const one = [{ kind: 'queue.posted', ts: '2026-09-20T22:10:00Z' }];
-  assert.equal(pace.whyNotNow(one, {}, new Date('2026-09-21T01:00:00Z')), null);
+  // 21:10Z is 07:10 Brisbane on the 21st; 00:30Z is 10:30 the same day, inside
+  // the window and past the gap.
+  const one = [{ kind: 'queue.posted', ts: '2026-09-20T21:10:00Z' }];
+  assert.equal(pace.whyNotNow(one, {}, new Date('2026-09-21T00:30:00Z')), null);
 });

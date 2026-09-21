@@ -601,16 +601,26 @@ most repeated failure in this repo.
   binaries), is in `docs/playbook.md` — read it before proposing either again.
 - **"Post it" means QUEUE it. Only publish when he says publish** (mate, 2026-08-21). The procedure
   is the `mwk-post` skill's opening section — read it there, this is the decision only.
-- **There is no time-of-day posting window** (mate, 2026-08-21) — the audience spans timezones, so
-  holding for a "good hour" only delays. `lib/pace.js` caps the day and spaces posts ninety minutes
-  apart; the day boundary is the audience's timezone, or the cap resets twelve hours early.
-- **THE BRISBANE MORNING IS THE SLOT, BECAUSE IT IS THE US EVENING** (mate, 2026-09-21:
-  *"the morning giving us the best coverage"*, *"i do not care about hungary at all"*).
-  10:00-11:00 Brisbane is **20:00-21:00 New York** and 17:00-18:00 Los Angeles. It is also
-  02:00 in Budapest, and he has ruled the European audience irrelevant — **do not re-propose
-  an evening slot for Europe.** No code change: `--at` already unlocks at 00:00 UTC, which
-  IS 10:00 AEST, and the rolled jitter spreads it across the hour. This does not reinstate a
-  time-of-day WINDOW in `pace.js` — an item with no `--at` still goes whenever the pace allows.
+- ⚠ **"THERE IS NO TIME-OF-DAY POSTING WINDOW" WAS REVERSED ON 2026-09-21.** It was mate's call on
+  2026-08-21 (the audience spans timezones, so holding for a "good hour" only delays) and it is his
+  call again: *"i think better morning is better"*. `lib/pace.js` now refuses outside
+  **07:00-11:00 Brisbane**, on top of the daily cap and the gap. The day boundary for the cap is
+  still the audience's timezone, or it resets twelve hours early.
+- **THE WINDOW IS 07:00-11:00 BRISBANE, BECAUSE THAT IS 17:00-21:00 NEW YORK** (mate,
+  2026-09-21: *"the morning giving us the best coverage"*, *"i do not care about hungary at
+  all"*). Start inclusive, end exclusive. It is 23:00-03:00 in Budapest and he has ruled the
+  European audience irrelevant — **do not re-propose an evening slot for Europe.**
+  - **The hours live in `pace.DEFAULTS.window` and NOWHERE else.** `queue-add.js` derives
+    `--at`'s unlock from it, so a held item cannot unlock at an hour the pace will then refuse;
+    a test fails if it stops reading `pace.DEFAULTS.window`.
+  - **`--at`'s stored instant straddles midnight UTC.** 07:00-11:00 Brisbane is 21:00-00:59
+    UTC, so a hold for the 22nd is stored on the 21st in UTC for most of the window.
+    **Asserting a UTC date on `not_before` is the trap** — two tests did and both were wrong
+    the moment the window moved off midnight. Assert the BRISBANE day.
+  - The offset is derived by asking what hour midnight UTC is in `cfg.tz`, not hardcoded +10.
+  - **`MWK_WINDOW`** ("7-11", or "off") changes it with no deploy. An unparseable value is
+    treated as no window rather than throwing: a typo in an env var must not stop the queue.
+  - **The cost is the point** — something queued at noon waits until tomorrow morning.
   ⚠ **That the hour affects anything is UNMEASURED, and the number that looked like proof was
   not one.** Over 253 posts, the 04:00-08:00 Brisbane block read 1.75x its platforms' medians
   — and its posts are a median 32 days old against 11 for the morning block, so most of it was

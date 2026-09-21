@@ -5,10 +5,25 @@
  * the queue, so the event log is the complete record of what we have sent — no
  * second source to reconcile against.
  *
- * There is no time-of-day window (mate's call, 2026-08-21): the audience is
- * spread across timezones and reads a post whenever it reaches them, so holding
- * one back for a "good hour" only delays it. What is left is volume — a daily
- * cap and a minimum gap — so the feed never gets a burst.
+ * THERE IS A TIME-OF-DAY WINDOW AGAIN SINCE 2026-09-21, AND IT REVERSES THE
+ * 2026-08-21 CALL. The old reasoning was that the audience is spread across
+ * timezones, so holding one back for a "good hour" only delays it. What
+ * changed is the arithmetic: **07:00-11:00 Brisbane is 17:00-21:00 in New
+ * York**, the evening of the audience he actually wants, and at TWO posts a
+ * day the slot matters in a way it did not at six. Mate: "i think better
+ * morning is better", "the morning giving us the best coverage", "i do not
+ * care about hungary at all" (it is 23:00-03:00 there, ruled irrelevant).
+ *
+ * The other half of the rule is unchanged: volume. A daily cap and a minimum
+ * gap, so the feed never gets a burst.
+ *
+ * ⚠ **The window is REASONING, not a measurement.** Across 253 posts the
+ * publish hour explains nothing once post age is controlled for. It is a
+ * decision about who we are aiming at and must never be quoted as a finding
+ * about performance.
+ *
+ * The cost is real and is the point: something queued at noon waits until
+ * tomorrow morning. `MWK_WINDOW` ("7-11", or "off") is the way out.
  *
  * The day boundary for that cap is still the AUDIENCE's, never the box's. This
  * machine runs Etc/UTC; counting UTC days would reset the cap twelve hours
@@ -35,6 +50,19 @@
 
 const TZ = process.env.MWK_TZ || 'Australia/Brisbane';
 
+/**
+ * "7-11" to { from: 7, to: 11 }, "off" (or anything unparseable) to null.
+ * Unparseable is deliberately null rather than a throw: a typo in an env var
+ * must not stop the queue publishing altogether.
+ */
+function parseWindow(spec) {
+  const m = /^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$/.exec(String(spec || ''));
+  if (!m) return null;
+  const from = Number(m[1]); const to = Number(m[2]);
+  if (from < 0 || to > 24 || from >= to) return null;
+  return { from, to };
+}
+
 const DEFAULTS = {
   /*
    * TWO (mate, 2026-09-21: "enable only 2 posts per a day, you spammed
@@ -47,6 +75,13 @@ const DEFAULTS = {
    * caller would quietly undo this, so do not.
    */
   perDay: 2,
+  /*
+   * The posting window in the AUDIENCE's hours, start inclusive and end
+   * exclusive: 7 to 11 means a post may go from 07:00:00 to 10:59:59
+   * Brisbane. `MWK_WINDOW=off` restores the old any-hour behaviour with no
+   * deploy.
+   */
+  window: parseWindow(process.env.MWK_WINDOW || '7-11'),
   minGapMinutes: 90,
   jitterMinutes: 60,
   tz: TZ,
@@ -108,6 +143,13 @@ function whyNotNow(events = [], opts = {}, now = new Date()) {
   const todays = sent.filter((at) => zoned(new Date(at), cfg.tz).day === here.day);
   if (todays.length >= cfg.perDay) return `${todays.length} already went out today`;
 
+  // The window is checked BEFORE the gap: when both are true, "not this hour"
+  // is the more useful thing to read.
+  if (cfg.window && (here.hour < cfg.window.from || here.hour >= cfg.window.to)) {
+    return `${String(here.hour).padStart(2, '0')}:${String(here.minute).padStart(2, '0')} is outside `
+      + `the ${cfg.window.from}:00-${cfg.window.to}:00 window`;
+  }
+
   const last = sent[sent.length - 1];
   if (last) {
     const gap = (now - new Date(last)) / 60000;
@@ -142,6 +184,14 @@ function nextSlot(events = [], opts = {}, now = new Date()) {
       at = new Date(at.getTime() + 60 * 60000);       // an hour at a time until the day turns
       continue;
     }
+    if (cfg.window && (here.hour < cfg.window.from || here.hour >= cfg.window.to)) {
+      // Step to the TOP of the next hour rather than adding an hour to a time
+      // that has minutes on it, or the answer keeps the minutes of whenever
+      // the page happened to load and drifts on every render.
+      at = new Date(at.getTime() + (60 - here.minute) * 60000);
+      at.setUTCSeconds(0, 0);
+      continue;
+    }
     return at.toISOString();
   }
   return null;
@@ -160,6 +210,7 @@ function status(events = [], opts = {}, now = new Date()) {
     today,
     minGapMinutes: cfg.minGapMinutes,
     jitterMinutes: cfg.jitterMinutes,
+    window: cfg.window,
     tz: cfg.tz,
     why,
     nextAt: next ? new Intl.DateTimeFormat('en-GB', {
@@ -170,4 +221,5 @@ function status(events = [], opts = {}, now = new Date()) {
   };
 }
 
-module.exports = { TZ, DEFAULTS, zoned, whyNotNow, nextSlot, status, sentTimes, jitterFor };
+module.exports = { TZ, DEFAULTS, zoned, whyNotNow, nextSlot, status, sentTimes, jitterFor,
+  parseWindow };

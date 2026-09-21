@@ -47,11 +47,12 @@
  *                                    of those platforms can be edited after.
  *   --comment TEXT                   a custom first comment instead of the rotation
  *   --at YYYY-MM-DD                  hold it until that day. Stored as a full
-                                   timestamp: midnight UTC (10am Brisbane) plus
-                                   a random 0-60 minutes, rolled ONCE here so
-                                   held posts stop all landing at 10:05. The
-                                   pace still applies on the day; without this
-                                   it goes as soon as the pace allows
+                                   timestamp: a random instant inside the
+                                   posting window (07:00-11:00 Brisbane),
+                                   rolled ONCE here so held posts stop all
+                                   landing at 10:05. The pace still applies on
+                                   the day; without this it goes at the next
+                                   slot the window and the pace allow
   --no-first-comment               post it with no CTA comment at all
  *   --no-reshare                     do not repost it from the personal LinkedIn
  *
@@ -67,6 +68,7 @@ const path = require('path');
 const { ulid } = require('./lib/events');
 const { PLATFORMS } = require('./lib/platforms');
 const captions = require('./lib/captions');
+const pace = require('./lib/pace');
 
 // YouTube's title cap. The title is the first line of the caption, so the cap
 // is on his words, not on anything we compose. Zernio's YouTube page, 2026-09-20.
@@ -242,12 +244,36 @@ function splitList(v) {
   return String(v).split(',').map((x) => x.trim()).filter(Boolean);
 }
 
-/** Midnight UTC on that day, plus a rolled-once 0-60 minutes. See --at above. */
-const AT_JITTER_MINUTES = 60;
+/**
+ * A held day becomes a real instant inside the posting window.
+ *
+ * The window comes from `pace.DEFAULTS` rather than a number here, because
+ * two places holding the same hours is how they end up disagreeing: a hold
+ * that unlocked before the window would simply sit there refused by the pace,
+ * and a hold that unlocked after it would lose a morning.
+ *
+ * The offset is DERIVED, not hardcoded +10. Midnight UTC is asked what hour
+ * it is in the audience's timezone and the difference is applied, so the
+ * arithmetic survives the timezone being changed.
+ *
+ * The roll is made ONCE, here, and stored on the row. The gap jitter in
+ * lib/pace.js has to be hashed instead, because the pace is recomputed every
+ * tick and a fresh roll each time collapses to the minimum — this value is
+ * computed a single time, so real randomness is correct and simpler.
+ */
 function unlockAt(day, roll = Math.random()) {
-  const minutes = Math.floor(roll * (AT_JITTER_MINUTES + 1));
-  return new Date(Date.parse(`${day}T00:00:00.000Z`) + minutes * 60000).toISOString();
+  const w = pace.DEFAULTS.window;
+  const from = w ? w.from : 10;
+  const spanMinutes = w ? (w.to - w.from) * 60 : 60;
+  const utcMidnight = Date.parse(`${day}T00:00:00.000Z`);
+  const hourThere = pace.zoned(new Date(utcMidnight), pace.DEFAULTS.tz).hour;
+  const start = utcMidnight - (hourThere - from) * 3600000;
+  const minutes = Math.floor(roll * spanMinutes);   // end-exclusive, like the window
+  return new Date(start + minutes * 60000).toISOString();
 }
+/* Kept for the tests and the header: how wide the roll is. */
+const AT_JITTER_MINUTES = pace.DEFAULTS.window
+  ? (pace.DEFAULTS.window.to - pace.DEFAULTS.window.from) * 60 : 60;
 
 /** The INSERT, as text. Separated out so a test can read it without a network. */
 function sqlFor(opt, id, media, mediaWide, now, extraKeys) {

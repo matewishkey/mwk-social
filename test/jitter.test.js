@@ -18,10 +18,17 @@
 const test = require('node:test');
 const assert = require('node:assert');
 
+const fs = require('node:fs');
+const path = require('node:path');
 const pace = require('../scripts/lib/pace');
 const { unlockAt, AT_JITTER_MINUTES, parse } = require('../scripts/queue-add.js');
 
 const posted = (iso) => ({ kind: 'queue.posted', ts: iso });
+
+// These cases are about the GAP. The live 07:00-11:00 window would refuse most
+// of the instants they walk over, for a reason none of them is testing, so it
+// is switched off here and pinned in test/window.test.js instead.
+const GAP = { window: null };
 
 test('the gap jitter is the same answer at every tick, for the same last post', () => {
   const last = '2026-09-21T03:18:00.000Z';
@@ -48,17 +55,17 @@ test('asking every five minutes does NOT walk an item out early', () => {
   const events = [posted(last)];
   const at = (mins) => new Date(Date.parse(last) + mins * 60000);
   for (let m = 0; m < 90 + extra; m += 5) {
-    assert.ok(pace.whyNotNow(events, {}, at(m)), `let through at +${m} min, before 90+${extra}`);
+    assert.ok(pace.whyNotNow(events, GAP, at(m)), `let through at +${m} min, before 90+${extra}`);
   }
-  assert.equal(pace.whyNotNow(events, {}, at(90 + extra + 1)), null, 'never opens');
+  assert.equal(pace.whyNotNow(events, GAP, at(90 + extra + 1)), null, 'never opens');
 });
 
 test('nextSlot promises the same instant the publisher will accept', () => {
   const last = '2026-09-21T03:18:00.000Z';
   const events = [posted(last)];
   const now = new Date(Date.parse(last) + 10 * 60000);
-  const slot = new Date(pace.nextSlot(events, {}, now));
-  assert.equal(pace.whyNotNow(events, {}, new Date(slot.getTime() + 1000)), null,
+  const slot = new Date(pace.nextSlot(events, GAP, now));
+  assert.equal(pace.whyNotNow(events, GAP, new Date(slot.getTime() + 1000)), null,
     'the page would show a time the publisher then refuses');
 });
 
@@ -66,28 +73,48 @@ test('the jitter can be switched off, and then the old constant gap is back', ()
   const last = '2026-09-21T03:18:00.000Z';
   const events = [posted(last)];
   const at = new Date(Date.parse(last) + 91 * 60000);
-  assert.equal(pace.whyNotNow(events, { jitterMinutes: 0 }, at), null);
+  assert.equal(pace.whyNotNow(events, { jitterMinutes: 0, window: null }, at), null);
 });
 
 test('status reports the jitter, so the dashboard cannot describe a fixed gap', () => {
   assert.equal(pace.status([], {}, new Date()).jitterMinutes, 60);
 });
 
-test('an unlock is midnight UTC plus 0..60 minutes, and every minute is reachable', () => {
-  const mins = new Set();
-  for (let i = 0; i <= AT_JITTER_MINUTES; i += 1) {
-    const iso = unlockAt('2026-09-22', i / (AT_JITTER_MINUTES + 0.0001));
-    const d = new Date(iso);
-    assert.equal(d.getUTCDate(), 22, 'the hold must not slip to another day');
-    assert.equal(d.getUTCHours() * 60 + d.getUTCMinutes() <= AT_JITTER_MINUTES, true);
-    mins.add(iso);
+/*
+ * An unlock lands somewhere in the posting window, in HIS hours. The old
+ * version of this test asserted a UTC date, which was only ever right while
+ * the window started at exactly midnight UTC: 07:00 Brisbane is the PREVIOUS
+ * day in UTC, so the UTC date is now the wrong question to ask.
+ */
+test('an unlock lands inside the window, on the right Brisbane day', () => {
+  const seen = new Set();
+  for (let i = 0; i < AT_JITTER_MINUTES; i += 1) {
+    // The MIDDLE of each minute's band. i/span looks equivalent and is not:
+    // floating point makes floor((i / span) * span) land on i - 1 for some i,
+    // which cost one value out of 240 and read like an off-by-one in the code.
+    const iso = unlockAt('2026-09-22', (i + 0.5) / AT_JITTER_MINUTES);
+    const z = pace.zoned(new Date(iso), pace.DEFAULTS.tz);
+    assert.equal(z.day, '2026-09-22', `${iso} slipped off the day he asked for`);
+    assert.ok(z.hour >= pace.DEFAULTS.window.from && z.hour < pace.DEFAULTS.window.to,
+      `${iso} is ${z.hour}:00, outside the window`);
+    seen.add(iso);
   }
-  assert.equal(mins.size, AT_JITTER_MINUTES + 1);
+  assert.equal(seen.size, AT_JITTER_MINUTES, 'every minute of the window must be reachable');
+});
+
+test('the unlock window is the pace window, not a second copy of the hours', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'queue-add.js'), 'utf8');
+  assert.match(src, /pace\.DEFAULTS\.window/,
+    'queue-add must read the window from pace, or the two drift apart');
 });
 
 test('--at still takes a plain day and stores a timestamp', () => {
   const opt = parse(['--body', 'Chris fixed his own website in an afternoon.', '--at', '2026-09-22']);
-  assert.match(opt.at, /^2026-09-22T00:\d\d:00\.000Z$/, `stored ${opt.at}`);
+  // The window straddles midnight UTC, so assert the BRISBANE day and hour —
+  // the UTC date is the 21st for most of the window and proves nothing.
+  const z = pace.zoned(new Date(opt.at), pace.DEFAULTS.tz);
+  assert.equal(z.day, '2026-09-22', `stored ${opt.at}`);
+  assert.ok(z.hour >= 7 && z.hour < 11, `stored ${opt.at}, hour ${z.hour}`);
 });
 
 test('--at still refuses a shape that is not a day', () => {

@@ -219,7 +219,10 @@ ${held ? `<div class="card"><div class="card-body"><b class="bad">Not queued:</b
 <div class="tiles">
   ${tile(waiting.length, 'waiting')}
   ${tile(pace.today, `of ${pace.perDay} sent today`, pace.today >= pace.perDay ? 'warn' : 'plain')}
-  ${tile(pace.minGapMinutes ? `${pace.minGapMinutes} min` : '—', 'minimum gap', 'plain', pace.tz)}
+  ${tile(pace.minGapMinutes ? `${pace.minGapMinutes} min` : '—', 'minimum gap', 'plain',
+    pace.jitterMinutes ? `plus 0-${pace.jitterMinutes} random` : '')}
+  ${tile(pace.window ? `${String(pace.window.from).padStart(2, '0')}-${String(pace.window.to).padStart(2, '0')}`
+    : 'any hour', 'posting window', 'plain', pace.tz)}
   ${tile(pace.nextAt || '—', 'next slot', 'plain', pace.why || '')}
 </div>
 

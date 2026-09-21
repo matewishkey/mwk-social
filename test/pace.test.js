@@ -16,13 +16,22 @@ const pace = require('../scripts/lib/pace.js');
 
 // A fixture, deliberately not the default: these tests are about the shape of
 // the rules, and pinning the live cap is test/daily-cap.test.js's job.
-const CFG = { perDay: 6, minGapMinutes: 90, tz: 'Australia/Brisbane' };
+//
+// `window: null` is part of that isolation. These cases are about VOLUME — the
+// cap and the gap — and leaving the live 07:00-11:00 window in would have them
+// fail for a reason none of them is testing. The window has its own file.
+const CFG = { perDay: 6, minGapMinutes: 90, tz: 'Australia/Brisbane', window: null };
 const at = (iso) => new Date(iso);
 const sent = (...isos) => isos.map((ts) => ({ kind: 'queue.posted', ts }));
 
-test('the hour of the day never refuses a post', () => {
-  // 21:00 UTC is 07:00 Brisbane and 23:00 UTC is 09:00 — early morning and
-  // small hours somewhere, and neither is a reason to hold a post back.
+/*
+ * THIS TEST USED TO ASSERT THE OPPOSITE, and the reversal is the point.
+ * Until 2026-09-21 it read "the hour of the day never refuses a post" (mate,
+ * 2026-08-21). He reversed it: 07:00-11:00 Brisbane is 17:00-21:00 New York.
+ * With the window switched off the old behaviour is still exactly right, which
+ * is what this now pins — every hour is fine when nothing says otherwise.
+ */
+test('with no window, the hour of the day never refuses a post', () => {
   for (const iso of ['2026-08-20T21:00:00Z', '2026-08-20T15:00:00Z',
     '2026-08-20T23:30:00Z', '2026-08-20T09:00:00Z']) {
     assert.equal(pace.whyNotNow([], CFG, at(iso)), null, `${iso} should be fine`);

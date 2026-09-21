@@ -87,7 +87,11 @@ test('the defaults are a first comment and a personal repost', () => {
  */
 test('--at rides into the insert, and no --at is NULL rather than a date', () => {
   const held = parse(['--body', 'x', '--at', '2026-08-31']);
-  assert.match(sqlFor(held, '01ABC', [null, null], [null, null], 'now'), /'2026-08-31T00:\d\d:00\.000Z'\)/);
+  // 07:00-11:00 Brisbane is 21:00-00:59 UTC, which STRADDLES midnight: the
+  // stored instant is the 30th in UTC for the early part of the window and the
+  // 31st for the late part. Asserting a UTC date here is the trap.
+  const sql = sqlFor(held, '01ABC', [null, null], [null, null], 'now');
+  assert.match(sql, /'2026-08-3(0T2[123]|1T00):\d\d:00\.000Z'\)/, sql);
   const free = parse(['--body', 'x']);
   assert.equal(free.at, undefined);
   assert.match(sqlFor(free, '01ABC', [null, null], [null, null], 'now'), /NULL\);/);
