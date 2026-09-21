@@ -1158,7 +1158,8 @@ another repo directly.
   of cropping. Tall grabs pad up to 4:5. **A single video IS a Reel and Zernio caps it at 90
   seconds** — the table said 900 until 2026-09-20 and nothing over 90 s was ever sent, so raise it
   only after a longer clip has actually published.
-- **Pinterest** (connected 2026-09-20 as `mate4671`, his to rename): every pin needs a board, and
+- **Pinterest** (connected 2026-09-20, renamed to `matewishkey` and confirmed live
+  2026-09-21): every pin needs a board, and
   **`zernio connect:get-pinterest-boards <id>` answers 405** while `GET
   /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the REST route. The account
   had no board, so `POST` to the same route created *Mate Wish Key Show* (exercised). The link is

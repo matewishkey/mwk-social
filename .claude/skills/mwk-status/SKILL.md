@@ -75,7 +75,7 @@ window `why` names it and `nextAt` is tomorrow morning — that is the design, n
     console.log("BROKEN",a.platform,a.username,JSON.stringify(a.issues));})'
 ```
 
-Nine accounts, three of them LinkedIn — two people and the company page. (A Reddit connection was
+Ten accounts, three of them LinkedIn — two people and the company page. (A Reddit connection was
 here in August and is gone; if `accounts:list` grows one again, `platforms.known()` skips it rather
 than failing the run.) **`warning` is routine — never report it as a fault.** Zernio refreshes tokens
 lazily, so an account passes through `warning` with "Token expired or expiring soon (auto-refresh
