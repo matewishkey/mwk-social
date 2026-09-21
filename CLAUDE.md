@@ -1039,10 +1039,13 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
     397, 387 and 361 clips. **What he banned
     was the RATE, not Pinterest** — the two-a-day cap already fixes that, so a pin still costs
     a slot and still waits for a day with nothing new.
-  - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND THAT IS NOT YET A VERDICT.** All nine pins read
-    **0 impressions, 0 saves, 0 clicks** on 2026-09-21. Pinterest is a search surface that
-    accrues over weeks, so a day proves nothing either way — but do not spend slots on more
-    pins while the answer is unknown. Read it again about a week in.
+  - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND WE CAN ONLY SEE 44% OF IT.** The four pins
+    Zernio's analytics returns read **0 impressions, 0 saves, 0 clicks** on 2026-09-21 —
+    but **nine are live**, and `analytics:posts --platform pinterest` returns four of them
+    under every `--source`, so `daily_metric` believes we pinned four (repo issue #43).
+    **Do not quote a Pinterest total as if it covered the pins**; it covers the ones Zernio
+    happened to sync. Pinterest is a search surface that accrues over weeks, so a day proves
+    nothing either way — read it again about a week in, and count from `queue_item.result`.
   - **A HELD ITEM CAN BE A BACKFILL NOBODY CALLED ONE.** `01M16273CVBA0MJP4RMWQ5EC69` — the Adri
     review card, queued 2026-08-29 for X and Threads, held to the 22nd — would have published
     the morning after this decision, and the same card had already run on Instagram on the 20th.
