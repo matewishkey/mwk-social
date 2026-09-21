@@ -27,6 +27,10 @@ const { execFileSync } = require('child_process');
 const { api } = require('./lib/api');
 const voice = require('./lib/voice');
 const platformTable = require('./lib/platforms');
+// One implementation, shared with queue-add.js: the thing that QUEUES a post
+// has to know what the publisher knows, or a platform gets dropped hours later
+// with nobody watching (2026-09-21).
+const { captionLength } = require('./lib/captions');
 const shortlink = require('./lib/shortlink');
 const commentState = require('./lib/comment-state');
 const fs = require('fs');
@@ -368,17 +372,6 @@ async function pinFields(account, opts) {
   };
 }
 
-/*
- * How long is this caption where it is going?
- *
- * X counts every url as 23 characters however long it is — t.co wraps them all
- * — so measuring the raw string overstates our own short codes and would drop
- * a post that fits. Everywhere else a character is a character.
- */
-function captionLength(platform, text) {
-  if (platform !== 'twitter') return text.length;
-  return text.replace(shortlink.URL_RE, 'x'.repeat(23)).length;
-}
 
 /*
  * Fit the caption to the platform, giving up OUR parts first and never his.

@@ -506,6 +506,20 @@ most repeated failure in this repo.
   posted with no hashtags at all until 2026-08-21.
 - **`shortsAreDead`** — a link can be dead for one CLIP and live for another.
   `platforms.linkDeadFor(name, probe)` decides it; `run-queue.js` computes the list per post.
+- **A PLATFORM HIS WORDS WILL NOT FIT WAS DECIDED NINE HOURS AFTER ANYBODY WAS LOOKING**
+  (2026-09-21). A 318-character caption was queued for "wherever it fits" and announced as
+  going to all eight platforms; at 10:45 the next morning `captionForPlatform` did exactly the
+  right thing — X takes 280, his words are never truncated — dropped X and logged the reason
+  into a journal nobody reads. **The publisher was not wrong; the knowledge was in the wrong
+  place.** `scripts/lib/captions.js` now holds the ONE `captionLength` (post.js imports it
+  rather than defining its own, and a test fails if it grows one back) plus `wontFit()`, which
+  `queue-add.js` runs at queue time. The split is whether he named the platform:
+  **named → throw** (he asked for X, X cannot take it, say so while it is one edit);
+  **implied → record and print it on the `queued` line itself**, and on the `--dry-run` output,
+  because "wherever it fits" already licenses a drop and what was missing was anybody being
+  told. A warning higher up the output is the journal problem again, so a test pins WHERE it
+  prints. Historical rate: 8 of 46 bodies exceed 280, so this fires often enough to matter and
+  rarely enough that refusing every one would have been wrong.
 - **`captionMax`** became load-bearing the day X's link joined his words. `captionForPlatform()`
   gives up **the tags first, then the link, and his words never** — if his words alone do not fit,
   the platform is dropped with a reason rather than truncated. **X counts every url as 23
@@ -590,6 +604,20 @@ most repeated failure in this repo.
 - **There is no time-of-day posting window** (mate, 2026-08-21) — the audience spans timezones, so
   holding for a "good hour" only delays. `lib/pace.js` caps the day and spaces posts ninety minutes
   apart; the day boundary is the audience's timezone, or the cap resets twelve hours early.
+- **THE BRISBANE MORNING IS THE SLOT, BECAUSE IT IS THE US EVENING** (mate, 2026-09-21:
+  *"the morning giving us the best coverage"*, *"i do not care about hungary at all"*).
+  10:00-11:00 Brisbane is **20:00-21:00 New York** and 17:00-18:00 Los Angeles. It is also
+  02:00 in Budapest, and he has ruled the European audience irrelevant — **do not re-propose
+  an evening slot for Europe.** No code change: `--at` already unlocks at 00:00 UTC, which
+  IS 10:00 AEST, and the rolled jitter spreads it across the hour. This does not reinstate a
+  time-of-day WINDOW in `pace.js` — an item with no `--at` still goes whenever the pace allows.
+  ⚠ **That the hour affects anything is UNMEASURED, and the number that looked like proof was
+  not one.** Over 253 posts, the 04:00-08:00 Brisbane block read 1.75x its platforms' medians
+  — and its posts are a median 32 days old against 11 for the morning block, so most of it was
+  views still accruing. Matched on age it is 1.33x on 8-21 posts. Zernio's own
+  `analytics:best-time` is worse: its top slots rest on ONE post each. **No platform reports
+  audience geography** (checked every field `analytics:posts` returns), so "the US is awake" is
+  a reasoned guess and must never be quoted as a finding.
 - **TWO A DAY, AND IT IS HIS NUMBER** (mate, 2026-09-21: *"enable only 2 posts per a day, you
   spammed pinterest... only override this one if i say so"*). It was six. The Pinterest backfill
   put **eight pins out in one day** at `--priority -1`, every one of them legal under the old cap

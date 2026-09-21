@@ -66,6 +66,7 @@ const path = require('path');
 
 const { ulid } = require('./lib/events');
 const { PLATFORMS } = require('./lib/platforms');
+const captions = require('./lib/captions');
 
 // YouTube's title cap. The title is the first line of the caption, so the cap
 // is on his words, not on anything we compose. Zernio's YouTube page, 2026-09-20.
@@ -203,6 +204,32 @@ function parse(argv) {
     throw new Error(`the first line becomes the YouTube title and is ${firstLine.length} characters; `
       + `YouTube cuts it at ${YOUTUBE_TITLE_MAX}. Break it, or leave youtube out of --platforms`);
   }
+
+  /*
+   * WHICH PLATFORMS HIS WORDS ARE TOO LONG FOR, decided HERE rather than at
+   * publish time (2026-09-21). A 318 character caption went out to seven
+   * platforms and X was dropped nine hours later, correctly, with a line in
+   * the journal that nobody read — it had been announced as going to eight.
+   *
+   * Two different answers on purpose, and the difference is whether he asked
+   * for that platform BY NAME:
+   *   - named   → throw. He said twitter, twitter cannot take it, and
+   *               silently posting to everything else is not what he asked
+   *               for. Shortening it is one edit.
+   *   - implied → record it. An empty list already means "wherever it fits",
+   *               so dropping one is legitimate; what was missing was anybody
+   *               being told. It rides out on the `queued` line instead.
+   *
+   * His words are never truncated to make them fit — post.js gives up our
+   * tags and then our link and stops, which is the rule this reads from.
+   */
+  opt.wontFit = captions.wontFit(opt.body, opt.platforms);
+  const named = opt.wontFit.filter((w) => w.named);
+  if (named.length) {
+    throw new Error(`not queued — ${named.map((w) => `${w.platform} takes ${w.max} characters `
+      + `and his words are ${captions.captionLength(w.platform, opt.body)}`).join('; ')}. `
+      + `Shorten it, or leave ${named.map((w) => w.platform).join(', ')} out of --platforms.`);
+  }
   return opt;
 }
 
@@ -285,6 +312,10 @@ function main() {
 
   if (opt.dryRun) {
     console.log(sql);
+    // A dry run is exactly when he wants to hear this, so it is not only on
+    // the success path.
+    const dryLine = captions.wontFitLine(opt.wontFit);
+    if (dryLine) console.log(`-- ${dryLine}`);
     console.log('-- --dry-run: nothing written, nothing uploaded');
     return;
   }
@@ -298,6 +329,10 @@ function main() {
     fs.rmSync(path.dirname(file), { recursive: true, force: true });
   }
   console.log(`queued ${id} — ${opt.platforms.length ? opt.platforms.join(', ') : 'wherever it fits'}`);
+  // On the SAME line he already reads. A warning further up the output is the
+  // same failure as a line in the journal: true, and not looked at.
+  const line = captions.wontFitLine(opt.wontFit);
+  if (line) console.log(`  ${line}`);
   console.log('https://social.matewishkey.com/queue');
 }
 
