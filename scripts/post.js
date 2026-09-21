@@ -30,7 +30,7 @@ const platformTable = require('./lib/platforms');
 // One implementation, shared with queue-add.js: the thing that QUEUES a post
 // has to know what the publisher knows, or a platform gets dropped hours later
 // with nobody watching (2026-09-21).
-const { captionLength, titleLine, overlayCaption } = require('./lib/captions');
+const { captionLength, titleLine, splitCredits } = require('./lib/captions');
 const mediaLib = require('./lib/media');
 const shortlink = require('./lib/shortlink');
 const commentState = require('./lib/comment-state');
@@ -396,7 +396,14 @@ async function pinFields(account, opts) {
  * first comment is untouched and still carries the lot; he excluded it in the
  * same sentence. A line of pure @mentions and #tags rides along with the
  * title — "tag Chris" was the same instruction as "keep the hashtags", and
- * dropping the credit is exactly what the title-only rule would have done. `platforms.captionOverlaysShortFor` is the one decision, and
+ * dropping the credit is exactly what the title-only rule would have done.
+ *
+ * THE CREDIT IS COMPOSED LAST, AFTER OUR TAGS, on every platform (mate,
+ * 2026-09-22: "put my tags first not chris one"). Our tag line is appended
+ * after everything of his, so that is the only order in which his brand tags
+ * precede somebody else's handle. It is never given up to make a caption
+ * fit: he asked for the tag, so it ranks with his words, and the hashtags
+ * and then the link go first exactly as before. `platforms.captionOverlaysShortFor` is the one decision, and
  * it needs `opts.probe` — with no probe nothing changes, which is the safe
  * direction: a full caption on a Short is what we were already doing.
  */
@@ -405,23 +412,24 @@ async function captionForPlatform(platform, opts) {
   const join = (xs) => xs.filter(Boolean).join('\n\n');
 
   const overlaid = platformTable.captionOverlaysShortFor(platform, opts.probe);
-  const words = overlaid ? overlayCaption(opts.text) : opts.text;
+  const { prose, credits } = splitCredits(opts.text);
+  const words = overlaid ? titleLine(prose) : prose;
 
   const link = linkInCaption(platform) ? await linkFor(platform, opts, 'caption')
     : (profileCtaInCaption(platform, opts) ? voice.profileCta(platform) : null);
   const tags = tagsInCaption(platform) ? voice.tagLine(platform, opts.topics || []) : null;
 
   for (const [caption, dropped] of [
-    [join([words, link, tags]), null],
-    [join([words, link]), 'the hashtags'],
-    [join([words]), 'the hashtags and the tracked link'],
+    [join([words, link, tags, credits]), null],
+    [join([words, link, credits]), 'the hashtags'],
+    [join([words, credits]), 'the hashtags and the tracked link'],
   ]) {
     if (captionLength(platform, caption) <= max) {
       if (dropped) console.log(`note: ${platform} caption is over ${max} — dropped ${dropped}`);
       return caption;
     }
   }
-  throw new Error(`his words alone are ${captionLength(platform, words)} characters `
+  throw new Error(`his words alone are ${captionLength(platform, join([words, credits]))} characters `
     + `and ${platform} takes ${max}`);
 }
 

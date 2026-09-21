@@ -36,9 +36,10 @@ Prompt it yourself!
 
 @thechrisgoor #couchtocreator`;
 
-// What a short is allowed to show: the title, and the credit line.
-const SHORT = 'I had a job interview and told them to prompt it yourself'
-  + '\n\n@thechrisgoor #couchtocreator';
+const TITLE = 'I had a job interview and told them to prompt it yourself';
+const CREDIT = '@thechrisgoor #couchtocreator';
+// His prose with the credit line lifted out — what every caption is built from.
+const STORY = BODY.slice(0, BODY.indexOf(CREDIT)).trim();
 
 const TALL = { aspect: 0.5625, durationSec: 37.7, isImage: false };
 const WIDE = { aspect: 1.7778, durationSec: 37.7, isImage: false };
@@ -98,28 +99,45 @@ test('a short gets the title line and the tags, and nothing else of his', async 
   const opts = { text: BODY, topics: ['JobInterview'], probe: TALL };
 
   const tiktok = await captionForPlatform('tiktok', opts);
-  assert.equal(tiktok, `${SHORT}\n\n#MWKShow #PIY #JobInterview`);
+  assert.equal(tiktok, `${TITLE}\n\n#MWKShow #PIY #JobInterview\n\n${CREDIT}`);
   assert.ok(!tiktok.includes('They wanted a CTO'), 'the story stays off the picture');
 
   // Instagram keeps its five hashtags for the comment, so the caption is the
   // title and the credit — hashtagsInCaption: 0 still decides that, not this rule.
-  assert.equal(await captionForPlatform('instagram', opts), SHORT);
+  assert.equal(await captionForPlatform('instagram', opts), `${TITLE}\n\n${CREDIT}`);
 });
 
 test('the same clip landscape, and the same platform, gets all of his words', async () => {
   const wide = await captionForPlatform('facebook', { text: BODY, topics: [], probe: WIDE });
-  assert.ok(wide.startsWith(BODY), 'the feed post is unchanged');
+  assert.ok(wide.startsWith(STORY), 'the feed post keeps every word of the story');
+  assert.ok(wide.endsWith(CREDIT), 'and the credit is still on it');
   // Facebook takes hashtags in the caption, so its short one is the title and
   // the two always-on tags — the same rule Instagram's hashtagsInCaption: 0
   // answers differently.
   const tall = await captionForPlatform('facebook', { text: BODY, topics: [], probe: TALL });
-  assert.equal(tall, `${SHORT}\n\n#MWKShow #PIY`);
+  assert.equal(tall, `${TITLE}\n\n#MWKShow #PIY\n\n${CREDIT}`);
 });
 
 test('a platform outside the set is untouched by the rule', async () => {
   for (const p of ['linkedin', 'threads']) {
     const caption = await captionForPlatform(p, { text: BODY, topics: [], probe: TALL });
-    assert.ok(caption.startsWith(BODY), `${p} is a text-first feed — his words stay whole`);
+    assert.ok(caption.startsWith(STORY), `${p} is a text-first feed — his words stay whole`);
+  }
+});
+
+/*
+ * "PUT MY TAGS FIRST NOT CHRIS ONE" (mate, 2026-09-22, an hour after asking
+ * for Chris to be tagged at all). Our tag line is appended after everything
+ * of his, so the credit has to be composed LAST for his brand tags to come
+ * first. It is the one ordering rule here, and it holds on a short and on a
+ * full caption alike.
+ */
+test('his tags come before the credit, short or not', async () => {
+  for (const probe of [TALL, WIDE]) {
+    const caption = await captionForPlatform('facebook', { text: BODY, topics: ['JobSearch'], probe });
+    assert.ok(caption.indexOf('#MWKShow') < caption.indexOf('@thechrisgoor'),
+      'the brand tags lead, whoever else is tagged');
+    assert.ok(caption.endsWith(CREDIT), 'and the credit is the last thing on the post');
   }
 });
 
@@ -131,18 +149,19 @@ test('a platform outside the set is untouched by the rule', async () => {
  * body, and on Instagram and TikTok — the two platforms where a @handle
  * actually notifies the person — the body is exactly what a short drops.
  */
-test('a line of pure tagging rides with the title; prose does not', () => {
-  const { overlayCaption } = captions;
-  assert.equal(overlayCaption(BODY), SHORT, 'the credit survives, the story does not');
+test('a line of pure tagging is lifted out; prose is not', () => {
+  const { splitCredits } = captions;
+  assert.deepStrictEqual(splitCredits(BODY), { prose: STORY, credits: CREDIT });
 
-  assert.equal(overlayCaption('Title\n\nThanks @thechrisgoor #couchtocreator'), 'Title',
-    'a sentence with a mention in it is prose, and prose covers the picture');
-  assert.equal(overlayCaption('Title\n\n@one, @two #three'), 'Title\n\n@one, @two #three',
+  assert.deepStrictEqual(splitCredits('Title\n\nThanks @thechrisgoor #couchtocreator'),
+    { prose: 'Title\n\nThanks @thechrisgoor #couchtocreator', credits: '' },
+    'a sentence with a mention in it is prose: it stays where he wrote it, and a short drops it');
+  assert.deepStrictEqual(splitCredits('Title\n\n@one, @two #three'),
+    { prose: 'Title', credits: '@one, @two #three' },
     'commas and several handles are still just tagging');
-  assert.equal(overlayCaption('Title\n\nstory here'), 'Title');
-  assert.equal(overlayCaption('@credit #first\n\nreal title'), '@credit #first',
-    'line one is the title whatever it contains — it is also the YouTube title');
-  assert.equal(overlayCaption(''), '');
+  assert.deepStrictEqual(splitCredits('Title\n\nstory here'),
+    { prose: 'Title\n\nstory here', credits: '' });
+  assert.deepStrictEqual(splitCredits(''), { prose: '', credits: '' });
 });
 
 /*
@@ -158,6 +177,6 @@ test('the first comment is unchanged on a short', () => {
   const before = voice.firstComment('queue:test', args);
   const after = voice.firstComment('queue:test', args);
   assert.equal(after.text, before.text);
-  assert.ok(before.text.length > SHORT.length,
+  assert.ok(before.text.length > TITLE.length,
     'the CTA still carries the full comment, which is where his words now live');
 });

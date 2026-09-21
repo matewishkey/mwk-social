@@ -550,9 +550,15 @@ repeated failure in this repo.
   - **A LINE OF PURE TAGGING RIDES WITH THE TITLE**, wherever in the body it sits — *"add tag
     chris, and his tag as well"* arrived in the next breath after the rule above, and the rule
     would have deleted it on the four platforms where a @handle actually notifies somebody.
-    `captions.overlayCaption()` keeps line one plus every line that is only `@mentions` and
-    `#tags`; **prose does not qualify**, so `Thanks @thechrisgoor #couchtocreator` is dropped and
-    `@thechrisgoor #couchtocreator` is kept. Write the credit as a bare line.
+    `captions.splitCredits()` lifts out every line that is only `@mentions` and `#tags`;
+    **prose does not qualify**, so `Thanks @thechrisgoor #couchtocreator` stays in the body and
+    is dropped on a short, while `@thechrisgoor #couchtocreator` survives. Write a credit bare.
+  - **THE CREDIT IS COMPOSED LAST, AFTER OUR TAGS, EVERYWHERE** (*"put my tags first not chris
+    one"*, an hour later the same day). Our tag line is appended after everything of his, so
+    that is the only order in which his brand tags precede somebody else's handle — and it is
+    why the credit is lifted out of the body rather than left where he typed it. It is **never
+    given up to fit a cap**: he asked for the tag, so it ranks with his words, and the hashtags
+    then the link are still what go first.
   - **The title line is `captions.titleLine()` and it now has four readers** — the YouTube title
     (Zernio takes the first line, capped at 100 and refused at queue time), the Pinterest pin
     title, and this. `queue-add.js` prints which platforms will get the title alone on the

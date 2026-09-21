@@ -66,10 +66,12 @@ is nothing to switch on. What it needs from the DRAFT is one thing:
 
 - **Write the body title-first.** Line one has to stand alone, because on those four it is the
   whole caption. The story goes underneath, for LinkedIn, Threads, X and Pinterest.
-- **A credit goes on its own line, bare.** A line that is ONLY `@mentions` and `#tags` travels
-  with the title onto the shorts; a sentence does not. `@thechrisgoor #couchtocreator` survives,
-  `Thanks @thechrisgoor #couchtocreator` is dropped there — and tagging somebody is worth most on
-  Instagram and TikTok, which are shorts.
+- **A credit goes on its own line, bare, and is published LAST.** A line that is ONLY
+  `@mentions` and `#tags` is lifted out of the body and composed after our hashtags, on every
+  platform — his brand tags lead, whoever else is tagged (mate, 2026-09-22: *"put my tags first
+  not chris one"*). It survives onto a short; a sentence does not, so write
+  `@thechrisgoor #couchtocreator` and never `Thanks @thechrisgoor #couchtocreator`. Tagging
+  somebody is worth most on Instagram and TikTok, which are shorts.
 - **Line one is also the YouTube title** (capped at 100, refused at queue time) and the Pinterest
   pin title. One line, three jobs.
 - **The invitation still has to land somewhere he can read it.** On Instagram, Facebook and

@@ -56,31 +56,41 @@ function titleLine(body) {
 const CREDIT_LINE = /^[@#][\p{L}\p{N}_.]+(?:[\s,]+[@#][\p{L}\p{N}_.]+)*$/u;
 
 /**
- * WHAT A SHORT'S CAPTION IS MADE OF: the title, and any line that is purely
- * tagging.
+ * HIS PROSE AND HIS CREDITS, SEPARATED — because they are composed in
+ * different places and in that order.
  *
- * "Keep the title and the hashtags" and "tag Chris" are the same instruction
- * given twice (mate, 2026-09-22), and the first one silently cancels the
- * second if the caption is only ever line one: a mention lives in the body,
- * and the body is what a short drops. It matters most exactly where it would
- * be dropped — on Instagram and TikTok a @handle notifies the person and
- * links to them, and those are shorts.
+ * "Keep the title and the hashtags" and "tag Chris" arrived in the same
+ * breath (mate, 2026-09-22), and the first silently cancels the second if a
+ * short's caption is only ever line one: a mention lives in the body, and the
+ * body is what a short drops. It matters most exactly where it would be
+ * dropped — on Instagram and TikTok a @handle notifies the person and links
+ * to them, and those are shorts. So a credit line survives into a short.
  *
- * So a line of pure tagging rides with the title, wherever in the body he put
- * it. It costs no room over his subtitles: it is a line of handles, which is
- * what he asked to keep. Prose does not qualify — "Thanks @thechrisgoor" is a
- * sentence, and the test for a credit has to be something a draft either
- * clearly is or clearly is not, not a judgement about how many words are too
- * many.
+ * Then, an hour later, *"put my tags first not chris one"*. OUR tag line is
+ * appended by the caller after everything of his, so the only way his brand
+ * tags come before somebody else's is if the credit is composed LAST — after
+ * the tags, on every platform, wherever in the body he wrote it.
+ *
+ * Moving it is not moving his words. A credit line is tagging by definition
+ * here: nothing but @handles and #tags, no prose. "Thanks @thechrisgoor
+ * #couchtocreator" is a sentence and stays exactly where he put it, which is
+ * also why it does not survive onto a short — a sentence covers the picture.
+ * The test for a credit has to be something a draft clearly is or clearly is
+ * not, never a judgement about how many words are too many.
  *
  * @param {string} body his words, as stored.
- * @returns {string} the title, then each credit line, blank-line separated.
+ * @returns {{prose: string, credits: string}} his words with the credit lines
+ *   lifted out, and those lines joined — either may be ''.
  */
-function overlayCaption(body) {
-  const lines = String(body == null ? '' : body).split('\n').map((l) => l.trim()).filter(Boolean);
-  const [title, ...rest] = lines;
-  if (!title) return '';
-  return [title, ...rest.filter((l) => CREDIT_LINE.test(l))].join('\n\n');
+function splitCredits(body) {
+  const lines = String(body == null ? '' : body).split('\n');
+  const credits = [];
+  const kept = [];
+  for (const line of lines) {
+    if (CREDIT_LINE.test(line.trim())) credits.push(line.trim());
+    else kept.push(line);
+  }
+  return { prose: kept.join('\n').trim(), credits: credits.join('\n') };
 }
 
 /**
@@ -117,4 +127,4 @@ function wontFitLine(problems) {
     .map((p) => `${p.platform} (his words are ${p.length}, cap ${p.max})`).join(', ');
 }
 
-module.exports = { captionLength, titleLine, overlayCaption, wontFit, wontFitLine };
+module.exports = { captionLength, titleLine, splitCredits, wontFit, wontFitLine };
