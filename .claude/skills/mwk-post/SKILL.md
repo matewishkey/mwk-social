@@ -140,13 +140,15 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 
 ## 5. Say what will actually happen
 
-- The pace releases it: **two a day** (mate, 2026-09-21, after a Pinterest backfill put eight
+- The pace releases it: **one a day** (mate, 2026-09-21: *"I want to focus one short per a day
+  instead of overdo it"*, hours after cutting six to two over a Pinterest backfill that put eight
   out in one day), ninety minutes apart **plus 0-60 minutes of jitter**, inside a posting
   window of **07:00-11:00 Brisbane** (mate, 2026-09-21, reversing the 2026-08-21 "no window"
   rule: that is 17:00-21:00 New York, and Europe explicitly does not count). Both numbers are
   his and only he changes them — say what they will do to a batch rather than working around
   them. **Something queued after 11:00 waits until the next morning**, so never promise a
-  today that the window will refuse.
+  today that the window will refuse. **The window's opening slides 0-180 minutes by the day**,
+  so do not promise 07:00 either — read `pace.status()`'s `nextAt` and quote that.
 - The CTA lands as a first comment on Facebook, Instagram, LinkedIn, YouTube (natively at publish)
   and Threads (the hourly watcher).
 - **X takes the link IN THE TWEET** (changed 2026-08-24). It rode in a thread reply for three days;

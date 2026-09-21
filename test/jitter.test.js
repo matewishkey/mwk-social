@@ -26,9 +26,11 @@ const { unlockAt, AT_JITTER_MINUTES, parse } = require('../scripts/queue-add.js'
 const posted = (iso) => ({ kind: 'queue.posted', ts: iso });
 
 // These cases are about the GAP. The live 07:00-11:00 window would refuse most
-// of the instants they walk over, for a reason none of them is testing, so it
-// is switched off here and pinned in test/window.test.js instead.
-const GAP = { window: null };
+// of the instants they walk over, and the live cap of ONE refuses a second
+// post outright before the gap is ever consulted — neither is what any of them
+// is testing, so both are switched off here and pinned where they belong
+// (test/window.test.js and test/daily-cap.test.js).
+const GAP = { window: null, perDay: 6 };
 
 test('the gap jitter is the same answer at every tick, for the same last post', () => {
   const last = '2026-09-21T03:18:00.000Z';
@@ -73,7 +75,7 @@ test('the jitter can be switched off, and then the old constant gap is back', ()
   const last = '2026-09-21T03:18:00.000Z';
   const events = [posted(last)];
   const at = new Date(Date.parse(last) + 91 * 60000);
-  assert.equal(pace.whyNotNow(events, { jitterMinutes: 0, window: null }, at), null);
+  assert.equal(pace.whyNotNow(events, { ...GAP, jitterMinutes: 0 }, at), null);
 });
 
 test('status reports the jitter, so the dashboard cannot describe a fixed gap', () => {
