@@ -499,8 +499,11 @@ had already published were jargon the rule rejects.
 wired, with `commentProblems()` asserting the table agrees with itself and a test reading both
 composition call sites for it.) (`verifiable` and
 `mediaUrlAvailable` were on this list too and no longer exist at all; they went with the mirror.)
-The config page renders every field, which makes an unread one look implemented. This is the single
-most repeated failure in this repo.
+The config page renders **many** of them, which makes an unread one look implemented — it is a
+curated eight (`captionMax`, `foldAt`, `hashtagsInCaption`, `videoMaxSec`, `imageOk`, `imageMax`,
+`deletable`, `estCostCents`), so `landscapeOk`, `commentMax`, `aspectRange` and the rest are on
+the table and on no page. The hazard is real; the absolute was not. This is the single most
+repeated failure in this repo.
 
 - **`hashtagsInCaption`** was decorative from the beginning, so LinkedIn, Facebook and YouTube
   posted with no hashtags at all until 2026-08-21.
@@ -543,8 +546,7 @@ most repeated failure in this repo.
     `galleryProblems()` asserts the table agrees with itself, and the config page renders it.
     The field and the first reader landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
     **X 4** (Zernio's own platform pages, 2026-08-27) and **Pinterest 1**, which is why a pin is
-    never part of a gallery. `galleryProblems()` asserts the table agrees
-    with itself, the way `linkProblems()` does.
+    never part of a gallery — `galleryProblems()` asserts that the way `linkProblems()` does.
     **Read the numbers out of `platforms.js`, not out of this line** — it has been a platform
     behind twice now.
   - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is the
@@ -686,11 +688,14 @@ most repeated failure in this repo.
   platforms while somebody looked up the flag list. Instagram and TikTok cannot be deleted through
   the API, so that class of slip is permanent. It is the one script that publishes and it was the
   one script that did not check.
-  ⚠ **"Every sibling already did" was overstated** (corrected 2026-09-21). Only `queue-add.js`
-  and `run-queue.js` refuse an unknown argument; `yt-description.js` still reads its flags with
-  bare `argv.includes()` and swallows a typo silently. It writes descriptions rather than
-  publishing, so the stakes are lower — but do not quote this line as if the guard were
-  everywhere. `grep -l 'Unknown' scripts/*.js` is the actual list.
+  ⚠ **"Every sibling already did" was overstated, AND THE CORRECTION WAS WRONG TOO** (2026-09-21,
+  re-measured the same day). **Four** scripts refuse: `queue-add.js` and `run-queue.js` throw on an
+  `unknown argument`, `post.js` and `first-comment.js` `exit 2` on an `unknown option`. The gap is
+  **`yt-description.js`, `ship-events.js` and `ship-stats.js`**, which read their flags with bare
+  `argv.includes()` and swallow a typo silently; none of the three publishes, so the stakes are
+  lower. **The verification command in this line was ALSO wrong and returned a clean absence** —
+  `grep -l 'Unknown' scripts/*.js` matches nothing, because the code spells it lowercase in two
+  forms. `grep -ln 'unknown argument\|unknown option' scripts/*.js` is the actual list.
 - **A publish call that times out has NOT necessarily failed, and since 2026-09-14 the code
   agrees.** The request aborts at the client and Zernio keeps processing. `post.js` now reconciles
   a timeout by searching `posts:list` for the exact caption, minutes old; found, it waits on it like
@@ -994,8 +999,11 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   was off, a token had expired, or the queue had stopped. `scripts/lib/health.js` is the one path:
   three Healthchecks dead-man checks (`heartbeat` from ship-events every 2 min, `posted` from
   run-queue on a live post, `accounts` from ship-stats hourly on `needsReconnect`/`error`), URLs
-  in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job never fails
-  because the alerting did. A test drives it through a curl shim. The Healthchecks project has to
+  **would** go in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job
+  never fails because the alerting did. ⚠ **None is set today** — that file holds
+  `MWK_LOG_TOKEN`, `MWK_LOG_URL` and `ZERNIO_API_KEY` and nothing else (checked 2026-09-21), so
+  every `health.ping` is a no-op and **nothing alerts anybody**. The code is wired, the account
+  is not. A test drives it through a curl shim. The Healthchecks project has to
   exist first — it is mate's account to create it in.
 - **A FLAKY OPTIONAL SOURCE TOOK THE WHOLE SWEEP DOWN, AND THE ALERT COULD NOT FIRE BECAUSE THE
   THROW CAME FIRST** (2026-09-15 02:00 UTC). `first-comment.js` reads `analytics:posts` for YouTube

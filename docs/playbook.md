@@ -26,7 +26,7 @@ which lands a reel on Facebook and YouTube in the same minute. `first-comment.js
 pinning it there. The Facebook copy is handled by hand. Do not rebuild an "is a copy already over
 there?" check: that was the mirror's job and the mirror is why it hurt.
 
-Five ways the call-to-action gets under a post:
+Six ways the call-to-action gets under a post:
 
 | | How | Where |
 |---|---|---|
@@ -49,8 +49,8 @@ in the wrong place.
 - **`#MWKShow` and `#PIY` go on every post, in that order** — the brand and the motto short form.
   A cap tighter than the pair truncates it, so X's one tag is `#MWKShow`.
 - **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
-  table decides: Facebook, YouTube, LinkedIn, TikTok and X take them in the caption; Instagram and
-  Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive
+  table decides: Facebook, YouTube, LinkedIn, TikTok, X and Pinterest take them in the caption;
+  Instagram and Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive
   choice, not a rule Instagram states (see CLAUDE.md).
   "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
   is just `#PIY`.
@@ -84,10 +84,11 @@ in the wrong place.
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
 | **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. **His own profile posts natively** (2026-09-14) — that is where the followers are and the only place the voice is first person. The company page reposts it with his thought on top and the tracked CTA underneath; any other connected profile reposts **plain**, because words under a person's name have to be that person's. A thought on top is optional and always his |
 | **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
-| **A still picture** | — | — | Five take one: Facebook, Instagram, LinkedIn, Threads, X. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (LinkedIn 20, Facebook/Instagram/Threads 10, X 4) and `galleryFor()`, `galleryProblems()` and the config page read it; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
+| **A still picture** | — | — | Six take one: Facebook, Instagram, LinkedIn, Threads, X, Pinterest. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (LinkedIn 20, Facebook/Instagram/Threads 10, X 4, Pinterest 1) and `galleryFor()`, `galleryProblems()` and the config page read it; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there — in the caption, in a comment, and **in the bio**, which is tappable only on a Business account or past 1,000 followers. So a TikTok post carries no link and makes no claim about one (2026-09-14). Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
+| **Pinterest** | **none at all** | not exercised | Connected 2026-09-20. **Every pin needs a board**, and `connect:get-pinterest-boards` answers 405 while `GET /accounts/{id}/pinterest-boards` returns the list, so `post.js` uses the REST route. The CTA gets its **own slot** — `platformSpecificData.link` is the pin's destination, minted with medium `link`; a url in the description is plain text. Title is the first line of his words, 100 max. **2:3, 1:1 or 9:16 only**, so `landscapeOk: false`, and `imageMax` is **1** — a pin is never part of a gallery. Analytics return impressions, saves and clicks, but `analytics:posts` syncs only some of the live pins (repo issue #43), so count from `queue_item.result` |
 
 ### The two worth getting right
 
@@ -170,7 +171,7 @@ platform will not take costs the post otherwise, and the item is already claimed
   selector asks for `avc1` first and only falls through if there is none.
 - **yt-dlp serves Opus audio unless told otherwise, and X alone refuses it.** Constraining the
   video codec and leaving `+ba` free takes YouTube's best audio, which is Opus; `--merge-output-format
-  mp4` muxes it in without complaint and so do five of the six platforms. X uploads the entire file
+  mp4` muxes it in without complaint and so does every platform but one. X uploads the entire file
   and fails at 99% with "media processing failed". Ask for `+ba[ext=m4a]`. `check()` now catches it
   before the upload.
 - **yt-dlp appends its own extension to `-o`.** Asking for `x` and getting `x.mp4` reads as "the

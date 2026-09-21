@@ -47,8 +47,9 @@ length, and which platforms take a still at all.
 Six systemd `--user` timers run it (`scripts/install-timers.sh`): the queue every five minutes,
 the comment watcher hourly, events every two minutes, analytics hourly, show notes daily, and a
 nightly copy of the box's state to the backed-up share. Three Healthchecks dead-man checks
-(`scripts/lib/health.js`) email the owner if the heartbeat stops, nothing posts for a day, or an
-account needs reconnecting.
+(`scripts/lib/health.js`) are wired for the heartbeat stopping, nothing posting for a day, and an
+account needing reconnection — **wired but unconfigured**: they no-op until `MWK_HC_*_URL` is set,
+and nothing is set today.
 
 ## Reproduce it
 
@@ -117,7 +118,8 @@ covering three, and read half again as high as the truth. It was deleted rather 
   message that reads exactly like a plan limit. It is not one.
 - **One VIDEO per post, on every platform** — so a vertical cut and a landscape cut are two posts.
   Stills are the exception: several ride together as one gallery, capped per platform by
-  `imageMax` (LinkedIn 20, Facebook/Instagram/Threads 10, X 4).
+  `imageMax` (LinkedIn 20, Facebook/Instagram/Threads 10, X 4, Pinterest 1 — so a pin is never
+  part of a gallery).
 - **TikTok settings go in `tiktokSettings` at the top level**, not `platformSpecificData`, which
   would look accepted and apply none of them because that field echoes any key you send it.
 

@@ -87,12 +87,30 @@ Omit `--topics` entirely to let the watcher derive them from the clip's own tran
 ```sh
 node -e 'const m=require("./scripts/lib/media");const p=m.probe(process.argv[1]);
   console.log(JSON.stringify(p));
-  for (const pl of ["facebook","instagram","youtube","linkedin","tiktok","threads","twitter"])
+  for (const pl of ["facebook","instagram","youtube","linkedin","tiktok","threads","twitter","pinterest"])
     console.log(pl, JSON.stringify(m.check(pl,p)))' /path/to/clip.mp4
 ```
 
 An empty array is a pass. `check()` returns an ARRAY of problems, and the argument order is
 `(platform, probe)` — both are easy to get backwards.
+
+**WHAT HE UPLOADS IS A MASTER, NOT A DELIVERABLE — EVERY PLATFORM REFUSES IT AS IT ARRIVES.**
+The `.mov` files that land in `~/share/work/mat-mwk-social/input/` are **ProRes video with PCM
+audio**, 1080x1920, around a gigabyte for forty seconds — 3 of 3 checked on 2026-09-21 (`001 -
+Chris Website`, `002 - Refund`, `003 - Job interview`). `check()` fails all eight platforms on
+the codec alone, and X fails a second time on the audio. So *"the video is ready"* means the
+master is ready; the encode is ours:
+
+```sh
+ffmpeg -y -hide_banner -loglevel error -i "<master>.mov" \
+  -c:v libx264 -profile:v high -pix_fmt yuv420p -crf 20 -preset slow \
+  -movflags +faststart -c:a aac -b:a 192k -ar 48000 "<slug>-<NNN>.mp4"
+```
+
+That took 1.24 GB to 32.8 MB with the picture and the 38.6 s untouched, and passed all eight.
+Write it **beside the master in `input/`**, named `<slug>-<NNN>.mp4` after the master's number
+(`chris-website-001.mp4` is the one already in the archive) — then probe THAT file, never the
+`.mov`. Both go to `input/archive/<date>/` once the post is out.
 
 Pulling a clip off YouTube, two traps that bite every time:
 

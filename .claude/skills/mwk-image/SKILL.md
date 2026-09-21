@@ -76,7 +76,7 @@ tweet. **Stills only**: one video per post is a hard limit everywhere, so a set 
 it silently collapses to the first item.
 
 Caps are per platform and `platforms.galleryFor()` applies them: **LinkedIn 20, Facebook 10,
-Instagram 10, Threads 10, X 4**. Over the cap it truncates; a platform that takes no still gets
+Instagram 10, Threads 10, X 4, Pinterest 1** — a pin is therefore never part of a gallery. Over the cap it truncates; a platform that takes no still gets
 nothing.
 
 **Pad the SET to a common ratio, not each file to whatever passes.** Instagram forces one aspect
@@ -118,7 +118,7 @@ words are yours and easy to replace. If he dictates, his words win untouched.
 
 ## 7. Then say what happened
 
-Read the run output, not your expectations. Five platforms publish, two skip, and the skip lines
+Read the run output, not your expectations. Six platforms publish, two skip, and the skip lines
 name the reason. Instagram mints **no** short code — nothing there is clickable, so its CTA
 points at the bio.
 
