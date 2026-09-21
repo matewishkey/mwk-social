@@ -5,14 +5,14 @@
  * audience spans timezones, so holding for a good hour only delays. He
  * reversed it on 2026-09-21 — "i think better morning is better", "the
  * morning giving us the best coverage" — on the arithmetic rather than on any
- * measurement: 07:00-11:00 Brisbane is 17:00-21:00 in New York, and at one
- * post a day the slot matters in a way it did not at six.
+ * measurement: 07:00-11:00 Brisbane is 17:00-21:00 in New York, and at two
+ * posts a day the slot matters in a way it did not at six.
  *
  * WITHIN the window the day's opening SLIDES, and that is the half of this
- * file to read first. At one post a day the gap jitter can never bind — the
- * cap refuses a second post before the gap is consulted — so without a
- * sliding opening every post would land at 07:05 Brisbane for ever, which is
- * the fingerprint he asked us to stop leaving on the same day he set the cap.
+ * file to read first. The gap jitter only ever moves the SECOND post of a
+ * day — the first has no gap to wait out — so without a sliding opening it
+ * would land at 07:05 Brisbane every morning, which is half of everything we
+ * publish and the same fingerprint he asked us to stop leaving.
  *
  * What these pin: the window is real, it is escapable, it applies to the
  * PUBLISHER and to what the dashboard promises, the hours live in one place

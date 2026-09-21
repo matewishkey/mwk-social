@@ -221,9 +221,9 @@ Every unit is `Type=oneshot` and runs through `scripts/with-secrets.sh`, because
 `EnvironmentFile` can read neither `~/.secrets` nor the sops-encrypted project env.
 
 **The pace is in `scripts/lib/pace.js`, not the cadence.** The timer is a dumb heartbeat and
-`whyNotNow()` says no most of the time — one a day, inside a window whose opening slides 0-180
-minutes so we are not publishing at the same minute every morning (the ninety-minute gap and its
-0-60 of jitter are still there, and at one a day the cap always answers first). Under `--scheduled` it
+`whyNotNow()` says no most of the time — two a day, ninety minutes apart plus 0-60 of jitter,
+inside a window whose opening itself slides 0-180 minutes so the day's first post is not always at
+07:05. Under `--scheduled` it
 says so silently, or nine refusals an hour would drown the log. Keeping it in one module
 means a run by hand obeys the same rules, and it counts `queue.posted` events so there is one
 budget rather than one per caller.
@@ -256,7 +256,7 @@ correct, DST included.
 
 **Why it does not fit, in the order the reasons bite:**
 
-1. **It is a timetable, not a pace.** Our rule is one a day, ninety minutes apart plus a hashed
+1. **It is a timetable, not a pace.** Our rule is two a day, ninety minutes apart plus a hashed
    0-60 minutes of jitter, inside a four-hour window whose opening itself slides by the day. A fixed slot list cannot express a minimum
    gap or a daily cap, and the jitter exists precisely so consecutive posts do not land on a
    timetable — a constant gap was a fingerprint (95 minutes, 42 publishes). ⚠ This reason used

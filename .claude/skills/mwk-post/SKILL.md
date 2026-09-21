@@ -140,9 +140,10 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 
 ## 5. Say what will actually happen
 
-- The pace releases it: **one a day** (mate, 2026-09-21: *"I want to focus one short per a day
-  instead of overdo it"*, hours after cutting six to two over a Pinterest backfill that put eight
-  out in one day), ninety minutes apart **plus 0-60 minutes of jitter**, inside a posting
+- The pace releases it: **two a day** (mate, 2026-09-21, after a Pinterest backfill put eight
+  out in one day — and confirmed at two the same evening: *"the two limit is good"*. His own
+  "one short a day" is what he SHOOTS, not this number), ninety minutes apart **plus 0-60
+  minutes of jitter**, inside a posting
   window of **07:00-11:00 Brisbane** (mate, 2026-09-21, reversing the 2026-08-21 "no window"
   rule: that is 17:00-21:00 New York, and Europe explicitly does not count). Both numbers are
   his and only he changes them — say what they will do to a batch rather than working around

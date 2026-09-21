@@ -631,33 +631,29 @@ most repeated failure in this repo.
   `analytics:best-time` is worse: its top slots rest on ONE post each. **No platform reports
   audience geography** (checked every field `analytics:posts` returns), so "the US is awake" is
   a reasoned guess and must never be quoted as a finding.
-- **ONE A DAY, AND IT IS HIS NUMBER** (mate, 2026-09-21: *"I want to focus one short per a day
-  instead of overdo it... i think it is better i am learning things"*). It moved twice in one day:
-  six to **two** that lunchtime (*"enable only 2 posts per a day, you spammed pinterest... only
-  override this one if i say so"*, after the Pinterest backfill put **eight pins out in one day**
-  at `--priority -1` — every one legal under the old cap and the gap, and the day read as a
-  machine emptying a list), then two to **one** that evening. **The second move is not the same
-  complaint**: the first was about a burst, this one is about what he wants to spend his day on,
-  so do not argue it with throughput. **The cap is the only thing between a backfill and a feed
-  nobody wants to follow** — a priority below zero orders the queue, it does not slow it down.
-  `test/daily-cap.test.js` pins the DEFAULT rather than a fixture, because the pace tests all pass
-  their own `perDay` and would not notice it moving. Raising it needs him to say so in words.
-  - **At one a day the gap and its jitter can never bind** — the cap refuses a second post
-    first, every time. They stay wired because the cap is his number and may move again.
-  - **A backfill now costs the WHOLE day**, which is the intended price: a pin goes out only on a
-    day he has written nothing. That does not reopen the Pinterest carve-out — it makes it
-    cheaper to honour.
+- **TWO A DAY, AND IT IS HIS NUMBER** (mate, 2026-09-21: *"enable only 2 posts per a day, you
+  spammed pinterest... only override this one if i say so"*). It was six. The Pinterest backfill
+  put **eight pins out in one day** at `--priority -1`, every one of them legal under the old cap
+  and the gap, and the day read as a machine emptying a list. **The cap is the only thing between
+  a backfill and a feed nobody wants to follow** — a priority below zero orders the queue, it does
+  not slow it down. `test/daily-cap.test.js` pins the DEFAULT rather than a fixture, because the
+  pace tests all pass their own `perDay` and would not notice it moving. Raising it needs him to
+  say so in words.
+  - ⚠ **IT WAS DROPPED TO ONE FOR AN HOUR ON A MISREADING** (same day). *"I want to focus one
+    short per a day instead of overdo it... i think it is better i am learning things"* is about
+    **what he shoots**, not what the queue releases — asked directly, he answered *"the two limit
+    is good, no worries about that"*. **His production rate and the publisher's cap are different
+    numbers**, and only the second one is in `pace.js`. The two sentences are easy to hear as one.
 - **A CONSTANT GAP IS A FINGERPRINT, AND OURS WAS 95 MINUTES ON THE DOT** (mate, 2026-09-21:
   *"make sure we are randomizing stuff"*). Measured over 42 publishes: a constant 90-minute
   minimum plus the five-minute timer put consecutive posts 95 minutes apart nearly every time,
   and 20 of the 42 landed at :04-:08 past the hour. Separately **every `--at` item went out at
   10:05 Brisbane, eleven days running** — a bare date unlocks at 00:00 UTC and :05 is the next
   tick. THREE jitters, and they are different mechanisms **on purpose**:
-  - **THE DAY'S OPENING SLIDES, AND AT ONE A DAY IT IS THE ONLY ONE THAT FIRES** (added
-    2026-09-21 with the cap). The gap can never bind at one post a day — the cap refuses the
-    second post first — so the window start plus the first tick would have put **every** post at
-    07:05 Brisbane for ever, which is a worse metronome than the 95 minutes he complained about.
-    `pace.openingFor(day)` hashes the Brisbane DAY to 0-180 minutes past 07:00, and `whyNotNow`
+  - **THE DAY'S OPENING SLIDES, BECAUSE THE GAP ONLY EVER MOVES THE SECOND POST** (added
+    2026-09-21). The first post of a day has no gap to wait out, so the window start plus the
+    first tick put it at **07:05 Brisbane every morning** — half of everything we publish, and
+    the half that sets the pattern. `pace.openingFor(day)` hashes the Brisbane DAY to 0-180 minutes past 07:00, and `whyNotNow`
     gives its own refusal for it ("inside the window, but today opens at 09:34") because at 07:10
     *"outside the window"* would be a lie. **The range stops an hour short of 11:00** so the day
     always keeps an hour of five-minute ticks to publish in.
@@ -1056,16 +1052,16 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   LinkedIn (the largest audience) is missing from nearly every August winner. The mechanism
   exists and works — `queue-add.js --media-key` re-queues a clip already in R2, and anything
   older than 2026-08-21 predates the queue and would come back off YouTube with yt-dlp.
-  **The reasoning against it is his supply, not the platforms**: at ONE a day a backfill item
-  eats the whole day, which is the Pinterest complaint again. Revisit only if he says so.
+  **The reasoning against it is his supply, not the platforms**: at two a day a backfill item
+  eats half a day's output, which is the Pinterest complaint again. Revisit only if he says so.
   - **PINTEREST IS THE ONE CARVE-OUT** (mate, same day: *"Pinterest is fine, because it was
     never there"*). His line is the definition of the rule: a clip going somewhere it has
     NEVER run is not a resend, and Pinterest is the only platform where that is true at scale.
     **Nine of the channel's nineteen Shorts are pinned and ten are not** (counted
     2026-09-21), the ten including the biggest: the 1,100-view *secret exposed* and the 504,
     397, 387 and 361 clips. **What he banned
-    was the RATE, not Pinterest** — the daily cap already fixes that, and at one a day a pin
-    costs the WHOLE day, so it waits for one he has written nothing for.
+    was the RATE, not Pinterest** — the two-a-day cap already fixes that, so a pin still costs
+    a slot and still waits for a day with nothing new.
   - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND WE CAN ONLY SEE 44% OF IT.** The four pins
     Zernio's analytics returns read **0 impressions, 0 saves, 0 clicks** on 2026-09-21 —
     but **nine are live**, and `analytics:posts --platform pinterest` returns four of them

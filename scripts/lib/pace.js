@@ -9,7 +9,7 @@
  * 2026-08-21 CALL. The old reasoning was that the audience is spread across
  * timezones, so holding one back for a "good hour" only delays it. What
  * changed is the arithmetic: **07:00-11:00 Brisbane is 17:00-21:00 in New
- * York**, the evening of the audience he actually wants, and at ONE post a
+ * York**, the evening of the audience he actually wants, and at TWO posts a
  * day the slot matters in a way it did not at six. Mate: "i think better
  * morning is better", "the morning giving us the best coverage", "i do not
  * care about hungary at all" (it is 23:00-03:00 there, ruled irrelevant).
@@ -65,28 +65,26 @@ function parseWindow(spec) {
 
 const DEFAULTS = {
   /*
-   * ONE (mate, 2026-09-21: "I want to focus one short per a day instead of
-   * overdo it... i think it is better i am learning things"). It was six on
-   * the morning of the 21st, then TWO by lunchtime after the Pinterest
+   * TWO (mate, 2026-09-21: "the two limit is good, no worries about that").
+   *
+   * It was six that morning, then two at lunchtime after the Pinterest
    * backfill put EIGHT pins out in a single day behind a priority of -1 —
    * each one legal under the cap and the gap, and the whole day reading as a
-   * machine emptying a list. One is the same decision taken further, and the
-   * reason he gave is not throughput: he would rather make one clip he has
-   * learned something from than feed a schedule.
+   * machine emptying a list ("enable only 2 posts per a day, you spammed
+   * pinterest... only override this one if i say so").
    *
-   * At one a day the minimum gap and its jitter can never bind — the cap
-   * refuses first, every time. They stay because the cap is his number and
-   * may move again, and a pace with no gap underneath it would be a burst
-   * the day it does.
+   * ⚠ IT WENT TO ONE FOR AN HOUR, AND THAT WAS A MISREADING. "I want to
+   * focus one short per a day instead of overdo it... i think it is better i
+   * am learning things" was about HIS OWN production rate — he makes one
+   * clip a day — not about the publisher's cap, which he then confirmed at
+   * two. Worth keeping because the two sentences are easy to hear as the same
+   * thing: what he shoots and what the queue releases are different numbers,
+   * and the second one is the only one in this file.
    *
-   * A backfill now costs the WHOLE day rather than half of it, which is the
-   * intended price: `--priority -1` orders the queue, so a pin goes out only
-   * on a day he has written nothing. The cap is the only thing standing
-   * between a backfill and a feed nobody wants to follow. Raising it is HIS
-   * call and he has to say so; passing perDay in an opts object is how a
-   * caller would quietly undo this, so do not.
+   * Raising it is HIS call and he has to say so; passing perDay in an opts
+   * object is how a caller would quietly undo this, so do not.
    */
-  perDay: 1,
+  perDay: 2,
   /*
    * The posting window in the AUDIENCE's hours, start inclusive and end
    * exclusive: 7 to 11 means a post may go from 07:00:00 to 10:59:59
@@ -148,12 +146,12 @@ function jitterFor(seed, jitterMinutes = DEFAULTS.jitterMinutes) {
  * WHEN THE WINDOW OPENS *TODAY* — a second fingerprint, and it only became
  * the whole story when the cap went to one.
  *
- * The gap jitter can never bind at one post a day: the cap refuses a second
- * post outright, so the only thing deciding the minute is the window's start
- * plus the first timer tick after it. That is 07:05 Brisbane, every single
+ * The gap jitter only ever moves the SECOND post of a day. The first one has
+ * no gap to wait out, so the only thing deciding its minute is the window's
+ * start plus the first timer tick after it: 07:05 Brisbane, every single
  * morning, for ever — the exact thing mate asked us to stop doing on
- * 2026-09-21 ("make sure we are randomizing stuff"). At two a day it was half
- * the posts; at one it is all of them.
+ * 2026-09-21 ("make sure we are randomizing stuff"). At two a day that is
+ * half of everything we publish, and the half that sets the pattern.
  *
  * So the day's opening slides. Hashed off the Brisbane DAY for the same
  * reason the gap is hashed off the last post: the pace is recomputed every
