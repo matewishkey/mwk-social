@@ -873,6 +873,39 @@ The invariants:
   rendered thirty days); **connecting an account is not growth** — the follower total counts only
   accounts present at BOTH ends, and the ones left out are named.
 
+## "Are we being suppressed?" — the seed test
+
+**A SHORT THAT UNDERPERFORMS IS ALMOST NEVER A PENALTY, AND `daily_metric_revision` CAN PROVE IT
+IN ONE QUERY** (2026-09-21, mate: *"did i got a shadowban because of the content"*). YouTube gives
+every Short the same small trial and then either expands it or stops. **A suppressed video does not
+get its trial** — so compare the FIRST HOURS, not the lifetime number.
+
+- The revision table is hourly and `daily_metric` attributes lifetime accrual to a publish date, so
+  **on a day with exactly one YouTube post that series IS that post's accrual curve.** Check
+  `post_count = 1` before reading it as one video.
+- Measured on the pair that prompted the question: `faHLBwsj7OE` (1,105 views) read **17 at 3h29m**
+  and **326 at 5h29m**; `7Y90aN-LQAk` (20 views) read **18 at 3h54m** and **19 at 5h54m**. Identical
+  seed, opposite outcome. The trial ran and did not convert — which is what 11 of the channel's 19
+  Shorts do.
+- **The channel is bimodal and that is the base rate, not a symptom**: 11 Shorts under 100 views
+  lifetime, 8 over 350. A low number is the mode.
+- **The best control is the neighbouring post.** One breakout 19 hours earlier, same pipeline, same
+  face, same edit, kills every channel-level theory without any research at all.
+
+- **SATURATION AND "FLAGGED AS AI" ARE BOTH MEASURABLE OR REFUTABLE — do not speculate.**
+  `ffmpeg -vf "fps=2,signalstats,metadata=print:file=-"` gives SATAVG/YAVG per frame; the
+  20-view clip read **9.8** against the 1,105-view clip's **12.4**, and its own source file read
+  9.9, so YouTube had not crushed it either. The under-performer was the *less* saturated one.
+  YouTube's inauthentic-content rule is a **monetization** policy about mass-produced or templated
+  uploads, not a distribution throttle, and nothing in it keys on "made with AI".
+- ⚠ **The 24 August 2026 view-count change did NOT touch Shorts.** Shorts have counted from the
+  first frame since March 2025; the change brought long-form and live into line. So a Shorts trend
+  crossing that date is real, and `viewsUnitBlocked` is about the other formats.
+- **Most "shadowban" writing online is SEO filler.** The "Visual Uniqueness filter" that several
+  2026 blogs describe has no YouTube source — do not repeat it. What IS observable from this box:
+  `availability`, the channel's own Shorts tab from a logged-out `yt-dlp`, and the accrual curve.
+  Retention and the monetization icon are Studio-only and no API exposes them.
+
 ## Traps that cost a session
 
 - **A TEST WITH A FIXED FIXTURE AND A RELATIVE WINDOW PASSES UNTIL A DATE, THEN LIES**
