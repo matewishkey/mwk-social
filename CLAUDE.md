@@ -1022,6 +1022,20 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   `--source late|external|all` narrows it. **YouTube is the one platform we still sweep**
   (`first-comment.js`'s `sources()`, which runs `--platform youtube` and passes no `--source`) —
   see *Live streams* above. Anywhere else a post made outside the pipeline is handled by hand.
+- **REUSING AN OLD CLIP IS DECLINED — NEW CLIPS INSTEAD** (mate, 2026-09-21: *"do not resend
+  anything yet... we will add new clips instead so do not reuse"*). This closes a proposal made
+  the same day off a real coverage gap, so **the gap is not a reason to re-propose it**: TikTok,
+  his second-best reach channel, has never carried four of the strongest August clips, and
+  LinkedIn (the largest audience) is missing from nearly every August winner. The mechanism
+  exists and works — `queue-add.js --media-key` re-queues a clip already in R2, and anything
+  older than 2026-08-21 predates the queue and would come back off YouTube with yt-dlp.
+  **The reasoning against it is his supply, not the platforms**: at two a day a backfill item
+  eats half a day's output, which is the Pinterest complaint again. Revisit only if he says so.
+  - **A HELD ITEM CAN BE A BACKFILL NOBODY CALLED ONE.** `01M16273CVBA0MJP4RMWQ5EC69` — the Adri
+    review card, queued 2026-08-29 for X and Threads, held to the 22nd — would have published
+    the morning after this decision, and the same card had already run on Instagram on the 20th.
+    It is parked at `not_before = 2026-10-01`. **When a reuse rule lands, read the queue for what
+    is already holding**, the same way a voice change has to reach what is already drafted.
 
 ## X: follows only
 
