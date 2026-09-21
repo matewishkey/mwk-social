@@ -525,7 +525,7 @@ most repeated failure in this repo.
   the platform is dropped with a reason rather than truncated. **X counts every url as 23
   characters** however long it is. Composition is caught per account: a throw there is before the
   requests, so one over-long post would otherwise take every platform with it.
-- **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X; **not YouTube**
+- **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X, Pinterest; **not YouTube**
   (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
   we have never built one, so it is "not built", not "impossible" — **and mate declined building
   them, 2026-08-26 closing #27**, so "not built" is the decision, not a gap). `imageAspectRange` is not
@@ -542,8 +542,11 @@ most repeated failure in this repo.
   - **`imageMax` is the cap, and it has THREE readers** — `galleryFor()` caps the set,
     `galleryProblems()` asserts the table agrees with itself, and the config page renders it.
     The field and the first reader landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
-    **X 4** (Zernio's own platform pages, 2026-08-27). `galleryProblems()` asserts the table agrees
+    **X 4** (Zernio's own platform pages, 2026-08-27) and **Pinterest 1**, which is why a pin is
+    never part of a gallery. `galleryProblems()` asserts the table agrees
     with itself, the way `linkProblems()` does.
+    **Read the numbers out of `platforms.js`, not out of this line** — it has been a platform
+    behind twice now.
   - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is the
     natural way to write it and is wrong: X and LinkedIn share a first image and have caps of 4 and
     20, so X would be handed twenty. A test fails if the key stops covering every file.
@@ -663,7 +666,12 @@ most repeated failure in this repo.
   were all a live publish — and on 2026-08-27 `--help` claimed an item and posted it to three
   platforms while somebody looked up the flag list. Instagram and TikTok cannot be deleted through
   the API, so that class of slip is permanent. It is the one script that publishes and it was the
-  one script that did not check; every sibling already did.
+  one script that did not check.
+  ⚠ **"Every sibling already did" was overstated** (corrected 2026-09-21). Only `queue-add.js`
+  and `run-queue.js` refuse an unknown argument; `yt-description.js` still reads its flags with
+  bare `argv.includes()` and swallows a typo silently. It writes descriptions rather than
+  publishing, so the stakes are lower — but do not quote this line as if the guard were
+  everywhere. `grep -l 'Unknown' scripts/*.js` is the actual list.
 - **A publish call that times out has NOT necessarily failed, and since 2026-09-14 the code
   agrees.** The request aborts at the client and Zernio keeps processing. `post.js` now reconciles
   a timeout by searching `posts:list` for the exact caption, minutes old; found, it waits on it like

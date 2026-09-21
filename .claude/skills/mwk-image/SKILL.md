@@ -14,7 +14,7 @@ For a **still**. A clip is `mwk-post`; everything there about his voice, the has
 
 | takes a still | does not |
 |---|---|
-| Facebook, Instagram, LinkedIn, Threads, X | **YouTube**, **TikTok** |
+| Facebook, Instagram, LinkedIn, Threads, X, Pinterest | **YouTube**, **TikTok** |
 
 **YouTube** has nothing a still can be posted *as*. **TikTok** photo posts need
 `contentType: photo` and are **declined, not merely unbuilt** (mate, 2026-08-26, closing #27) —
@@ -24,8 +24,11 @@ do not propose building them. Expect both to be skipped in the run output and sa
 day. This skill is for a picture he hands over, or one the post is genuinely about — never for
 swapping a clip out.
 
-So a picture reaches five surfaces, not seven. If the point of the post needs TikTok or YouTube,
+So a picture reaches six surfaces, not eight. If the point of the post needs TikTok or YouTube,
 it needs a clip.
+
+**Pinterest takes exactly ONE image** (`imageMax: 1`), so it is never part of a gallery, and it
+refuses landscape: 2:3, 1:1 or 9:16 only. Its title is the first line of his words, 100 characters.
 
 ## 2. Believe `identify`, never the file name
 

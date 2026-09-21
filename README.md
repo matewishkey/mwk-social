@@ -1,6 +1,6 @@
 # mwk-social
 
-A paced publishing queue for seven platforms, driven from the terminal with the
+A paced publishing queue for eight platforms, driven from the terminal with the
 [Zernio](https://zernio.com) CLI, with a dashboard for the decisions that need a human.
 
 It runs the social side of [Mate Wish Key](https://matewishkey.com), a show where people with no
@@ -10,10 +10,11 @@ coding experience build something they actually want.
 
 ## What it does
 
-**One item in, seven platforms out, spread over hours.** Something is queued — from the dashboard
+**One item in, eight platforms out, spread over hours.** Something is queued — from the dashboard
 or from the box — and `lib/pace.js` decides when it goes: a daily cap counted in the audience's
-timezone and a minimum gap, with no time-of-day window because the audience is in every timezone.
-Queue five things at once and you get five posts across the day, not five in a minute.
+timezone, a minimum gap with a jittered top-up, and a posting window of **07:00-11:00 Brisbane**,
+which is the US evening. Queue five things at once and they go out **two a day**, not five in a
+minute — and something queued at noon waits until the next morning.
 
 **Every post carries a route back to the show.** A first comment with a tracked
 `mwkshow.com/<code>` link, minted per platform and placement, so a click says which channel and
@@ -93,7 +94,7 @@ At this size followers are not the scoreboard — most of the connected channels
 digits and one holds nearly all the audience. What the stats page shows instead:
 
 1. **Posts and actions per post** — the only two numbers measured the same way everywhere
-2. **Tracked clicks** — one redirect hit with crawlers filtered, identical on all seven channels
+2. **Tracked clicks** — one redirect hit with crawlers filtered, identical on all eight channels
 3. **Cadence** — the biggest lever fully within our control
 4. **"Seen"** — kept because it is what we have, but **never ranked across channels**: three of
    ours report reach, two report views and one reports impressions, and those are different things

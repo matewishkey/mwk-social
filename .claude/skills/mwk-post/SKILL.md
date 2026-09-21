@@ -141,9 +141,12 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 ## 5. Say what will actually happen
 
 - The pace releases it: **two a day** (mate, 2026-09-21, after a Pinterest backfill put eight
-  out in one day), ninety minutes apart **plus 0-60 minutes of jitter**, and **no time-of-day
-  window**. Two is his number and only he changes it — say what the cap will do to a batch
-  rather than working around it.
+  out in one day), ninety minutes apart **plus 0-60 minutes of jitter**, inside a posting
+  window of **07:00-11:00 Brisbane** (mate, 2026-09-21, reversing the 2026-08-21 "no window"
+  rule: that is 17:00-21:00 New York, and Europe explicitly does not count). Both numbers are
+  his and only he changes them — say what they will do to a batch rather than working around
+  them. **Something queued after 11:00 waits until the next morning**, so never promise a
+  today that the window will refuse.
 - The CTA lands as a first comment on Facebook, Instagram, LinkedIn, YouTube (natively at publish)
   and Threads (the hourly watcher).
 - **X takes the link IN THE TWEET** (changed 2026-08-24). It rode in a thread reply for three days;

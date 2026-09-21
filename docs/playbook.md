@@ -7,7 +7,7 @@ Everything here was learned by doing it live — where a rule exists, something 
 
 ```
 the queue (dashboard) ──> run-queue.js ──> Facebook · Instagram · YouTube · LinkedIn
-                              │            Threads · TikTok · X
+                              │            Threads · TikTok · X · Pinterest
                               │                     │
                               │            the CTA, in a comment or the caption
                               │                     │
@@ -26,7 +26,7 @@ which lands a reel on Facebook and YouTube in the same minute. `first-comment.js
 pinning it there. The Facebook copy is handled by hand. Do not rebuild an "is a copy already over
 there?" check: that was the mirror's job and the mirror is why it hurt.
 
-Four ways the call-to-action gets under a post:
+Five ways the call-to-action gets under a post:
 
 | | How | Where |
 |---|---|---|
@@ -35,6 +35,7 @@ Four ways the call-to-action gets under a post:
 | **In the caption** | the link rides in the post itself — X has a comments API, but a comment would be the same link twice under one tweet, and an out-of-network REPLY never reaches the For You feed at all | X |
 | **Nowhere — the bio instead** | a url is dead text in a caption AND a comment, so the CTA names the bio and mints no code | Instagram |
 | **Nowhere, and it says nothing** | the bio is dead text too — a TikTok bio link is tappable only on a Business account or past 1,000 followers, and this account is neither (checked in the app, 2026-09-14). His words and the tags, no link and no claim about one | TikTok |
+| **The pin's own destination** | a pin carries a link field of its own (`platformSpecificData.link`), so the CTA gets a real slot rather than dead text in the description; minted with medium `link` | Pinterest |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
 carries the marker — whoever put it there.
@@ -225,10 +226,14 @@ says so silently, or nine refusals an hour would drown the log. Keeping it in on
 means a run by hand obeys the same rules, and it counts `queue.posted` events so there is one
 budget rather than one per caller.
 
-**There is no time-of-day window** (mate's call, 2026-08-21). There used to be a 09:00–21:00 one.
-The audience is spread across timezones — someone in the US reads a post hours after it goes up
-and is none the wiser — so holding a post for a "good hour" only delayed it. What is left is
-volume, not timing.
+**The posting window is 07:00–11:00 Brisbane** (mate's call, 2026-09-21), and it reverses his own
+2026-08-21 decision that there should be none. The old reasoning was that the audience spans
+timezones, so holding for a "good hour" only delayed the post; the new one is that the Brisbane
+morning is the US evening (17:00–21:00 New York, 14:00–18:00 Los Angeles) and the European
+audience has been ruled irrelevant. It lives in `pace.DEFAULTS.window` and nowhere else —
+`queue-add.js` derives a held item's unlock from it. **That the hour changes anything is
+unmeasured**: over 253 posts the apparent morning advantage disappeared once post age was
+controlled, and no platform reports audience geography.
 
 **The daily cap is still counted in the audience's timezone.** The box is `Etc/UTC` and the
 audience is in Brisbane, so counting UTC days would reset the cap twelve hours early. `MWK_TZ`
@@ -249,10 +254,12 @@ correct, DST included.
 
 **Why it does not fit, in the order the reasons bite:**
 
-1. **It is a timetable, not a pace.** Our rule is two a day, ninety minutes apart, at *any* hour.
-   A queue is precisely the time-of-day window that was deleted on 2026-08-21. Expressing "any
-   time, min ninety minutes apart" needs ~112 hand-maintained slots and still does not enforce a
-   daily cap.
+1. **It is a timetable, not a pace.** Our rule is two a day, ninety minutes apart plus a hashed
+   0-60 minutes of jitter, inside a four-hour window. A fixed slot list cannot express a minimum
+   gap or a daily cap, and the jitter exists precisely so consecutive posts do not land on a
+   timetable — a constant gap was a fingerprint (95 minutes, 42 publishes). ⚠ This reason used
+   to read "at *any* hour, and a queue is the window we deleted"; the window came back on
+   2026-09-21 and that half of the argument is dead. Reasons 2 and 3 carry the conclusion.
 2. **A queue belongs to ONE profile, and our accounts span two.** LinkedIn-personal and TikTok sit
    on one profile; Facebook, Instagram, LinkedIn-Ltd, Threads, X and YouTube on the other. A
    routine post crosses both, and no single queue can schedule it as one unit.
