@@ -49,6 +49,40 @@ function titleLine(body) {
   return String(body == null ? '' : body).split('\n').map((l) => l.trim()).find(Boolean) || '';
 }
 
+/*
+ * A line that is nothing but @mentions and #hashtags — a credit, not prose.
+ * Unicode letters, because a handle is not always ASCII.
+ */
+const CREDIT_LINE = /^[@#][\p{L}\p{N}_.]+(?:[\s,]+[@#][\p{L}\p{N}_.]+)*$/u;
+
+/**
+ * WHAT A SHORT'S CAPTION IS MADE OF: the title, and any line that is purely
+ * tagging.
+ *
+ * "Keep the title and the hashtags" and "tag Chris" are the same instruction
+ * given twice (mate, 2026-09-22), and the first one silently cancels the
+ * second if the caption is only ever line one: a mention lives in the body,
+ * and the body is what a short drops. It matters most exactly where it would
+ * be dropped — on Instagram and TikTok a @handle notifies the person and
+ * links to them, and those are shorts.
+ *
+ * So a line of pure tagging rides with the title, wherever in the body he put
+ * it. It costs no room over his subtitles: it is a line of handles, which is
+ * what he asked to keep. Prose does not qualify — "Thanks @thechrisgoor" is a
+ * sentence, and the test for a credit has to be something a draft either
+ * clearly is or clearly is not, not a judgement about how many words are too
+ * many.
+ *
+ * @param {string} body his words, as stored.
+ * @returns {string} the title, then each credit line, blank-line separated.
+ */
+function overlayCaption(body) {
+  const lines = String(body == null ? '' : body).split('\n').map((l) => l.trim()).filter(Boolean);
+  const [title, ...rest] = lines;
+  if (!title) return '';
+  return [title, ...rest.filter((l) => CREDIT_LINE.test(l))].join('\n\n');
+}
+
 /**
  * Which platforms HIS WORDS ALONE are too long for.
  *
@@ -83,4 +117,4 @@ function wontFitLine(problems) {
     .map((p) => `${p.platform} (his words are ${p.length}, cap ${p.max})`).join(', ');
 }
 
-module.exports = { captionLength, titleLine, wontFit, wontFitLine };
+module.exports = { captionLength, titleLine, overlayCaption, wontFit, wontFitLine };

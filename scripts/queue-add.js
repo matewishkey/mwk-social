@@ -322,7 +322,7 @@ function overlayLine(file, wanted) {
     .filter((p) => !wanted.length || wanted.includes(p))
     .filter((p) => platforms.captionOverlaysShortFor(p, probe));
   if (!names.length) return null;
-  return `a short — ${names.join(', ')} get the title line and the tags only; `
+  return `a short — ${names.join(', ')} get the title line and the tags, not the story; `
     + 'the first comment is unchanged';
 }
 

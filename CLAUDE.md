@@ -547,6 +547,12 @@ repeated failure in this repo.
     player, YouTube is the Short test it already runs. Threads, LinkedIn, X and Pinterest are out
     — text-first surfaces, **not measured with a ruler**; if he says the text covers a clip on one
     of them, add it to the table.
+  - **A LINE OF PURE TAGGING RIDES WITH THE TITLE**, wherever in the body it sits — *"add tag
+    chris, and his tag as well"* arrived in the next breath after the rule above, and the rule
+    would have deleted it on the four platforms where a @handle actually notifies somebody.
+    `captions.overlayCaption()` keeps line one plus every line that is only `@mentions` and
+    `#tags`; **prose does not qualify**, so `Thanks @thechrisgoor #couchtocreator` is dropped and
+    `@thechrisgoor #couchtocreator` is kept. Write the credit as a bare line.
   - **The title line is `captions.titleLine()` and it now has four readers** — the YouTube title
     (Zernio takes the first line, capped at 100 and refused at queue time), the Pinterest pin
     title, and this. `queue-add.js` prints which platforms will get the title alone on the

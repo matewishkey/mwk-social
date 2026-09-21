@@ -30,7 +30,7 @@ const platformTable = require('./lib/platforms');
 // One implementation, shared with queue-add.js: the thing that QUEUES a post
 // has to know what the publisher knows, or a platform gets dropped hours later
 // with nobody watching (2026-09-21).
-const { captionLength, titleLine } = require('./lib/captions');
+const { captionLength, titleLine, overlayCaption } = require('./lib/captions');
 const mediaLib = require('./lib/media');
 const shortlink = require('./lib/shortlink');
 const commentState = require('./lib/comment-state');
@@ -394,7 +394,9 @@ async function pinFields(account, opts) {
  * fit a cap, they are deliberately not sent, because the player would print
  * them over the subtitles burned into his own clip (mate, 2026-09-22). The
  * first comment is untouched and still carries the lot; he excluded it in the
- * same sentence. `platforms.captionOverlaysShortFor` is the one decision, and
+ * same sentence. A line of pure @mentions and #tags rides along with the
+ * title — "tag Chris" was the same instruction as "keep the hashtags", and
+ * dropping the credit is exactly what the title-only rule would have done. `platforms.captionOverlaysShortFor` is the one decision, and
  * it needs `opts.probe` — with no probe nothing changes, which is the safe
  * direction: a full caption on a Short is what we were already doing.
  */
@@ -403,7 +405,7 @@ async function captionForPlatform(platform, opts) {
   const join = (xs) => xs.filter(Boolean).join('\n\n');
 
   const overlaid = platformTable.captionOverlaysShortFor(platform, opts.probe);
-  const words = overlaid ? titleLine(opts.text) : opts.text;
+  const words = overlaid ? overlayCaption(opts.text) : opts.text;
 
   const link = linkInCaption(platform) ? await linkFor(platform, opts, 'caption')
     : (profileCtaInCaption(platform, opts) ? voice.profileCta(platform) : null);

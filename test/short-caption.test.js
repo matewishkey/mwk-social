@@ -32,7 +32,13 @@ const BODY = `I had a job interview and told them to prompt it yourself
 They wanted a CTO to come in and do the AI part for them. They were in the
 meeting and not in the meeting.
 
-Prompt it yourself!`;
+Prompt it yourself!
+
+@thechrisgoor #couchtocreator`;
+
+// What a short is allowed to show: the title, and the credit line.
+const SHORT = 'I had a job interview and told them to prompt it yourself'
+  + '\n\n@thechrisgoor #couchtocreator';
 
 const TALL = { aspect: 0.5625, durationSec: 37.7, isImage: false };
 const WIDE = { aspect: 1.7778, durationSec: 37.7, isImage: false };
@@ -92,12 +98,12 @@ test('a short gets the title line and the tags, and nothing else of his', async 
   const opts = { text: BODY, topics: ['JobInterview'], probe: TALL };
 
   const tiktok = await captionForPlatform('tiktok', opts);
-  assert.equal(tiktok, `${captions.titleLine(BODY)}\n\n#MWKShow #PIY #JobInterview`);
+  assert.equal(tiktok, `${SHORT}\n\n#MWKShow #PIY #JobInterview`);
   assert.ok(!tiktok.includes('They wanted a CTO'), 'the story stays off the picture');
 
   // Instagram keeps its five hashtags for the comment, so the caption is the
-  // title alone — hashtagsInCaption: 0 still decides that, not this rule.
-  assert.equal(await captionForPlatform('instagram', opts), captions.titleLine(BODY));
+  // title and the credit — hashtagsInCaption: 0 still decides that, not this rule.
+  assert.equal(await captionForPlatform('instagram', opts), SHORT);
 });
 
 test('the same clip landscape, and the same platform, gets all of his words', async () => {
@@ -107,7 +113,7 @@ test('the same clip landscape, and the same platform, gets all of his words', as
   // the two always-on tags — the same rule Instagram's hashtagsInCaption: 0
   // answers differently.
   const tall = await captionForPlatform('facebook', { text: BODY, topics: [], probe: TALL });
-  assert.equal(tall, `${captions.titleLine(BODY)}\n\n#MWKShow #PIY`);
+  assert.equal(tall, `${SHORT}\n\n#MWKShow #PIY`);
 });
 
 test('a platform outside the set is untouched by the rule', async () => {
@@ -115,6 +121,28 @@ test('a platform outside the set is untouched by the rule', async () => {
     const caption = await captionForPlatform(p, { text: BODY, topics: [], probe: TALL });
     assert.ok(caption.startsWith(BODY), `${p} is a text-first feed — his words stay whole`);
   }
+});
+
+/*
+ * TAGGING SOMEONE AND KEEPING THE CAPTION SHORT ARE THE SAME INSTRUCTION, AND
+ * THE FIRST ONE CANCELS THE SECOND IF ONLY LINE ONE SURVIVES.
+ *
+ * Mate asked for both in the same breath (2026-09-22). A mention lives in the
+ * body, and on Instagram and TikTok — the two platforms where a @handle
+ * actually notifies the person — the body is exactly what a short drops.
+ */
+test('a line of pure tagging rides with the title; prose does not', () => {
+  const { overlayCaption } = captions;
+  assert.equal(overlayCaption(BODY), SHORT, 'the credit survives, the story does not');
+
+  assert.equal(overlayCaption('Title\n\nThanks @thechrisgoor #couchtocreator'), 'Title',
+    'a sentence with a mention in it is prose, and prose covers the picture');
+  assert.equal(overlayCaption('Title\n\n@one, @two #three'), 'Title\n\n@one, @two #three',
+    'commas and several handles are still just tagging');
+  assert.equal(overlayCaption('Title\n\nstory here'), 'Title');
+  assert.equal(overlayCaption('@credit #first\n\nreal title'), '@credit #first',
+    'line one is the title whatever it contains — it is also the YouTube title');
+  assert.equal(overlayCaption(''), '');
 });
 
 /*
@@ -130,6 +158,6 @@ test('the first comment is unchanged on a short', () => {
   const before = voice.firstComment('queue:test', args);
   const after = voice.firstComment('queue:test', args);
   assert.equal(after.text, before.text);
-  assert.ok(before.text.length > captions.titleLine(BODY).length,
+  assert.ok(before.text.length > SHORT.length,
     'the CTA still carries the full comment, which is where his words now live');
 });
