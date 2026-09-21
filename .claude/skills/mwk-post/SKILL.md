@@ -53,6 +53,28 @@ never a paraphrase — read it off the live page rather than typing it from memo
   themselves as AI experts went out ending *"Worth knowing before the invoice turns up."*
   Diagnosing the problem is not the post; the answer is.
 
+## 1b. A SHORT GETS THE TITLE LINE AND NOTHING ELSE OF HIS
+
+Mate, 2026-09-22: *"the text what you are sending is overlaying my captions, so it can take too
+much space... keep the title and the hashtags, keep it super short, to drive them into the video.
+It is only rules for the shorts, and not for the comments."*
+
+A short-form player prints the caption ON the video, over the subtitles he burns into every clip.
+**TikTok, Instagram, Facebook and YouTube** do that to a vertical clip under three minutes; the
+publisher works it out per platform and per clip (`platforms.captionOverlaysShortFor`), so there
+is nothing to switch on. What it needs from the DRAFT is one thing:
+
+- **Write the body title-first.** Line one has to stand alone, because on those four it is the
+  whole caption. The story goes underneath, for LinkedIn, Threads, X and Pinterest.
+- **Line one is also the YouTube title** (capped at 100, refused at queue time) and the Pinterest
+  pin title. One line, three jobs.
+- **The invitation still has to land somewhere he can read it.** On Instagram, Facebook and
+  YouTube the first comment carries the full CTA, untouched — he excluded comments by name.
+  **TikTok has no comment path at all**, so if the line is to reach a TikTok viewer it has to be
+  in the title itself.
+- `queue-add.js` prints which platforms are getting the title alone, on the `queued` line. Read it
+  back to him rather than describing the post as if every platform got all of it.
+
 A still picture rather than a clip: `mwk-image`.
 
 ## 2. The hashtags are for normal humans, never for tech people

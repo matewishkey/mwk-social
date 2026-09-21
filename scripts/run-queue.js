@@ -320,6 +320,12 @@ async function main() {
           // CTA names the bio there instead of spending a code nobody can follow.
           linkDead: accts.map((a) => a.platform)
             .filter((pl) => platforms.linkDeadFor(pl, (cutFor(pl) || {}).probe)),
+          // Already measured on the way in, so the publisher does not run
+          // ffprobe over the same file again. Every account in this group
+          // shares one media set by construction, so one probe answers for
+          // all of them — it is what decides whether the caption is his title
+          // line (a short) or all of his words (anything else).
+          probe: (set[0] || {}).probe || null,
           accounts: accts.map((a) => a.id),
           all: false,
           media: set.map((m) => m.file),

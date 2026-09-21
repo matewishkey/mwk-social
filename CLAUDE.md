@@ -497,7 +497,9 @@ had already published were jargon the rule rejects.
 **Five fields have shipped declared-and-never-read**: `linkPlacement`, `landscapeOk`,
 `hashtagsInCaption`, `shortsAreDead`, `captionMax` — all wired now. (`commentMax` landed already
 wired, with `commentProblems()` asserting the table agrees with itself and a test reading both
-composition call sites for it.) (`verifiable` and
+composition call sites for it. So did `captionOverlaysShort`, in one commit with
+`captionForPlatform()` reading it, `flowFor()` rendering the condition on the workflow page and a
+test pinning the set to exactly four.) (`verifiable` and
 `mediaUrlAvailable` were on this list too and no longer exist at all; they went with the mirror.)
 The config page renders **many** of them, which makes an unread one look implemented — it is a
 curated eight (`captionMax`, `foldAt`, `hashtagsInCaption`, `videoMaxSec`, `imageOk`, `imageMax`,
@@ -528,6 +530,30 @@ repeated failure in this repo.
   the platform is dropped with a reason rather than truncated. **X counts every url as 23
   characters** however long it is. Composition is caught per account: a throw there is before the
   requests, so one over-long post would otherwise take every platform with it.
+- **`captionOverlaysShort` — ON A SHORT THE CAPTION IS THE TITLE LINE AND THE TAGS, BECAUSE THE
+  PLAYER PRINTS IT OVER HIS OWN SUBTITLES** (mate, 2026-09-22: *"the text what you are sending is
+  overlaying my captions... keep the title and the hashtags, keep it super short, to drive them
+  into the video. It is only rules for the shorts, and not for the comments"*). Both halves
+  decide it — the platform has a short-form player, **and** the clip is one (`platforms.isShort`,
+  vertical under three minutes, now shared with `linkDeadFor` rather than written twice). So
+  Facebook and YouTube compose in full for the wide cut and short for the tall one, on the same
+  day, from the same words.
+  - **Nothing is truncated and this is not the give-up order bending.** The rest of his words are
+    not squeezed to fit a cap, they are deliberately not sent; **the first comment still carries
+    everything**, which is the half of his sentence that is easy to drop.
+  - **It is measured per platform, not assumed.** Facebook was the one in doubt and it is in:
+    a 9:16 page post published as `facebook.com/watch/?v=<id>` carries
+    `og:url = facebook.com/reel/<id>`. Instagram's own post URL is `/reel/`, TikTok has no other
+    player, YouTube is the Short test it already runs. Threads, LinkedIn, X and Pinterest are out
+    — text-first surfaces, **not measured with a ruler**; if he says the text covers a clip on one
+    of them, add it to the table.
+  - **The title line is `captions.titleLine()` and it now has four readers** — the YouTube title
+    (Zernio takes the first line, capped at 100 and refused at queue time), the Pinterest pin
+    title, and this. `queue-add.js` prints which platforms will get the title alone on the
+    `queued` line itself, because deciding it correctly at publish time and telling nobody is the
+    2026-09-21 mistake exactly.
+  - **So the body is written title-first**: line one stands alone as the whole caption on four
+    platforms, and the story goes underneath.
 - **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X, Pinterest; **not YouTube**
   (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
   we have never built one, so it is "not built", not "impossible" — **and mate declined building

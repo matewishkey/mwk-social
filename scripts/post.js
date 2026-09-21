@@ -30,7 +30,8 @@ const platformTable = require('./lib/platforms');
 // One implementation, shared with queue-add.js: the thing that QUEUES a post
 // has to know what the publisher knows, or a platform gets dropped hours later
 // with nobody watching (2026-09-21).
-const { captionLength } = require('./lib/captions');
+const { captionLength, titleLine } = require('./lib/captions');
+const mediaLib = require('./lib/media');
 const shortlink = require('./lib/shortlink');
 const commentState = require('./lib/comment-state');
 const fs = require('fs');
@@ -364,10 +365,11 @@ async function pinFields(account, opts) {
   let p;
   try { p = platformTable.get(account.platform); } catch { return null; }
   if (p.linkPlacement !== 'link') return null;
-  const firstLine = String(opts.text || '').split('\n')[0].trim();
   return {
     link: await linkFor(account.platform, opts, 'link'),
-    title: firstLine.slice(0, p.titleMax || 100),
+    // The same title line YouTube takes and the short caption is made of —
+    // captions.titleLine() is the one definition of it.
+    title: titleLine(opts.text).slice(0, p.titleMax || 100),
     boardId: await boardFor(account.id),
   };
 }
@@ -386,32 +388,66 @@ async function pinFields(account, opts) {
  * His words are never touched, never truncated, never re-wrapped: if they alone
  * do not fit, the platform was never going to take this post and it is dropped
  * with a reason rather than mangled into fitting.
+ *
+ * ON A SHORT, HIS WORDS ARE THE TITLE LINE — and that is not this rule
+ * bending. Nothing is truncated: the rest of his words are not squeezed to
+ * fit a cap, they are deliberately not sent, because the player would print
+ * them over the subtitles burned into his own clip (mate, 2026-09-22). The
+ * first comment is untouched and still carries the lot; he excluded it in the
+ * same sentence. `platforms.captionOverlaysShortFor` is the one decision, and
+ * it needs `opts.probe` — with no probe nothing changes, which is the safe
+ * direction: a full caption on a Short is what we were already doing.
  */
 async function captionForPlatform(platform, opts) {
   const max = platformTable.get(platform).captionMax || Infinity;
   const join = (xs) => xs.filter(Boolean).join('\n\n');
+
+  const overlaid = platformTable.captionOverlaysShortFor(platform, opts.probe);
+  const words = overlaid ? titleLine(opts.text) : opts.text;
 
   const link = linkInCaption(platform) ? await linkFor(platform, opts, 'caption')
     : (profileCtaInCaption(platform, opts) ? voice.profileCta(platform) : null);
   const tags = tagsInCaption(platform) ? voice.tagLine(platform, opts.topics || []) : null;
 
   for (const [caption, dropped] of [
-    [join([opts.text, link, tags]), null],
-    [join([opts.text, link]), 'the hashtags'],
-    [join([opts.text]), 'the hashtags and the tracked link'],
+    [join([words, link, tags]), null],
+    [join([words, link]), 'the hashtags'],
+    [join([words]), 'the hashtags and the tracked link'],
   ]) {
     if (captionLength(platform, caption) <= max) {
       if (dropped) console.log(`note: ${platform} caption is over ${max} — dropped ${dropped}`);
       return caption;
     }
   }
-  throw new Error(`his words alone are ${captionLength(platform, opts.text)} characters `
+  throw new Error(`his words alone are ${captionLength(platform, words)} characters `
     + `and ${platform} takes ${max}`);
+}
+
+/*
+ * The probe of this post's video, for the caption rules that depend on the
+ * CLIP and not only on the platform.
+ *
+ * run-queue has already probed every cut and passes its own in, so the
+ * pipeline never probes twice. A hand-run publish probes the local file
+ * itself rather than going without: a rule that applies through the queue and
+ * silently not by hand is the worse half of every bug in this repo. A URL
+ * cannot be probed here and gives null, which means "compose as before".
+ */
+function probeFor(opts) {
+  if (opts.probe !== undefined) return opts.probe;
+  for (const item of opts.media || []) {
+    if (/^https?:\/\//.test(item)) continue;
+    try { return mediaLib.probe(item); } catch { /* not a file we can read */ }
+  }
+  return null;
 }
 
 async function publish(opts) {
   const accounts = resolveAccounts(opts);
   const wantComment = opts.firstComment;
+  // Before resolveMedia, which uploads and hands back urls: the probe wants
+  // the local file.
+  const compose = { ...opts, probe: probeFor(opts) };
   const media = resolveMedia(opts.media);
 
   /*
@@ -431,7 +467,7 @@ async function publish(opts) {
   const composed = [];
   for (const a of accounts) {
     try {
-      composed.push({ account: a, caption: await captionForPlatform(a.platform, opts) });
+      composed.push({ account: a, caption: await captionForPlatform(a.platform, compose) });
     } catch (err) {
       console.log(`skip  ${a.platform} — ${err.message}`);
     }
@@ -482,6 +518,12 @@ async function publish(opts) {
   const inCaption = accounts.filter((a) => linkInCaption(a.platform));
   if (inCaption.length) {
     console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
+  }
+  const overlaid = accounts.filter((a) => platformTable.captionOverlaysShortFor(a.platform, compose.probe));
+  if (overlaid.length) {
+    console.log(`note: ${overlaid.map((a) => a.platform).join(', ')} play this as a short — `
+      + 'the caption is his title line and the tags, and nothing else would be read anyway '
+      + 'under the words already on the picture. The first comment is unchanged');
   }
   const toProfile = accounts.filter((a) => linkToProfile(a.platform, opts));
   if (toProfile.length) {

@@ -20,9 +20,41 @@
  * published limits and have NOT been exercised from here — they are both lower
  * than anything we compose, so they cost nothing if they are a little wrong.
  */
+
+/*
+ * `captionOverlaysShort` — THE CAPTION IS DRAWN OVER HIS OWN SUBTITLES.
+ *
+ * Mate, 2026-09-22: "the text what you are sending is overlaying my captions,
+ * so it can take too much space... keep the title and the hashtags, keep it
+ * super short, to drive them into the video. It is only rules for the shorts,
+ * and not for the comments."
+ *
+ * A short-form player puts the caption ON the video, bottom-left, over the
+ * burned-in subtitles he cuts into every clip. Everywhere else the text sits
+ * in the feed ABOVE or BESIDE the video and costs him nothing, which is why
+ * this is a per-platform field and not a rule about all captions. What it
+ * changes is the CAPTION only — the first comment carries the full CTA
+ * exactly as before, because he excluded it in the same sentence.
+ *
+ * True here, and how each one was established (2026-09-22):
+ *   tiktok     the only player it has.
+ *   instagram  a single video IS a Reel (videoMaxSec above says so), and the
+ *              published post URL is instagram.com/reel/<id>.
+ *   facebook   MEASURED, because it was the one in doubt: the refund clip was
+ *              posted as facebook.com/watch/?v=981201988355763 and Facebook's
+ *              own og:url on that page is facebook.com/reel/981201988355763/.
+ *              A 9:16 video on the page is a Reel whatever we called it.
+ *   youtube    vertical under three minutes is a Short — the same test
+ *              shortsAreDead already relies on.
+ *
+ * False for threads, linkedin, twitter and pinterest: all four are text-first
+ * surfaces where the words sit outside the frame. Not measured with a ruler —
+ * if he says the text covers a clip on one of those, add it here.
+ */
 const PLATFORMS = {
   instagram: {
     landscapeOk: false,           // aspectRange rejects it outright — reels are vertical
+    captionOverlaysShort: true,   // a single video is a Reel; the caption sits on it
     commentsApi: true,             // inbox:* works; the watcher can reach it
     reshare: 'none',
     metrics: { views:'yes', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
@@ -83,6 +115,7 @@ const PLATFORMS = {
     imageOk: false,
     imageMax: 0,             // imageOk is false — no still at all, so no gallery either
     landscapeOk: false,           // a vertical surface by definition
+    captionOverlaysShort: true,   // the caption is drawn on the video; there is no other player
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'partial',
@@ -211,6 +244,7 @@ const PLATFORMS = {
     imageOk: true,
     imageMax: 10,            // Zernio's Facebook page, 2026-08-27
     landscapeOk: true,           // feed takes landscape; Reels need the vertical cut
+    captionOverlaysShort: true,  // a 9:16 post canonicalises to facebook.com/reel/<id> — measured
     commentsApi: true,
     // Personal timelines are impossible via any API (Meta rule). This was
     // 'manual' — a "share it yourself" row filed on the dashboard per post —
@@ -233,6 +267,7 @@ const PLATFORMS = {
     imageOk: false,          // a video platform; there is nothing a still picture can be posted AS
     imageMax: 0,
     landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
+    captionOverlaysShort: true,  // ...and the Shorts player draws the title over the video
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'yes',
@@ -300,7 +335,14 @@ const known = (name) => Object.prototype.hasOwnProperty.call(PLATFORMS, name);
  */
 function flowFor(name) {
   const p = get(name);
-  const steps = [{ step: 'post', how: `media + caption${p.consent ? ', with the six TikTok consent flags' : ''}` }];
+  const steps = [{ step: 'post', how: `media + caption${p.consent ? ', with the six TikTok consent flags' : ''}`,
+    // So the caption rule is visible on the workflow page rather than only in
+    // the composed output. It is conditional on the clip, which flowFor cannot
+    // see, so it is worded as the condition rather than as a fact.
+    note: p.captionOverlaysShort
+      ? 'on a vertical clip under three minutes the caption is the title line and the tags only — '
+        + 'the player draws it over his subtitles'
+      : null }];
 
   if (p.supportsFirstComment) {
     steps.push({ step: 'first comment', how: 'native — Zernio posts it seconds after publish',
@@ -408,6 +450,20 @@ const linkIsLive = (name) => {
 };
 
 /*
+ * IS THIS CLIP A SHORT? One definition, because two rules now turn on it.
+ *
+ * Vertical and under three minutes — YouTube's own auto-classification, and
+ * the same shape every other short-form player takes. It was written inline
+ * in linkDeadFor() while it had one reader; captionOverlaysShort is the
+ * second, and two copies of a threshold is how one of them drifts.
+ *
+ * A still is never a Short: it has a duration of 0 and would otherwise pass
+ * both halves of the test.
+ */
+const isShort = (probe) => !!probe && !probe.isImage
+  && probe.aspect <= 1 && probe.durationSec < 180;
+
+/*
  * Will a link in this platform's post actually be clickable FOR THIS CLIP?
  *
  * Separate from linkIsLive because it depends on the media, not just the
@@ -420,9 +476,26 @@ const linkIsLive = (name) => {
  */
 function linkDeadFor(name, probe) {
   try {
-    const p = get(name);
-    if (!p.shortsAreDead || !probe) return false;
-    return probe.aspect <= 1 && probe.durationSec < 180;
+    return !!get(name).shortsAreDead && isShort(probe);
+  } catch { return false; }
+}
+
+/*
+ * Will this platform draw the caption OVER the video for this clip?
+ *
+ * Then the caption is his title line and the hashtags, and nothing else — the
+ * rest of his words would sit on top of the subtitles he burned into the clip
+ * (mate, 2026-09-22; the field's own comment at the top of this file carries
+ * his words and how each platform was established).
+ *
+ * Both halves matter. The platform decides whether there is a short-form
+ * player at all; the CLIP decides whether it goes into it. Facebook and
+ * YouTube publish landscape into an ordinary feed or watch page, where the
+ * text is nowhere near the picture and a full caption is right.
+ */
+function captionOverlaysShortFor(name, probe) {
+  try {
+    return !!get(name).captionOverlaysShort && isShort(probe);
   } catch { return false; }
 }
 
@@ -527,4 +600,5 @@ function commentProblems() {
 }
 
 module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
-  linkDeadFor, linkProblems, galleryFor, galleryProblems, commentProblems, SLOT };
+  isShort, linkDeadFor, captionOverlaysShortFor, linkProblems, galleryFor, galleryProblems,
+  commentProblems, SLOT };

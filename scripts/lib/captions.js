@@ -28,6 +28,28 @@ function captionLength(platform, text) {
 }
 
 /**
+ * THE TITLE IS THE FIRST LINE OF HIS WORDS, and three things already meant
+ * that before anything asked for it by name.
+ *
+ * Zernio makes the first line of the content a YouTube video's title;
+ * queue-add refuses a first line over 100 characters for that reason; and
+ * post.js takes the same line as a Pinterest pin's title. The short-caption
+ * rule (mate, 2026-09-22) is the fourth reader, and it is the one that makes
+ * the line load-bearing on its own — so all four go through here rather than
+ * spelling `split('\n')[0]` out again.
+ *
+ * The first NON-EMPTY line, not literally line one: a body that opens with a
+ * blank line has a title, and every caller wanting the bare `[0]` was really
+ * asking for this.
+ *
+ * @param {string} body his words, as stored on the queue item.
+ * @returns {string} the title line, trimmed; '' when there are no words.
+ */
+function titleLine(body) {
+  return String(body == null ? '' : body).split('\n').map((l) => l.trim()).find(Boolean) || '';
+}
+
+/**
  * Which platforms HIS WORDS ALONE are too long for.
  *
  * His words are never truncated (post.js gives up our tags, then our link, and
@@ -61,4 +83,4 @@ function wontFitLine(problems) {
     .map((p) => `${p.platform} (his words are ${p.length}, cap ${p.max})`).join(', ');
 }
 
-module.exports = { captionLength, wontFit, wontFitLine };
+module.exports = { captionLength, titleLine, wontFit, wontFitLine };

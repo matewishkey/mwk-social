@@ -66,8 +66,12 @@ const os = require('os');
 const path = require('path');
 
 const { ulid } = require('./lib/events');
-const { PLATFORMS } = require('./lib/platforms');
+const platforms = require('./lib/platforms');
+const { PLATFORMS } = platforms;
 const captions = require('./lib/captions');
+// `mediaLib`, because main() already has a local `media` holding the R2 key —
+// the same name twice in one file is how the wrong one gets read.
+const mediaLib = require('./lib/media');
 const pace = require('./lib/pace');
 
 // YouTube's title cap. The title is the first line of the caption, so the cap
@@ -201,7 +205,7 @@ function parse(argv) {
   // nothing saying so — refuse it here, where it is one line break to fix.
   // Only when YouTube can be a target: an empty list means "wherever it fits".
   const youtubeMayCarry = !opt.platforms.length || opt.platforms.includes('youtube');
-  const firstLine = opt.body.split('\n')[0].trim();
+  const firstLine = captions.titleLine(opt.body);
   if (youtubeMayCarry && firstLine.length > YOUTUBE_TITLE_MAX) {
     throw new Error(`the first line becomes the YouTube title and is ${firstLine.length} characters; `
       + `YouTube cuts it at ${YOUTUBE_TITLE_MAX}. Break it, or leave youtube out of --platforms`);
@@ -294,6 +298,34 @@ VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
 `;
 }
 
+/**
+ * WHICH PLATFORMS WILL PUBLISH THE TITLE LINE ALONE, said at the keyboard.
+ *
+ * The publisher works this out per platform from the clip (mate, 2026-09-22:
+ * the caption is drawn over the subtitles on a short). That is the right
+ * place to DECIDE it and the wrong place to first hear about it — the same
+ * lesson as the caption-fit line beside it, where a platform was dropped nine
+ * hours after the last human looked. So it is computed here too and printed
+ * on the line he already reads.
+ *
+ * A URL, a --media-key, or a file ffprobe cannot read gives null: no claim
+ * either way, rather than a guess.
+ *
+ * @returns {string|null} one line, or null when nothing here is a short.
+ */
+function overlayLine(file, wanted) {
+  if (!file || isUrl(file)) return null;
+  let probe = null;
+  try { probe = mediaLib.probe(file); } catch { return null; }
+  if (!platforms.isShort(probe)) return null;
+  const names = Object.keys(PLATFORMS)
+    .filter((p) => !wanted.length || wanted.includes(p))
+    .filter((p) => platforms.captionOverlaysShortFor(p, probe));
+  if (!names.length) return null;
+  return `a short — ${names.join(', ')} get the title line and the tags only; `
+    + 'the first comment is unchanged';
+}
+
 /** The usage block at the top of this file, so there is one copy of it. */
 function usage() {
   const src = fs.readFileSync(__filename, 'utf8');
@@ -335,6 +367,8 @@ function main() {
 
   const id = ulid();
   const sql = sqlFor(opt, id, media, mediaWide, new Date().toISOString(), extraKeys);
+  // The local file, not the R2 key: ffprobe needs bytes it can read.
+  const shortLine = overlayLine(opt.mediaKey ? null : first, opt.platforms);
 
   if (opt.dryRun) {
     console.log(sql);
@@ -342,6 +376,7 @@ function main() {
     // the success path.
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
+    if (shortLine) console.log(`-- ${shortLine}`);
     console.log('-- --dry-run: nothing written, nothing uploaded');
     return;
   }
@@ -359,6 +394,7 @@ function main() {
   // same failure as a line in the journal: true, and not looked at.
   const line = captions.wontFitLine(opt.wontFit);
   if (line) console.log(`  ${line}`);
+  if (shortLine) console.log(`  ${shortLine}`);
   console.log('https://social.matewishkey.com/queue');
 }
 
