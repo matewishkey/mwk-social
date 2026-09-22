@@ -158,11 +158,16 @@ const unescapeXml = (s) => s
  * @param {number} opts.avoidIndex   variant index used last on this platform
  * @param {boolean} opts.noEpisode   force a plain variant
  * @param {number} opts.variantIndex pin one plain variant instead of rotating
+ * @param {string} opts.linkUrl      WHERE THIS POST POINTS — what {show} renders
+ *   as. Named for the slot, not for the show: it is the show's tracked code on
+ *   an ordinary post and the post's own page on one that is about something
+ *   (mate, 2026-09-22: "the mwkshow.com is really just the show, otherwise use
+ *   the full link"). Null falls back to links.show.
  * @param {number} opts.maxLength    the platform's comment cap, or null for none
  * @returns {{text: string, variant: string, index: number, droppedTags: boolean, fellBack: boolean}}
  */
 function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisode = false,
-  variantIndex = null, showUrl = null, noTags = false, linkLive = true, maxLength = null } = {}) {
+  variantIndex = null, linkUrl = null, noTags = false, linkLive = true, maxLength = null } = {}) {
   const cfg = config();
   const fc = cfg.firstComment;
 
@@ -213,7 +218,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   const episode = episodes[hash(key, 'ep') % Math.max(episodes.length, 1)] || null;
   const render = (candidates, idx, withTags) => {
     let text = candidates[idx]
-      .replace(/\{show\}/g, linkLive ? (showUrl || cfg.links.show) : profileCta(platform))
+      .replace(/\{show\}/g, linkLive ? (linkUrl || cfg.links.show) : profileCta(platform))
       .replace(/\{wish\}/g, episode ? episode.wish : '')
       .replace(/\{episodeTitle\}/g, episode ? episode.title : '')
       .replace(/\{episodeUrl\}/g, episode ? episode.url : '')

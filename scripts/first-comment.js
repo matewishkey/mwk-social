@@ -424,7 +424,7 @@ async function main() {
       // the same id, so the Worker resolves the clip itself (resolveClipId in
       // web/src/api.js). Nothing is passed from here on purpose: the lookup
       // belongs next to the dedupe key it feeds.
-      const showUrl = (override || !live) ? null : await shortlink.mint({
+      const linkUrl = (override || !live) ? null : await shortlink.mint({
         platform: target.platform, postKey: target.key, label: target.url || null,
         campaign: 'clip', medium: 'comment',
       });
@@ -436,7 +436,7 @@ async function main() {
         : voice.firstComment(target.key, {
             platform: target.platform,
             topicTags,
-            showUrl,
+            linkUrl,
             linkLive: live,
             maxLength: commentMax,
             // A caption that already carries the tags must not get them again

@@ -332,3 +332,18 @@ END;
 -- NULL means "as soon as the pace allows", which is every item written before
 -- this column existed and every one queued without --at.
 ALTER TABLE queue_item ADD COLUMN not_before TEXT;
+
+-- WHERE A POST POINTS (2026-09-22). Every link slot used to resolve to the
+-- show: the pin's destination, X's caption link and the {show} slot in the
+-- first comment. That is right for a clip off the show and wrong for a post
+-- ABOUT something — the first Dial Countdown pin went live with a picture of a
+-- Stream Deck plugin and a tap that opened "Apply to be a guest".
+--
+-- Mate, the same day: "for these we can use always the original page with a
+-- link instead of the show... the mwkshow.com is really just the show
+-- otherwise use full link. this rule has to be generic."
+--
+-- So: a full url, published as written and never shortened (mwkshow.com is the
+-- show's address — scripts/lib/shortlink.js isShowLink()). NULL means the show,
+-- which is every item written before this column existed.
+ALTER TABLE queue_item ADD COLUMN link TEXT;

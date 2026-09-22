@@ -24,6 +24,33 @@ net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const voice = require('./voice');
 
+/*
+ * MWKSHOW.COM IS THE SHOW'S ADDRESS AND NOTHING ELSE'S (mate, 2026-09-22:
+ * "for these we can use always the original page with a link instead of the
+ * show... the mwkshow.com is really just the show, otherwise use full link").
+ *
+ * Every url we published used to be swapped for a mwkshow.com code, so the
+ * first Dial Countdown post sent people to `mwkshow.com/dial` for a Stream
+ * Deck plugin and would have sent them to `mwkshow.com/<code>` for Elgato's
+ * marketplace. A domain named after the show standing in for somebody else's
+ * page is a worse link than the real one: a reader cannot tell where it goes,
+ * and the show's own name is doing the vouching.
+ *
+ * So a code is minted for the SHOW and for nothing else, and every other
+ * destination is published as its own full url. The cost is real and it is
+ * his call: a project link is no longer counted. `/links` on the dashboard
+ * still mints by hand for anything, for the day a number is worth more than
+ * the clarity.
+ */
+function isShowLink(url) {
+  const show = voice.config().links.show;
+  const u = String(url || '');
+  // The page itself, or anything under it. A prefix test alone would let
+  // matewishkey.com/shortcuts through on a config where show is /show.
+  return u === show || u === `${show}/`
+    || u.startsWith(`${show}/`) || u.startsWith(`${show}?`) || u.startsWith(`${show}#`);
+}
+
 /**
  * @param {string} [opts.clipId] the QUEUE ITEM id. It is what makes a click
  *   answerable back to a video: queue_item carries the media_key, so
@@ -52,6 +79,10 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
   if (!base || !token) return null;
 
   const target = wanted || voice.config().links.show;
+  // The show, or no code at all — see isShowLink() above. Returning null is
+  // the same answer an unreachable dashboard gives, and every caller already
+  // handles it by publishing the plain url, which is exactly what is wanted.
+  if (!isShowLink(target)) return null;
   try {
     const res = await fetch(`${new URL(base).origin}/links`, {
       method: 'POST',
@@ -99,10 +130,12 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
    * had never been seen; it is one sort to make it unreachable.
    */
   for (const url of [...urls].sort((a, b) => b.length - a.length)) {
-    // Skip only a link that is ALREADY shortened — a code pointing at a code.
-    // Not carriesCta(): that matches the sign-up destination as well, which is
-    // precisely the link we most want to measure.
+    // Skip a link that is ALREADY shortened — a code pointing at a code — and
+    // anything that is not the show, which mint() would refuse anyway. The
+    // second test is the 2026-09-22 rule and it is what leaves a project page,
+    // a marketplace listing or a repo in a custom comment written out in full.
     if (host(url) === (voice.shortLink().host || '').toLowerCase()) continue;
+    if (!isShowLink(url)) continue;
     const short = await mint({ platform, postKey, clipId, campaign, medium,
       target: url, label: url.slice(0, 120) });
     if (short) out = out.split(url).join(short);
@@ -110,4 +143,4 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
   return out;
 }
 
-module.exports = { mint, trackLinks, URL_RE };
+module.exports = { mint, trackLinks, isShowLink, URL_RE };

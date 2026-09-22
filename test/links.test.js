@@ -109,7 +109,7 @@ test('an episode variant carrying a url is dropped where urls are dead', () => {
 
 test('a live-link platform still gets the url', () => {
   const t = voice.firstComment('k', { platform: 'linkedin', noEpisode: true,
-    showUrl: 'https://mwkshow.com/ab12' }).text;
+    linkUrl: 'https://mwkshow.com/ab12' }).text;
   assert.ok(t.includes('https://mwkshow.com/ab12'));
   assert.ok(!t.includes(voice.config().firstComment.profileCta));
 });

@@ -209,6 +209,33 @@ had already published were jargon the rule rejects.
 
 ## Links, and where a url actually works
 
+- **A POST POINTS AT WHAT IT IS ABOUT, AND `mwkshow.com` IS THE SHOW'S ADDRESS AND NOTHING
+  ELSE'S** (mate, 2026-09-22, an hour after the first Dial Countdown pin went live: *"for these
+  we can use always the original page with a link instead of the show... the mwkshow.com is
+  really just the show otherwise use full link. this rule has to be generic"*). Two rules, and
+  they are separate:
+  - **`queue_item.link` is the post's own destination** (`--link` on `queue-add.js`, a field on
+    the dashboard form). Null means the show, which is every item written before 2026-09-22.
+    When it is set, **every link slot points there**: Pinterest's `link`, X's caption link and
+    the `{show}` slot in the first comment. `linkFor()` returns it before it mints anything.
+  - **A code is minted for the show and for nothing else** (`shortlink.isShowLink()`). A domain
+    named after the show standing in for Elgato's marketplace is a worse link than the real
+    one: a reader cannot tell where it goes, and the show's name is doing the vouching.
+    `trackLinks()` therefore leaves every non-show url in a custom comment exactly as written.
+  - **The cost is real and it is his**: a project link is no longer counted. `/links` on the
+    dashboard still mints by hand for anything, for the day a number is worth more than the
+    clarity. `mwkshow.com/dial` stays alive — a live code is never broken — it is simply not
+    used again.
+  - ⚠ **`matewishkey.com/` JOINED `markers[]` IN THE SAME COMMIT, AND IT HAD TO.** A comment
+    carrying `matewishkey.com/projects/...` matches no other marker, so the watcher would add a
+    SECOND comment under every post that names a project page, for ever. The new marker is
+    broad on purpose: under the current voice the CTA *is* a mention of his site. The cost is
+    the other direction — a viewer who links his site makes the watcher skip that post — and a
+    missing comment we can add by hand beats a duplicate Instagram cannot delete.
+  - **It reaches nothing already published.** Pinterest cannot edit a pin's destination, so the
+    2026-09-22 Dial pin still opens `/show`; the parameter rename (`showUrl` to `linkUrl`) is
+    cosmetic and changes no rendered text.
+
 - **A URL IS NOT CLICKABLE EVERYWHERE, and for three weeks this pipeline acted as though it was**
   (2026-08-22, on mate's instinct). Instagram makes NOTHING clickable — not a caption, not a
   comment, not a Reel. TikTok the same. **YouTube deliberately renders urls in SHORTS descriptions
@@ -1326,7 +1353,8 @@ another repo directly.
   /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the REST route. The account
   had no board, so `POST` to the same route created *Mate Wish Key Show* (exercised). The link is
   `platformSpecificData.link`, the pin's own destination — `linkPlacement: 'link'`, its own SLOT,
-  minted with medium `link`; a url in the description is plain text. Title is the first line of
+  minted with medium `link` **unless the item names its own page**, which since 2026-09-22 goes
+  out in full and unminted (*Links*, above); a url in the description is plain text. Title is the first line of
   his words, 100 max. 2:3, 1:1 or 9:16 only, so `landscapeOk: false`. No comments, no DMs, no
   delete exercised. Analytics: impressions, saves, clicks. **`--media-key` on `queue-add.js`
   re-queues a clip already in R2 to a platform it has not run on; `--priority -1` keeps a backfill

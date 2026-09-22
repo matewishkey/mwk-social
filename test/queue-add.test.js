@@ -91,10 +91,10 @@ test('--at rides into the insert, and no --at is NULL rather than a date', () =>
   // stored instant is the 30th in UTC for the early part of the window and the
   // 31st for the late part. Asserting a UTC date here is the trap.
   const sql = sqlFor(held, '01ABC', [null, null], [null, null], 'now');
-  assert.match(sql, /'2026-08-3(0T2[123]|1T00):\d\d:00\.000Z'\)/, sql);
+  assert.match(sql, /'2026-08-3(0T2[123]|1T00):\d\d:00\.000Z', NULL\)/, sql);
   const free = parse(['--body', 'x']);
   assert.equal(free.at, undefined);
-  assert.match(sqlFor(free, '01ABC', [null, null], [null, null], 'now'), /NULL\);/);
+  assert.match(sqlFor(free, '01ABC', [null, null], [null, null], 'now'), /NULL, NULL\);/);
 });
 
 test('a hold that is not a date is refused, not held for ever', () => {

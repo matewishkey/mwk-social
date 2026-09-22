@@ -173,7 +173,7 @@ test('a line of pure tagging is lifted out; prose is not', () => {
 test('the first comment is unchanged on a short', () => {
   const voice = require('../scripts/lib/voice');
   const args = { platform: 'instagram', topicTags: ['JobInterview'], noTags: false,
-    showUrl: null, linkLive: false, maxLength: 2200 };
+    linkUrl: null, linkLive: false, maxLength: 2200 };
   const before = voice.firstComment('queue:test', args);
   const after = voice.firstComment('queue:test', args);
   assert.equal(after.text, before.text);

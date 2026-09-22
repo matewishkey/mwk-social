@@ -197,6 +197,7 @@ async function claim(body, env) {
         reshareText: row.reshare_text || null,
         reshare: row.reshare !== 0,
         commentText: row.comment_text || null,
+        link: row.link || null,
         topics: JSON.parse(row.topics || '[]'),
         mediaWideUrl,
         retryOf: row.retry_of || null,

@@ -46,6 +46,15 @@
  *                                    and nothing describing the clip, and none
  *                                    of those platforms can be edited after.
  *   --comment TEXT                   a custom first comment instead of the rotation
+ *   --link URL                       WHERE THIS POST POINTS. Default: the show.
+ *                                    Give it when the post is ABOUT something
+ *                                    with a page of its own — a project, an
+ *                                    episode, a tool — and that page becomes
+ *                                    the pin's destination, X's caption link
+ *                                    and the link in the first comment. It
+ *                                    goes out as the FULL url and is never
+ *                                    shortened: mwkshow.com is the show's
+ *                                    address (mate, 2026-09-22)
  *   --at YYYY-MM-DD                  hold it until that day. Stored as a full
                                    timestamp: a random instant inside the
                                    posting window (07:00-11:00 Brisbane),
@@ -78,6 +87,8 @@ const pace = require('./lib/pace');
 // is on his words, not on anything we compose. Zernio's YouTube page, 2026-09-20.
 const YOUTUBE_TITLE_MAX = 100;
 const { wordProblems } = require('./lib/words');
+// For links.show and the short-link host: the one place either is written down.
+const voice = require('./lib/voice');
 
 const WEB = path.join(__dirname, '..', 'web');
 const BUCKET = 'mwk-social-media';
@@ -152,6 +163,7 @@ function parse(argv) {
       case '--platforms': opt.platforms = take(i).split(',').map((s) => s.trim()).filter(Boolean); i++; break;
       case '--topics': opt.topics = take(i).split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean); i++; break;
       case '--comment': opt.comment = take(i); i++; break;
+      case '--link': opt.link = take(i); i++; break;
       case '--at': opt.at = take(i); i++; break;
       case '--no-first-comment': opt.firstComment = 0; break;
       case '--no-reshare': opt.reshare = 0; break;
@@ -168,6 +180,23 @@ function parse(argv) {
   // got in on 2026-09-13; the dashboard form has the same gate.
   const held = wordProblems(opt.body);
   if (held.length) throw new Error(`not queued — ${held.join('; ')}. His words, in his voice, or it does not go.`);
+
+  /*
+   * A LINK SLOT WANTS A URL, and the one time it was handed prose the pin
+   * died at Pinterest with `Invalid URL or request data` (2026-09-22). Caught
+   * here, where it is one edit, rather than nine hours later at publish.
+   * A mwkshow.com code is refused for the same reason the minter refuses to
+   * make one: that host means the show, so a project pointed at it would say
+   * the wrong thing however well it resolved.
+   */
+  if (opt.link !== undefined) {
+    let u;
+    try { u = new URL(opt.link); } catch { throw new Error(`--link wants a url, got ${JSON.stringify(opt.link)}`); }
+    if (!/^https?:$/.test(u.protocol)) throw new Error(`--link wants an http(s) url, got ${opt.link}`);
+    if (u.hostname.toLowerCase().endsWith(voice.shortLink().host)) {
+      throw new Error(`--link wants the page's own full url, not a ${voice.shortLink().host} code — that host is the show's`);
+    }
+  }
 
   /*
    * A bare YYYY-MM-DD unlocks at midnight UTC, which is 10:00 Brisbane, and the
@@ -288,13 +317,13 @@ function sqlFor(opt, id, media, mediaWide, now, extraKeys) {
   return `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
   media_key, media_url, media_type, media_extra, first_comment, priority,
   reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url,
-  not_before)
+  not_before, link)
 VALUES (${lit(id)}, ${lit(now)}, 'box@mwk-social', 'queued', ${lit(opt.body)},
   ${lit(JSON.stringify(opt.platforms))},
   ${lit(mediaKey)}, ${lit(opt.mediaUrl)}, ${lit(mediaType)}, ${lit(extra)}, ${opt.firstComment}, ${Number.isInteger(opt.priority) ? opt.priority : 0},
   ${opt.reshare}, NULL, ${lit(opt.comment)},
   ${lit(JSON.stringify(opt.topics))}, ${lit(mediaWide[0])}, ${lit(opt.mediaWideUrl)},
-  ${lit(opt.at)});
+  ${lit(opt.at)}, ${lit(opt.link)});
 `;
 }
 
@@ -377,6 +406,7 @@ function main() {
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
     if (shortLine) console.log(`-- ${shortLine}`);
+    console.log(`-- points at ${opt.link || `${voice.config().links.show} (the show)`}`);
     console.log('-- --dry-run: nothing written, nothing uploaded');
     return;
   }
@@ -395,6 +425,9 @@ function main() {
   const line = captions.wontFitLine(opt.wontFit);
   if (line) console.log(`  ${line}`);
   if (shortLine) console.log(`  ${shortLine}`);
+  // Where a tap lands, on the line he already reads — the pin that pointed at
+  // the show was correct code and the wrong destination, and nothing said so.
+  console.log(`  points at ${opt.link || `${voice.config().links.show} (the show)`}`);
   console.log('https://social.matewishkey.com/queue');
 }
 

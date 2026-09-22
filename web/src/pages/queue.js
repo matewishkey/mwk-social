@@ -92,15 +92,19 @@ export async function queueAction(request, env, email) {
     await env.DB.prepare(
       `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
          media_key, media_url, media_type, first_comment, priority,
-         reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url, retry_of)
-       VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?,?,?)`,
+         reshare, reshare_text, comment_text, topics, media_wide_key, media_wide_url, retry_of,
+         link)
+       VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?,?,?,?)`,
     ).bind(ulid(), new Date().toISOString(), email, row.body, JSON.stringify(failed),
       row.media_key, row.media_url, row.media_type, row.first_comment,
       // Never repost from the personal account a second time — that half
       // succeeded, and LinkedIn 422s a duplicate anyway.
       0, null,
       row.comment_text, row.topics, row.media_wide_key, row.media_wide_url,
-      row.retry_of || row.id).run();
+      row.retry_of || row.id,
+      // Carried across on purpose: a retry that quietly reverted to the show
+      // would be the 2026-09-22 pin bug coming back through the back door.
+      row.link || null).run();
     return back;
   }
 
@@ -139,8 +143,8 @@ export async function queueAction(request, env, email) {
   await env.DB.prepare(
     `INSERT INTO queue_item (id, created_at, created_by, status, body, platforms,
        media_key, media_url, media_type, first_comment, priority,
-       reshare, reshare_text, comment_text, topics, media_wide_key)
-     VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?)`,
+       reshare, reshare_text, comment_text, topics, media_wide_key, link)
+     VALUES (?,?,?,'queued',?,?,?,?,?,?,0,?,?,?,?,?,?)`,
   ).bind(ulid(), new Date().toISOString(), email, text, JSON.stringify(platforms),
     mediaKey, mediaUrl, mediaType, form.get('firstComment') ? 1 : 0,
     form.get('reshare') ? 1 : 0,
@@ -148,7 +152,14 @@ export async function queueAction(request, env, email) {
     String(form.get('commentText') || '').trim() || null,
     JSON.stringify(String(form.get('topics') || '').split(',')
       .map((t) => t.trim().replace(/^#/, '')).filter(Boolean)),
-    mediaWideKey).run();
+    mediaWideKey,
+    // A url or nothing. Refused rather than stored half-right: a link slot
+    // handed prose is what killed the first Dial Countdown pin.
+    (() => {
+      const raw = String(form.get('link') || '').trim();
+      if (!raw) return null;
+      try { const u = new URL(raw); return /^https?:$/.test(u.protocol) ? raw : null; } catch { return null; }
+    })()).run();
   return back;
 }
 
@@ -187,6 +198,7 @@ export function queuePage({ email, tz, waiting, done, pace,
             ? ' · reposted from your personal account, with your words'
             : ' · reposted from your personal account'}
           ${i.comment_text ? ' · custom first comment' : ''}
+          ${i.link ? ` · points at ${esc(i.link)}` : ''}
           ${i.not_before ? ` · <b>held until ${esc(when(i.not_before, tz))}</b>` : ''}
           ${i.priority > 0 ? ` · bumped ×${i.priority}` : ''}
           ${i.retry_of ? ' · retry, same short code' : ''}
@@ -264,11 +276,20 @@ ${card('Queue something', `
       are always added. Instagram takes three more, X takes none.</p>
   </div>
   <div class="field">
+    <label for="qlink">Where this post points (optional)</label>
+    <input type="url" id="qlink" name="link" placeholder="https://matewishkey.com/projects/dial-countdown/">
+    <p class="note">Leave it empty and everything points at the show. Fill it in when the post is
+      <em>about</em> something with a page of its own, and that page becomes the Pinterest pin's
+      destination, the link in the X post and the link in the first comment. It goes out in full —
+      <code>mwkshow.com</code> is the show's address and stands for nothing else.</p>
+  </div>
+  <div class="field">
     <label for="qcomment">First comment — override the standard one (optional)</label>
     <textarea id="qcomment" name="commentText" style="min-height:5rem"
-      placeholder="Left empty, the rotating sign-up comment is used. Any link you put here is shortened and tracked."></textarea>
-    <p class="note">Use this to point at something specific — a repo, an episode. Every URL is
-      replaced with its own <code>mwkshow.com</code> code, so you can see which one people click.</p>
+      placeholder="Left empty, the standard comment is used — the link, and nothing else."></textarea>
+    <p class="note">Use this to say something specific under the post. A link to the show is
+      replaced with a tracked <code>mwkshow.com</code> code; any other URL goes out as you wrote
+      it, in full.</p>
   </div>
   <div class="field">
     <div class="checks"><label><input type="checkbox" name="reshare" checked>

@@ -60,7 +60,7 @@ const VIDEO_RE = /\.(mp4|mov|avi|webm|m4v)$/i;
 function parseArgs(argv) {
   const opts = { text: null, accounts: null, all: false, media: [], title: null,
     firstComment: true, draft: false, schedule: null, wait: true, dryRun: false,
-    topics: [], commentVariant: null, comment: null, postKey: null,
+    topics: [], commentVariant: null, comment: null, postKey: null, link: null,
     tiktokPrivacy: 'PUBLIC_TO_EVERYONE' };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -72,6 +72,8 @@ function parseArgs(argv) {
     else if (a === '--topics') opts.topics = argv[++i].split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean);
     else if (a === '--comment-variant') opts.commentVariant = Number(argv[++i]);
     else if (a === '--comment') opts.comment = argv[++i];
+    // Where this post points, in full. Default: the show. See linkFor, below.
+    else if (a === '--link') opts.link = argv[++i];
     else if (a === '--tiktok-privacy') opts.tiktokPrivacy = argv[++i];
     else if (a === '--no-first-comment') opts.firstComment = false;
     else if (a === '--draft') opts.draft = true;
@@ -201,7 +203,11 @@ async function commentFor(platform, text, opts) {
   // minted one — so a pipeline post's CTA was the one link we could not measure.
   // No mint at all where the url would be plain text: that is a code spent on a
   // click that cannot happen, and it reads in the numbers as indifference.
-  const showUrl = live ? await shortlink.mint({ ...where, label: opts.title || null }) : null;
+  // The post's own destination wins, whole (2026-09-22). On Instagram and
+  // TikTok `live` is false and neither url can be followed, so the profile
+  // phrase still stands in — an unclickable project page is no better than an
+  // unclickable show page.
+  const linkUrl = live ? (opts.link || await shortlink.mint({ ...where, label: opts.title || null })) : null;
 
   /*
    * `avoidIndex` was wired on the watcher's path and nowhere else, so a queued
@@ -221,7 +227,7 @@ async function commentFor(platform, text, opts) {
     topicTags: opts.topics,
     noTags: tagsInCaption(platform),
     variantIndex: opts.commentVariant,
-    showUrl,
+    linkUrl,
     linkLive: live,
     // The platform's cap on a COMMENT, not on a caption — the native path
     // hands this to Zernio to post, so it overflows exactly the same way the
@@ -344,7 +350,18 @@ const tagsInCaption = (platform) => {
  * So the branch could only ever corrupt a slot, never serve one — it is gone
  * rather than narrowed.
  */
+/*
+ * AND THE SLOT POINTS AT WHAT THE POST IS ABOUT, NOT ALWAYS AT THE SHOW
+ * (mate, 2026-09-22, on the pin that had just gone live pointing at /show:
+ * "for these we can use always the original page with a link instead of the
+ * show... this rule has to be generic").
+ *
+ * `opts.link` is the queue item's own destination. It goes out as its full
+ * url and is deliberately not minted — mwkshow.com is the show's address and
+ * shortlink.isShowLink() is where that rule lives.
+ */
 async function linkFor(platform, opts, medium) {
+  if (opts.link) return opts.link;
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
   const where = { platform, postKey, clipId: opts.clipId || null,
     campaign: opts.campaign || 'clip', medium };

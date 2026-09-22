@@ -98,7 +98,7 @@ const RESHARE_LAG_MINUTES = Number(process.env.MWK_RESHARE_LAG_MINUTES || 240);
 async function reshareComment(account, { clipId = null, topics = [], postKey = null } = {}) {
   const accountId = account._id || account.id;
   const key = postKey || `reshare:${accountId}`;
-  const showUrl = await shortlink.mint({
+  const linkUrl = await shortlink.mint({
     platform: 'linkedin', postKey: key, clipId,
     campaign: 'reshare', medium: 'comment',
     label: `LinkedIn repost — ${account.displayName || account.username || accountId}`,
@@ -106,7 +106,7 @@ async function reshareComment(account, { clipId = null, topics = [], postKey = n
   return voice.firstComment(key, {
     platform: 'linkedin',
     topicTags: topics,
-    showUrl,
+    linkUrl,
     // LinkedIn takes its hashtags in the body, and a repost has no body of its
     // own — so unlike a native post, the comment IS where they belong.
     noTags: false,

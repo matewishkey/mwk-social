@@ -108,7 +108,7 @@ test('the rotation actually varies', () => {
  */
 test('the comment is the link and nothing else', () => {
   const text = voice.firstComment('instagram:1', { platform: 'facebook', noTags: true,
-    showUrl: 'https://mwkshow.com/xxxxx', linkLive: true }).text;
+    linkUrl: 'https://mwkshow.com/xxxxx', linkLive: true }).text;
   assert.strictEqual(text, 'https://mwkshow.com/xxxxx',
     'the comment grew prose again — mate, 2026-09-22: just the link');
   assert.strictEqual(voice.config().firstComment.plain.length, 1,
@@ -203,7 +203,28 @@ test('the guard recognises a comment carrying a short link', () => {
 
 test('the guard does not fire on an unrelated comment', () => {
   assert.ok(!voice.carriesCta('great video mate'));
-  assert.ok(!voice.carriesCta('see matewishkey.com/episodes'));
+  assert.ok(!voice.carriesCta('this is brilliant, where can I get it'));
+  assert.ok(!voice.carriesCta('https://elgato.com/marketplace/whatever'),
+    'somebody else\'s site is not our CTA, however relevant it is');
+});
+
+/*
+ * A LINK TO HIS OWN SITE COUNTS AS OURS, WHOEVER TYPED IT — and that is a
+ * deliberate trade, not an oversight (2026-09-22). Since a post can point at
+ * its own page rather than at the show, the comment under it carries
+ * matewishkey.com/projects/... and no marker would have matched it; the
+ * watcher would then add a SECOND comment under every such post, for ever.
+ *
+ * The cost is the other direction: a viewer who links his site in a comment
+ * makes the watcher skip that post. That is a missing comment, which we can
+ * add by hand, against a duplicate one, which on Instagram cannot even be
+ * deleted. The cheap failure was chosen on purpose.
+ */
+test('any link to his own site reads as the CTA already being there', () => {
+  assert.ok(voice.carriesCta('https://matewishkey.com/projects/dial-countdown/'));
+  assert.ok(voice.carriesCta('https://matewishkey.com/episodes/e010/'));
+  assert.ok(voice.config().markers.includes('matewishkey.com/'),
+    'drop this marker and every post pointing at its own page gets commented on twice');
 });
 
 test('every marker is a real substring of something we would post', () => {
@@ -218,22 +239,22 @@ test('every marker is a real substring of something we would post', () => {
 
 test('a composed comment renders the short link when it is given one', () => {
   const short = voice.firstComment('k1', { platform: 'threads', noEpisode: true,
-    showUrl: 'https://mwkshow.com/ab12x' });
+    linkUrl: 'https://mwkshow.com/ab12x' });
   assert.match(short.text, /mwkshow\.com\/ab12x/);
   assert.ok(!short.text.includes('matewishkey.com/show'));
   assert.ok(voice.carriesCta(short.text), 'and it still reads as ours');
 });
 
 test('without a short link it falls back to the plain URL rather than failing', () => {
-  const plain = voice.firstComment('k1', { platform: 'threads', noEpisode: true, showUrl: null });
+  const plain = voice.firstComment('k1', { platform: 'threads', noEpisode: true, linkUrl: null });
   assert.match(plain.text, /matewishkey\.com\/show/);
   assert.ok(voice.carriesCta(plain.text));
 });
 
 // Same post, same rendering — or the guard sees a different comment each run.
 test('the same post renders the identical comment twice running', () => {
-  const a = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, showUrl: 'https://mwkshow.com/zz' });
-  const b = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, showUrl: 'https://mwkshow.com/zz' });
+  const a = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, linkUrl: 'https://mwkshow.com/zz' });
+  const b = voice.firstComment('post-42', { platform: 'instagram', noEpisode: true, linkUrl: 'https://mwkshow.com/zz' });
   assert.equal(a.text, b.text);
 });
 
