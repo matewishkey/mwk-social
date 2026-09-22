@@ -35,6 +35,7 @@ const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const { api, cli } = require('./api');
+const platforms = require('./platforms');
 
 /**
  * One frame, as a JPEG on disk.
@@ -70,7 +71,10 @@ function frameAt(file, ms) {
  * platform's own video id — the Zernio `_id` 404s on this route.
  */
 function wantsCover({ platform, status, postId }, { isVideo, coverMs }) {
-  return platform === 'youtube'
+  // The TABLE decides which platforms take an image, not a literal here. A
+  // hardcoded 'youtube' is how a capability ends up known in one file and
+  // invisible on the dashboard that renders the table.
+  return !!platforms.coverImageFor(platform)
     && (status === 'published' || status === 'posted')
     && !!postId
     && isVideo === true

@@ -41,19 +41,21 @@
  * silently the last frame.
  *
  * Read off docs.zernio.com/platforms/{tiktok,instagram,pinterest} on
- * 2026-09-22. NOT on this table for the others, and each absence is a
- * different thing:
- *   youtube    takes a custom IMAGE on the media item, never a timestamp —
- *              and "custom thumbnails work on videos only, not Shorts", which
- *              is Zernio's own line and YouTube's rule. Everything vertical
- *              this pipeline sends is a Short, so there is nothing to set.
- *   facebook   no cover field documented at all.
- *   linkedin   no cover field documented at all.
- *   twitter    Zernio has no X platform page for it; nothing documented.
- *   threads    nothing documented.
- * `imageUrl` names the field that OVERRIDES the timestamp with a picture,
- * which nothing here sends yet — it is recorded so the next person does not
- * have to re-read the docs to find out whether it exists.
+ * 2026-09-22. Every other platform's page was read the same day and NONE of
+ * them documents a cover of any kind: facebook, linkedin, threads, and
+ * twitter — whose page is /platforms/twitter, not /platforms/x, which 404s
+ * and briefly had this note claiming X has no page at all.
+ *
+ * YouTube is the exception that is not a timestamp: it takes an IMAGE, and it
+ * has its own field below (`coverImage`). Everything about which of its
+ * surfaces that actually changes is there.
+ *
+ * `imageUrl` names the field that OVERRIDES the timestamp with a picture on
+ * the three below. Nothing here sends one, and on TikTok that is deliberate:
+ * ⚠ for an account not connected through the TikTok for Business app, Zernio
+ * "downloads the image, rehosts it, STITCHES IT IN AS A SINGLE FRAME AT THE
+ * START OF THE VIDEO" — a cover image there edits the video itself. A
+ * timestamp does not. Read the platform page before reaching for one.
  */
 
 /*
@@ -314,6 +316,28 @@ const PLATFORMS = {
     imageMax: 0,
     landscapeOk: true,           // vertical under 3 min auto-classifies as a Short
     captionOverlaysShort: true,  // ...and the Shorts player draws the title over the video
+    /*
+     * A PICTURE, NOT A TIMESTAMP — AND IT WORKS ON A SHORT, WHICH THE DOCS
+     * DENY. Zernio's YouTube page says "custom thumbnails work on videos
+     * only, not Shorts"; exercised 2026-09-22 on msRZswGIkCY, a Short, the
+     * served maxresdefault.jpg changed to the frame we sent and stayed
+     * changed. lib/cover.js carries the measurement.
+     *
+     * `how: 'update-metadata'` is the path that was EXERCISED, after the
+     * video exists. Zernio also documents `thumbnail` on the media item at
+     * publish time, which would avoid the minutes where YouTube's own pick
+     * is live — documented, NOT exercised, so it is recorded and not used.
+     *
+     * ⚠ It sets the 16:9 thumbnail only: search, the channel grid, embeds,
+     * share cards. The vertical cover inside the Shorts feed stays YouTube's
+     * own (`oar1/2/3.jpg` are three of ITS candidates, none of them ours) and
+     * no API sets it — that is the mobile app's Edit cover. Checked again
+     * twenty minutes later, in case it was a cache: the 16:9 had changed
+     * inside a minute and the vertical set still held YouTube's three.
+     */
+    coverImage: { field: 'thumbnailUrl', how: 'update-metadata',
+      atPublish: 'thumbnail on the media item (documented, never exercised)',
+      sets: '16:9 only — not the Shorts feed cover' },
     commentsApi: true,             // 403s on PRIVATE videos; unlisted is fine
     reshare: 'none',
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'yes',
@@ -568,6 +592,17 @@ function coverMsFor(probe) {
 }
 
 /**
+ * Does this platform take a cover as an IMAGE pushed after publishing?
+ *
+ * YouTube alone, today. Separate from coverFor() because it is a different
+ * mechanism at a different time: the timestamp platforms carry theirs in the
+ * publish, and this one needs the video to exist first.
+ */
+function coverImageFor(name) {
+  try { return get(name).coverImage || null; } catch { return null; }
+}
+
+/**
  * The cover-frame field this platform wants, ready to spread into a request.
  *
  * Returns the destination as well as the value, because the three platforms
@@ -713,6 +748,6 @@ function commentProblems() {
 }
 
 module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
-  isShort, linkDeadFor, captionOverlaysShortFor, coverFor, coverMsFor, COVER_MS,
+  isShort, linkDeadFor, captionOverlaysShortFor, coverFor, coverImageFor, coverMsFor, COVER_MS,
   linkProblems, galleryFor,
   galleryProblems, commentProblems, SLOT };

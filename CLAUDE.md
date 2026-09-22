@@ -485,6 +485,11 @@ had already published were jargon the rule rejects.
       cover*. **Never flatten the two into "we can set the thumbnail".**
     - `thumbnails.set`'s own reference page says nothing about Shorts at all — the exclusion is
       a product rule stated in help pages, and the API did not enforce it here.
+    - **It is not a cache, which was the obvious objection and was checked.** The 16:9 changed
+      inside a minute; twenty minutes later the vertical set still held `oar1/2/3.jpg`, three of
+      YouTube's OWN candidates (the opening, a middle frame, and the closing *Prompt it
+      yourself!* card) and none of them the file we uploaded. A cache would have served one
+      picture late, not three different ones.
 - **THE CARD IS DRAWN IN THE WEBSITE REPO AND IS ALREADY ON THE SHARE — do not draw one here.**
   `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes
   `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`: the upload size, inside
@@ -591,10 +596,17 @@ repeated failure in this repo.
     milliseconds. Each also has an image override (`video_cover_image_url`, `instagramThumbnail`
     /`reelCover`, `coverImageUrl`) which nothing sends yet. Read off the Zernio platform pages
     2026-09-22.
-  - **YouTube takes an image and never a timestamp, and NOT ON A SHORT** — Zernio's page says
-    *"custom thumbnails work on videos only, not Shorts"*, which is YouTube's rule, not theirs.
-    Everything vertical this pipeline sends is a Short, so there is nothing to set. Facebook,
-    LinkedIn, X and Threads document no cover field at all.
+  - **YouTube takes an IMAGE and never a timestamp, and it DOES work on a Short** — see
+    *Thumbnails* below, where the measurement is. It is the one platform whose cover is set
+    after publishing, so `run-queue` pushes it once the video exists.
+  - **Every other platform's page was read on 2026-09-22 and documents NO cover at all**:
+    Facebook, LinkedIn, Threads, and X — **whose page is `/platforms/twitter`**; `/platforms/x`
+    404s, which is not the same as the capability being absent.
+  - ⚠ **A COVER IMAGE ON TIKTOK EDITS THE VIDEO.** For an account not connected through the
+    TikTok for Business app, Zernio *"downloads the image, rehosts it, stitches it in as a
+    single frame at the start of the video"*. Ours is a developer-app account, so
+    `video_cover_image_url` would prepend a frame to the clip itself. The timestamp does not,
+    which is why the timestamp is what we send.
   - ⚠ **"THE TENTH FRAME" IS NOT A TIME.** At 60 fps it is 167 ms and at 30 fps 333 ms, and on
     the clip that prompted this it is the empty field the complaint was about — measured: 0 and
     167 ms nobody in shot, 1,000 ms he has walked in, 2,000 ms steady, 10,000 ms the title card

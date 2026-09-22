@@ -23,6 +23,25 @@ const platforms = require('../scripts/lib/platforms');
 const YT = { platform: 'youtube', status: 'published', postId: 'msRZswGIkCY' };
 const OPTS = { isVideo: true, coverMs: 2000 };
 
+/*
+ * The SET comes off the table, not a literal in cover.js. Every other
+ * platform's Zernio page was read on 2026-09-22 and none documents a cover of
+ * any kind — including X, whose page is /platforms/twitter (the /x URL 404s,
+ * which briefly got written down as "X has no page").
+ */
+test('youtube is the only platform that takes a cover image', () => {
+  const set = Object.keys(platforms.PLATFORMS)
+    .filter((p) => platforms.coverImageFor(p)).sort();
+  assert.deepStrictEqual(set, ['youtube']);
+});
+
+test('the two mechanisms do not overlap', () => {
+  for (const p of Object.keys(platforms.PLATFORMS)) {
+    const both = platforms.coverFor(p, 2000) && platforms.coverImageFor(p);
+    assert.ok(!both, `${p} would be sent a cover twice, by two different routes`);
+  }
+});
+
 test('only youtube, only a video, only with the platform id', () => {
   assert.equal(cover.wantsCover(YT, OPTS), true);
 
