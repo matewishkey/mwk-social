@@ -350,26 +350,57 @@ async function nextInSequence(env, prefix) {
  *
  * ⚠ ESCAPE THE UNDERSCORE. A Facebook post id is `<page>_<post>` and `_` is a
  * single-character wildcard in LIKE, so an unescaped id matches ids it is not.
+ *
+ * ⚠ A FACEBOOK VIDEO HAS TWO IDS AND WHICH ONE WE HOLD DEPENDS ON THE SOURCE.
+ * Measured 2026-09-22 on four videos, against an image post as the control:
+ *
+ *   surface              image post              video post
+ *   posts:list           <page>_<post>           1526644959488954   (bare)
+ *   analytics:posts      <page>_<post>           <page>_<post>
+ *
+ * The publisher records what `posts:list` gave it, so a video found through
+ * the Facebook sweep in `first-comment.js` carries a composite that appears
+ * nowhere in `queue_item.result` — and the two numbers are unrelated, so it
+ * cannot be computed. The post URL is the one thing both surfaces agree on
+ * (`/reel/<bare>/`, `watch/?v=<bare>`), which is why `postUrl` is passed in
+ * rather than derived. It is a SECOND lookup, never a replacement: the direct
+ * needle stays first so nothing that joins today changes.
  */
-export async function resolveClipId(env, postKey) {
+const FB_VIDEO_ID = /(?:\/(?:reel|videos)\/|[?&]v=)(\d+)/;
+
+export async function resolveClipId(env, postKey, postUrl = null) {
   if (!postKey || !postKey.includes(':')) return null;
   // The publisher's own keys already carry a clipId; these never need a lookup.
   if (/^(queue|reshare|manual|account|new|reality-check):/.test(postKey)) return null;
+  const platform = postKey.slice(0, postKey.indexOf(':'));
   const platformPostId = postKey.slice(postKey.indexOf(':') + 1);
   if (!platformPostId) return null;
-  const needle = `%"postId":"${platformPostId.replace(/[\\%_]/g, (c) => `\\${c}`)}"%`;
-  const row = await env.DB.prepare(
-    `SELECT id FROM queue_item WHERE result LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT 1`,
-  ).bind(needle).first();
-  return row ? row.id : null;
+
+  const lookup = async (id) => {
+    const needle = `%"postId":"${id.replace(/[\\%_]/g, (c) => `\\${c}`)}"%`;
+    const row = await env.DB.prepare(
+      `SELECT id FROM queue_item WHERE result LIKE ? ESCAPE '\\' ORDER BY created_at DESC LIMIT 1`,
+    ).bind(needle).first();
+    return row ? row.id : null;
+  };
+
+  const direct = await lookup(platformPostId);
+  if (direct) return direct;
+
+  if (platform !== 'facebook') return null;
+  const bare = FB_VIDEO_ID.exec(String(postUrl || ''));
+  // Not "did the regex match" — the composite's own tail is digits too, and a
+  // needle we have already tried is a wasted query that reads like a fallback.
+  if (!bare || bare[1] === platformPostId) return null;
+  return lookup(bare[1]);
 }
 
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
-  codePrefix = null,
+  codePrefix = null, postUrl = null,
 }) {
-  clipId = clipId || await resolveClipId(env, postKey);
+  clipId = clipId || await resolveClipId(env, postKey, postUrl);
 
   /*
    * A named code is its own identity and does NOT go through the attribute

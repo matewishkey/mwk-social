@@ -243,9 +243,23 @@ had already published were jargon the rule rejects.
     backfill-before-deploy ordering, the post keys that are null by nature, and the Facebook
     post id whose `_` is a LIKE wildcard. **A comment asserting an impossibility is still a
     claim** — that is how sixteen Threads codes went unjoined.
-    - ⚠ **A FACEBOOK VIDEO POST RECORDS A DIFFERENT ID SHAPE FROM THE ONE EVERYTHING ELSE
-      SEES**, so its codes never join: 7 of our 20 Facebook posts, open as **#44**. Read the
-      issue rather than re-deriving it; the composite is not computable from the bare video id.
+    - ⚠ **A FACEBOOK VIDEO HAS TWO IDS AND THE SOURCE PICKS ONE: `posts:list` says the bare
+      video id, `analytics:posts` says the `<page>_<post>` composite.** An image post reads
+      composite on both, which is the control. So a video found through the **Facebook sweep**
+      carries an id that appears nowhere in `queue_item.result`, and the numbers are unrelated
+      — nothing computes one from the other. The post url is the bridge (both spell it
+      `/reel/<bare>/`), and `resolveClipId()` takes it as a SECOND lookup behind the direct
+      one. Fixed 2026-09-22, #44, exercised against production D1 with a no-url control.
+      - **#44 said the 7 bare-id posts were the damage; they were never the damage.** They
+        join, because the publisher and `posts:list` agree. The one orphaned code, `2ksvn`,
+        is the 2026-09-13 Restream mirror — no queue item, null **by nature**. The mechanism
+        was real and the casualty list was the neighbouring fact.
+      - **The same split puts every Facebook video in the comment ledger TWICE**, once per
+        key (measured on three since the sweep landed 2026-09-20). No duplicate comment has
+        ever gone out: both entries read *"comment already on the post"*, because the watcher
+        reads the post before writing. **Left alone on purpose** — collapsing the keys would
+        route `inbox:reply` through the bare video id, which has never been exercised, while
+        the composite has.
 - **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwkshow.com/s5`.** Nobody can click a url under a
   Short, so the only route is reading it off screen and typing it, and `mwkshow.com/8x2kq` is not
   a thing anyone types. `mint({ codePrefix: 's' })` allocates base 10 (base32 mixes confusable

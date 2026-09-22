@@ -67,10 +67,15 @@ function isShowLink(url) {
  * @param {string} [opts.codePrefix] ask for a SHORT sequential code (s1, s2 ...)
  *   rather than five random characters. For a place where the link cannot be
  *   clicked and can only be typed — under a YouTube Short, chiefly.
+ * @param {string} [opts.postUrl] the post's own url on the platform. Only the
+ *   clip lookup reads it, and only for Facebook, where a video carries a
+ *   different id depending on which Zernio surface found it — see
+ *   `resolveClipId()` in `web/src/api.js`. Nothing else should key on it.
  * @returns {Promise<string|null>} the short URL, or null to use the plain one.
  */
 async function mint({ platform = null, clipId = null, postKey = null, label = null,
-  campaign = null, medium = null, target: wanted = null, codePrefix = null } = {}) {
+  campaign = null, medium = null, target: wanted = null, codePrefix = null,
+  postUrl = null } = {}) {
   const cfg = voice.shortLink();
   if (!cfg.enabled) return null;
 
@@ -88,7 +93,7 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, platform, clipId, postKey, label, campaign, medium,
-        codePrefix, createdBy: 'pipeline' }),
+        codePrefix, postUrl, createdBy: 'pipeline' }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;

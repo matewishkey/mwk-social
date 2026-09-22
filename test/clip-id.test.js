@@ -66,6 +66,8 @@ const ROWS = [
   { id: 'Q_THREADS', result: '[{"platform":"threads","status":"published","postId":"18070854974736781"}]' },
   { id: 'Q_FB_A', result: '[{"platform":"facebook","status":"published","postId":"1218437048021839_122115471303415959"}]' },
   { id: 'Q_FB_B', result: '[{"platform":"facebook","status":"published","postId":"1218437048021839X122115471303415959"}]' },
+  // A video: the publisher records what posts:list gave it, which is BARE.
+  { id: 'Q_FB_VIDEO', result: '[{"platform":"facebook","status":"published","postId":"1526644959488954"}]' },
 ];
 
 test('a watcher post_key resolves to the queue item that published it', async () => {
@@ -124,6 +126,74 @@ test('an underscore in a post id is escaped, not treated as a wildcard', async (
   assert.equal(got, 'Q_FB_A', 'the escaped needle must match only the real post');
   assert.match(db.seen[0].sql, /ESCAPE/, 'the LIKE must declare an escape character');
   assert.ok(db.seen[0].args[0].includes('\\_'), 'the underscore must be escaped in the needle');
+});
+
+/*
+ * A FACEBOOK VIDEO HAS TWO IDS AND THE SOURCE DECIDES WHICH ONE WE HOLD.
+ * Measured 2026-09-22 on four videos: `posts:list` reports the bare video id
+ * (which is what the publisher then writes into `queue_item.result`), while
+ * `analytics:posts` — the sweep that finds a Restream mirror — reports the
+ * `<page>_<post>` composite for the SAME video. The two numbers are unrelated,
+ * so the only bridge is the post url, which both surfaces spell with the bare
+ * id in it.
+ *
+ * The control is the image post two tests up: composite on both surfaces, and
+ * it must keep resolving on the FIRST lookup, or this fallback is papering
+ * over a direct match it broke.
+ */
+test('a Facebook video found by the analytics sweep resolves through its url', async () => {
+  const { resolveClipId } = await src('api.js');
+
+  // The control: without the url there is nothing to bridge with, and the
+  // composite matches no row. If this passed, the test below would prove
+  // nothing about the url.
+  const blind = fakeDb(ROWS);
+  assert.equal(
+    await resolveClipId(blind, 'facebook:1218437048021839_122116207695415959'),
+    null, 'the composite alone must not resolve — that is the bug',
+  );
+
+  const db = fakeDb(ROWS);
+  assert.equal(
+    await resolveClipId(db, 'facebook:1218437048021839_122116207695415959',
+      'https://www.facebook.com/reel/1526644959488954/'),
+    'Q_FB_VIDEO', 'the bare id in the url is what joins',
+  );
+  assert.equal(db.seen.length, 2, 'the direct needle has to be tried first');
+});
+
+test('the watch/?v= spelling resolves too, and a foreign url does not', async () => {
+  const { resolveClipId } = await src('api.js');
+  assert.equal(
+    await resolveClipId(fakeDb(ROWS), 'facebook:1218437048021839_122116207695415959',
+      'https://www.facebook.com/watch/?v=1526644959488954'),
+    'Q_FB_VIDEO',
+  );
+  // A url for some other video must not hand back this one.
+  assert.equal(
+    await resolveClipId(fakeDb(ROWS), 'facebook:1218437048021839_122116207695415959',
+      'https://www.facebook.com/reel/2067282410583411/'),
+    null, 'an unrelated video id must stay null rather than fall back to anything',
+  );
+});
+
+/*
+ * The fallback is FACEBOOK ONLY and is a SECOND lookup. A platform whose id
+ * shape is stable must not gain a second query it never needed, and a direct
+ * hit must never be second-guessed — Q_FB_A is the control for that.
+ */
+test('the url fallback never fires for a direct hit or for another platform', async () => {
+  const { resolveClipId } = await src('api.js');
+
+  const direct = fakeDb(ROWS);
+  assert.equal(await resolveClipId(direct, 'facebook:1218437048021839_122115471303415959',
+    'https://www.facebook.com/reel/1526644959488954/'), 'Q_FB_A');
+  assert.equal(direct.seen.length, 1, 'a direct hit must not run the fallback');
+
+  const other = fakeDb(ROWS);
+  assert.equal(await resolveClipId(other, 'threads:99999999999999999',
+    'https://www.facebook.com/reel/1526644959488954/'), null);
+  assert.equal(other.seen.length, 1, 'only Facebook gets a second lookup');
 });
 
 /*
