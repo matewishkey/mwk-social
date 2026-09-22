@@ -130,9 +130,12 @@ test('the queued block says when it goes, read off the pace at that moment', () 
   const s = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'queue-add.js'), 'utf8');
   const queuedAt = s.indexOf('console.log(`queued ${id}');
   const gateAt = s.indexOf('gateLine(opt)', queuedAt);
+  const urlAt = s.indexOf("console.log('https://social.matewishkey.com/queue')", queuedAt);
   assert.ok(queuedAt > 0 && gateAt > 0, 'the gate line must be printed with the queued line');
-  assert.ok(s.slice(queuedAt, gateAt).split('\n').filter((l) => /console\.log/.test(l)).length === 1,
-    'and be the very next thing printed after it');
+  assert.ok(gateAt < urlAt, 'and inside the block he reads, before the dashboard url');
+  // The dry run is where he decides, so it says it there too.
+  const dryAt = s.indexOf("'-- --dry-run: nothing written, nothing uploaded'");
+  assert.ok(s.lastIndexOf('gateLine(opt)', dryAt) > dryAt - 600, 'the dry-run block must say it too');
 
   const { gateLine } = require('../scripts/queue-add.js');
   assert.match(gateLine({ at: '2026-10-01' }), /held until 2026-10-01/);

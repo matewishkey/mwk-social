@@ -418,10 +418,10 @@ function main() {
     console.log(sql);
     // A dry run is exactly when he wants to hear this, so it is not only on
     // the success path.
+    console.log(`-- ${gateLine(opt)}`);
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
     if (shortLine) console.log(`-- ${shortLine}`);
-    console.log(`-- ${gateLine(opt)}`);
     console.log(`-- points at ${opt.link || `${voice.config().links.show} (the show)`}`);
     if (opt.link && !voice.carriesCta(opt.link)) {
       console.log('-- the first comment keeps the show — that host is not one of ours');
@@ -439,17 +439,13 @@ function main() {
     fs.rmSync(path.dirname(file), { recursive: true, force: true });
   }
   console.log(`queued ${id} — ${opt.platforms.length ? opt.platforms.join(', ') : 'wherever it fits'}`);
-  // WHEN, read off the pace at this instant and printed where he reads. A
-  // queue is only a review gate if something is holding it; on 2026-09-23 a
-  // drafted caption was queued at 09:34 Brisbane with "goes out Wed 08:19"
-  // quoted from a status read sixteen hours earlier — it was already Wednesday
-  // and the timer took it at 09:35 with the draft on it. The tool says it now,
-  // so the person queueing cannot say it stale.
-  console.log(`  ${gateLine(opt)}`);
   // On the SAME line he already reads. A warning further up the output is the
   // same failure as a line in the journal: true, and not looked at.
   const line = captions.wontFitLine(opt.wontFit);
   if (line) console.log(`  ${line}`);
+  // WHEN, off the pace at this instant — see gateLine() for the morning it
+  // was quoted sixteen hours stale and the timer took a draft.
+  console.log(`  ${gateLine(opt)}`);
   if (shortLine) console.log(`  ${shortLine}`);
   // Where a tap lands, on the line he already reads — the pin that pointed at
   // the show was correct code and the wrong destination, and nothing said so.
