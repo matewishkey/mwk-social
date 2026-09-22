@@ -359,6 +359,24 @@ function overlayLine(file, wanted) {
 
 const usage = () => require('./lib/args').usageFromHeader(__filename);
 
+/**
+ * One line saying when this item can actually go, read off the pace NOW.
+ *
+ * "Queued" reads as "waiting for him" and on a quiet morning inside the
+ * window it is not: the timer asks every five minutes and takes the item on
+ * the next tick. The line names the case out loud so nobody has to know the
+ * pace to know whether there is time to fix the words.
+ */
+function gateLine(opt) {
+  if (opt.at) return `held until ${opt.at} — the pace releases it then`;
+  const s = pace.status(require('./lib/events').read());
+  if (s.why === null) {
+    return 'GOES OUT AT THE NEXT TICK — inside the window with a slot free, so within minutes; '
+      + 'this is not a review gate. Cancel on the dashboard now if the words are not his.';
+  }
+  return `held — ${s.why}; next slot ${s.nextAt}`;
+}
+
 function main() {
   const opt = parse(process.argv.slice(2));
   if (opt.help) { console.log(usage()); return; }
@@ -403,6 +421,7 @@ function main() {
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
     if (shortLine) console.log(`-- ${shortLine}`);
+    console.log(`-- ${gateLine(opt)}`);
     console.log(`-- points at ${opt.link || `${voice.config().links.show} (the show)`}`);
     if (opt.link && !voice.carriesCta(opt.link)) {
       console.log('-- the first comment keeps the show — that host is not one of ours');
@@ -420,6 +439,13 @@ function main() {
     fs.rmSync(path.dirname(file), { recursive: true, force: true });
   }
   console.log(`queued ${id} — ${opt.platforms.length ? opt.platforms.join(', ') : 'wherever it fits'}`);
+  // WHEN, read off the pace at this instant and printed where he reads. A
+  // queue is only a review gate if something is holding it; on 2026-09-23 a
+  // drafted caption was queued at 09:34 Brisbane with "goes out Wed 08:19"
+  // quoted from a status read sixteen hours earlier — it was already Wednesday
+  // and the timer took it at 09:35 with the draft on it. The tool says it now,
+  // so the person queueing cannot say it stale.
+  console.log(`  ${gateLine(opt)}`);
   // On the SAME line he already reads. A warning further up the output is the
   // same failure as a line in the journal: true, and not looked at.
   const line = captions.wontFitLine(opt.wontFit);
@@ -438,4 +464,4 @@ if (require.main === module) {
   try { main(); } catch (e) { console.error(e.message); process.exit(1); }
 }
 
-module.exports = { lit, sqlFor, parse, unlockAt, AT_JITTER_MINUTES };
+module.exports = { lit, sqlFor, parse, unlockAt, gateLine, AT_JITTER_MINUTES };

@@ -116,3 +116,27 @@ test('the claim query actually reads not_before, or the column is decoration', (
   const claim = api.slice(api.indexOf('async function claim'));
   assert.match(claim, /not_before IS NULL OR not_before <= \?1/);
 });
+
+/*
+ * "QUEUED" IS NOT "WAITING FOR HIM". On 2026-09-23 a drafted caption was
+ * queued at 09:34 Brisbane with "goes out Wed 08:19" quoted from a pace read
+ * sixteen hours earlier; it was already Wednesday and the timer took the item
+ * with the draft on it. The line that says WHEN is printed by the tool, off
+ * the pace at that instant, on the block he reads — so it cannot be stale.
+ */
+test('the queued block says when it goes, read off the pace at that moment', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const s = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'queue-add.js'), 'utf8');
+  const queuedAt = s.indexOf('console.log(`queued ${id}');
+  const gateAt = s.indexOf('gateLine(opt)', queuedAt);
+  assert.ok(queuedAt > 0 && gateAt > 0, 'the gate line must be printed with the queued line');
+  assert.ok(s.slice(queuedAt, gateAt).split('\n').filter((l) => /console\.log/.test(l)).length === 1,
+    'and be the very next thing printed after it');
+
+  const { gateLine } = require('../scripts/queue-add.js');
+  assert.match(gateLine({ at: '2026-10-01' }), /held until 2026-10-01/);
+  // The live case reads the pace now, so only its shape is pinned: it must
+  // either name the next slot or say out loud that there is no gate.
+  assert.match(gateLine({}), /next slot|NOT a review gate|not a review gate/);
+});
