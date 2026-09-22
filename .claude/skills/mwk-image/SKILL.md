@@ -75,9 +75,10 @@ the same post — a LinkedIn/Facebook/Threads gallery, an Instagram carousel, an
 tweet. **Stills only**: one video per post is a hard limit everywhere, so a set with a clip in
 it silently collapses to the first item.
 
-Caps are per platform and `platforms.galleryFor()` applies them: **LinkedIn 20, Facebook 10,
-Instagram 10, Threads 10, X 4, Pinterest 1** — a pin is therefore never part of a gallery. Over the cap it truncates; a platform that takes no still gets
-nothing.
+Caps are per platform and `platforms.galleryFor()` applies them — **read `imageMax` out of
+`scripts/lib/platforms.js`, never a number written here** (`node -e 'const p=require("./scripts/lib/platforms");for(const n of Object.keys(p.PLATFORMS))console.log(n,p.get(n).imageMax)'`).
+Pinterest's is 1, which is why a pin is never part of a gallery. Over the cap it truncates; a
+platform that takes no still gets nothing.
 
 **Pad the SET to a common ratio, not each file to whatever passes.** Instagram forces one aspect
 across a carousel, so mixed shapes get cropped by Instagram itself — the thing §3 exists to

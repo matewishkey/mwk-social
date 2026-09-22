@@ -1,5 +1,5 @@
 {
-  "_": "Everything this pipeline says out loud. Public-safe by design: account IDs, budgets and keys live in ~/.config/mwk-social/ and ~/.secrets, never here.",
+  "_": "Everything this pipeline says out loud. Public-safe by design: account IDs and keys live in ~/.secrets, td-sops/apps/mwk-social.enc.env and ~/.zernio/config.json, never here.",
   "marker": "matewishkey.com/show",
   "_marker": "The PRIMARY duplicate-guard substring, and the one every plain composed comment contains. Changing it is a breaking change: the watcher would stop recognising its own past comments and would comment again on every post.",
   "markers": [

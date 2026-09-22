@@ -115,8 +115,9 @@ Both trace to marketing blogs rather than to Instagram, and both were retracted 
 the enforcement date that sat here went with them, being unverifiable and in the same breath.
 The behaviour stayed because it costs nothing if the stricter reading is wrong.
 **And a first comment may buy nothing on Instagram at all**: IG's own search guidance says keywords have to be in the CAPTION to be searchable, which is the opposite direction from where we put the tags. Kept because the cap is real and spending it twice cannot help.
-So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
-always-on tags and three describing the clip.
+So an Instagram caption carries *zero* hashtags and the comment spends the budget — the
+always-on tags first, then whatever topic slots the cap of 5 leaves (two, with three always-on
+since 2026-09-22; `config/voice.json` → `tags` is the count, not this line).
 
 **X bills $0.20 for a tweet containing a URL, and that replaces the $0.015 base charge rather
 than adding to it.** Measured against real billing, not the price list: `content_create: 2` plus

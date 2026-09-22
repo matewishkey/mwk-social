@@ -85,7 +85,7 @@ const RESHARE_LAG_MINUTES = Number(process.env.MWK_RESHARE_LAG_MINUTES || 240);
  *
  * Its own, per account, and that is the whole point. Until 2026-08-24 a repost
  * carried no comment and no code at all: the company page — two followers — got
- * the tracked call to action, and the two personal profiles holding 7,192
+ * the tracked call to action, and the two personal profiles holding 7,222
  * between them got a bare repost with no route to the sign-up page except
  * clicking through to the company post and finding its comment there. That is
  * essentially the entire LinkedIn audience with nothing to follow and nothing

@@ -243,8 +243,11 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 - **Pinterest gets the clip as a video pin** (since 2026-09-20): the first line of his words is
   the pin's title (100 max), the words plus up to three tags are the description, and the pin's
   own destination field carries the link — the show by default, or **whatever `--link` names**.
-  A pin cannot be edited afterwards (and no delete has been exercised), so the destination is
-  decided now or not at all. 2:3, 1:1 or 9:16 only. No comment, no watcher.
+  The PIN cannot be edited afterwards (and no delete has been exercised) — but its destination
+  is a `mwkshow.com/<code>` we own, and the code's `target` is a row in D1 read fresh on every
+  hit, so a show-code pin is repointed with one `UPDATE link` and the pin is never touched
+  (done for the 2026-09-22 Dial pin; CLAUDE.md → *Links* has the rule and its limits). A full
+  `--link` url is baked in and is decided now. 2:3, 1:1 or 9:16 only. No comment, no watcher.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
 - Tags go in the caption **or** the comment, never both — that is the behaviour, and it holds.

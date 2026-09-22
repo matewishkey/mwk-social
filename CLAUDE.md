@@ -613,6 +613,14 @@ table, on no page, and read by nothing without anything looking wrong.
   day-granularity only**, so there is no way to hold for an hour today. Either check the pace
   before calling a queue a gate, or say plainly that it goes out at the next tick. **His own
   dictated words need no gate**; drafts do.
+  - **IT HAPPENED AGAIN ON 2026-09-23 WITH THE RULE ABOVE ALREADY WRITTEN**: a draft was
+    queued at 09:34 Brisbane with *"goes out Wed 08:19"* quoted from a pace read sixteen hours
+    earlier, and the timer took it at 09:35. The knowledge was in the right place and read at
+    the wrong time — so **`queue-add.js` prints the gate itself** (`gateLine()`), off the pace
+    at that instant, on the `queued` block: held-until, held-why-and-next-slot, or *GOES OUT AT
+    THE NEXT TICK*. Read that line; never quote a `nextAt` you read earlier in the session.
+    What it cost: LinkedIn was edited to his words afterwards (`posts:edit`, exercised); the
+    four short-form platforms had only the title line anyway; Threads and X kept the draft.
 - **An item that has put ANYTHING live is never queued again.** A throw in one publish group used
   to unwind the run and requeue the item — X's upload failed at 99% after five platforms had
   published, and the next tick reposted everything three times over. Each group is caught where
@@ -670,7 +678,9 @@ table, on no page, and read by nothing without anything looking wrong.
   that is the real limit, not the numbers.
 - **TikTok has NO delete API**, and neither has Instagram; everything else deletes through
   `posts:unpublish <id> --platform <p>`. Image swap on a published post = unpublish + recreate
-  (`posts:edit` is text-only).
+  (`posts:edit` is text-only — **exercised on LinkedIn 2026-09-23**, `posts:edit <zernio id>
+  --platform linkedin --content "<the whole composed caption>"`, verified on the page; Threads
+  and X have no edit at all).
 - **Everything publishes through the queue; the mirror is gone** (mate, 2026-08-20). **Do not
   reintroduce a "is a copy already over there?" check** — it existed only because Restream put
   copies somewhere we could not see. A post made outside the pipeline is handled by hand.
