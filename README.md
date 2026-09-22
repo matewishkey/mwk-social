@@ -16,9 +16,10 @@ timezone, a minimum gap with a jittered top-up, and a posting window of **07:00-
 which is the US evening. Queue five things at once and they go out **two a day**, not five in a
 minute — and something queued at noon waits until the next morning.
 
-**Every post carries a route back to the show.** A first comment with a tracked
-`mwkshow.com/<code>` link, minted per platform and placement, so a click says which channel and
-which clip earned it. Where a url is not clickable at all — Instagram, a YouTube Short — the
+**Every post carries a route back** — the show by default, or the page the post is about when
+it names one (`--link`, since 2026-09-22). The show's route is a tracked `mwkshow.com/<code>`,
+minted per platform and placement, so a click says which channel and which clip earned it; a
+project's own page goes out whole and is not counted, because `mwkshow.com` means the show. Where a url is not clickable at all — Instagram, a YouTube Short — the
 comment names where the link *is* instead of spending a code on a click that cannot happen. On
 TikTok not even the bio is clickable, so a post there carries no link and claims none.
 
@@ -118,8 +119,7 @@ covering three, and read half again as high as the truth. It was deleted rather 
   message that reads exactly like a plan limit. It is not one.
 - **One VIDEO per post, on every platform** — so a vertical cut and a landscape cut are two posts.
   Stills are the exception: several ride together as one gallery, capped per platform by
-  `imageMax` (LinkedIn 20, Facebook/Instagram/Threads 10, X 4, Pinterest 1 — so a pin is never
-  part of a gallery).
+  `imageMax` — a pin is never part of a gallery, and the numbers live in `platforms.js`.
 - **TikTok settings go in `tiktokSettings` at the top level**, not `platformSpecificData`, which
   would look accepted and apply none of them because that field echoes any key you send it.
 

@@ -18,8 +18,7 @@ the skill and leave a pointer. Two copies of a rule is how one of them drifts.
 - `zernio auth:check` verifies auth; `zernio accounts:health` verifies connections;
   `zernio accounts:list` is the source of truth for connected account IDs.
 - zsh gotcha (bit twice): inline `node -e '...'` inside `$(...)` loses its closing paren —
-  put the JS in a script file instead. **zsh only** — `scripts/*.sh` run under bash and use the
-  inline form deliberately; don't "fix" them.
+  put the JS in a script file instead.
 
 ## Skills — read these before the sections below
 
@@ -42,8 +41,9 @@ this file loads every session whether it is relevant or not.
   read `post.platforms[]`, nothing else exposes them.
 - **Native first comment on publish**: `platforms[].platformSpecificData.firstComment` — Zernio
   posts it seconds after the post goes live. FB (feed + Reels, not Stories), IG, LinkedIn, YouTube
-  (posted *and* pinned, 10k chars). **No TikTok.** Skipped on drafts. **The CLI has no flag for
-  it**, same as `reshareUrl`, so `scripts/post.js` talks to `POST /v1/posts` directly.
+  (posted *and* pinned, 10k chars). **No TikTok and no Threads** — which is why Threads' comment
+  is the watcher's alone. Skipped on drafts. **The CLI has no flag for it**, same as `reshareUrl`,
+  so `scripts/post.js` talks to `POST /v1/posts` directly.
 - **Every `inbox:*` command wants the PLATFORM's native post ID** (`platforms[].platformPostId`).
   The Zernio `_id` 404s. `inbox:reply <postId> --accountId <acc> --message "..."` with NO
   `--commentId` posts a top-level comment.
@@ -57,70 +57,45 @@ this file loads every session whether it is relevant or not.
   create response proves storage, never support. Check the platform guide, don't infer.
 - Pre-flight: `validate:post-length --text`, `validate:media --url`. **Neither checks image aspect
   ratio, and `validate:post` passes an Instagram post with no media at all** — so the two gotchas
-  that have actually bitten are still on you. Check aspect with `identify` before upload.
-- **`accounts:health` reporting `warning` is routine, not a fault** — Zernio refreshes tokens
-  lazily, so an account passes through `warning` and returns to `healthy` on its own. **Alerting
-  keys on `needsReconnect: true` or `status: error`**, never on `warning`.
+  that have actually bitten are still on you.
 
 ## What we say, and where it lives
 
 - **Everything we say out loud lives in `config/voice.json`** — CTA variants, identity and brand
   tags, per-platform hashtag caps, the blocklist, the YouTube show blurb, the feed URL.
-  `scripts/lib/voice.js` is the only reader. It must contain `marker` (`matewishkey.com/show`) and
-  every variant must contain `{show}`: the dedupe guard keys off that string, so a variant that
-  dropped the url would have the watcher duplicate every natively-posted comment. `voice.js`
-  refuses to load a config that breaks either rule.
+  `scripts/lib/voice.js` is the only reader, and it refuses to load a config that breaks either
+  load-bearing rule: `marker` must be present, and every variant must contain `{show}`, because
+  the dedupe guard keys off that string.
 - **Changing the CTA host is a breaking change.** The duplicate guard finds the CTA *in the comment
   text*, so a guard taught only the new host would re-comment on everything written before the
   change. `markers[]` lists every substring that counts; tests pin both old and new. Minting is
   **idempotent** and **never fatal** (no dashboard → plain URL → the comment still goes out).
 - **`matewishkey.com/brand` IS the voice, it MOVES, and it renders `VOICE.md` at that repo's root —
-  read it, never restate it.** Its rules are recorded beside the text in `config/voice.json`. Three
-  that have bitten: the three-line headline is **one unit and is not split**; the exclamation mark
-  on *yourself!* is load-bearing (a typo-cleanup flattened it within the hour); **no em dashes
-  anywhere the site speaks**.
+  read it, never restate it.** Some of its rules sit beside the text in `config/voice.json`
+  (`youtubeDescription._showBlurb`). Three that have bitten and are recorded NOWHERE else: the
+  three-line headline is **one unit and is not split**; the exclamation mark on *yourself!* is
+  load-bearing (a typo-cleanup flattened it within the hour); **no em dashes anywhere the site
+  speaks**.
   - **The one disagreement is SETTLED in the blurb's favour**: the page says *"I, never we"*, the
     blurb says "we build it". Mate, 2026-08-24: *"For sure keeping we here is great."* That "we" is
     him and the guest. **Do not raise it again** — it reads like a fresh finding every time
     somebody re-reads the brand page.
-- **NOBODY IS ASKED TO COME. THE SITE IS MENTIONED, AND THAT IS ALL** (mate, 2026-09-22:
-  *"i changed come to the show to apply... i want a more unique flavour instead of the beg to
-  come... we keep using mwkshow.com but stop using the beg to come, just mention the site,
-  that's it"*). He renamed `/show` to **Apply to be a guest** and the CTA follows the site.
-  - **What went**: *"Bring me something you wish your computer did"* (the tail on every YouTube
-    description), *"come to the show"*, *"Bring me yours"*, *"Yours could be next"*.
-  - **What a variant is now**: a true statement, then the site. *"Nobody who has been on the
-    show had written a line of code before."* *"Guests apply, and I pick every one myself."*
-    **Applying is not begging** — it is selective, which is the flavour he was after, and it is
-    the site's own word.
-  - **`plain[0]` is untouched**: the brand's three lines are the argument, not a plea.
-  - **The link did not move.** `mwkshow.com` stays, `markers[]` is unchanged, so the duplicate
-    guard still recognises every comment written before today — the phrasing was never what it
-    matched on.
+- **NOBODY IS ASKED TO COME; THE SITE IS MENTIONED, AND THEN ONLY THE LINK** (mate, twice on
+  2026-09-22). He renamed `/show` to **Apply to be a guest**, and an hour later cut the comment
+  to the url and the tags: *"we do not overcomplicate it... if they do not want to come i do not
+  care."* **His words and the full reasoning are in `config/voice.json` → `firstComment._register`
+  — read them there.** What is not in that note:
+  - **The link did not move**, so `markers[]` still recognises every comment written before the
+    change: the phrasing was never what it matched on.
   - **The tail change reaches the back catalogue by itself.** The old blurb went to
-    `showBlurbPast` (five entries now), so `findBlurb()` still recognises what is on the channel
-    and the nightly sync takes the SWAP path: one line replaced on each video, his approved
-    openings untouched.
-- **AND THEN: JUST THE LINK** (mate, 2026-09-22, an hour after the above: *"we do not have to
-  ask a question just the link... we do not overcomplicate it... if they do not want to come i
-  do not care, i do not want to push folks to come, only if they care"*). The first comment is
-  the url and the topic tags. Nothing else.
-  - **One variant on purpose.** `firstComment.plain` is `["{show}"]` and `episode` is empty.
-    The rotation, `avoidIndex`, the episode pool and the feed reader all still work and all
-    have nothing to choose between — a second variant is a content decision and needs his word.
-  - **Nothing curls the RSS for a comment any more.** `latestEpisodes()` was still fetched on
-    every composition to pick a wish that would then be discarded; it is skipped when the ratio
-    is 0 or the pool is empty.
-  - **The CAPTION is untouched.** It still ends on *Prompt it yourself!* — that is his own
-    writing and the brand's argument, not a plea. This is about the comment underneath.
+    `showBlurbPast`, so `findBlurb()` still recognises what is on the channel and the nightly
+    sync takes the SWAP path — one line replaced per video, his approved openings untouched.
   - ⚠ **The YouTube tail keeps ONE line, and not for taste.** `findBlurb()` locates our tail by
     the constant words either side of the slot, so a tail that is only `{show}` has no halves
-    to match — nothing on the channel would be recognised as ours again and all 23 videos would
-    take the REBUILD path. The line states what the show is and asks for nothing.
-  - **Ten tests went red and none was about the change.** They were rotation, pinning and the
-    give-up order, reading the LIVE config for their variants. They run against a fixture now:
-    content lives in `voice.json` and is asserted once for what it is, behaviour is exercised
-    against a config that cannot be edited out from under it.
+    to match — nothing on the channel would be recognised as ours again and every video would
+    take the REBUILD path.
+  - **The CAPTION is untouched.** It still ends on *Prompt it yourself!* — his own writing and
+    the brand's argument. All of the above is about the comment underneath.
 - **SHORT IS THE HOUSE STYLE** (mate, 2026-08-24: *"Keep the text simple short and concise, so we
   will not do AI issues"*). The description went 819 characters to 347. His reasoning: length is
   what reads as machine-written, so a long correct paragraph loses to a short one.
@@ -134,28 +109,22 @@ this file loads every session whether it is relevant or not.
   **Reassurance is where a false claim hides**: check it against what happens on the show, not
   against how kind it sounds.
 - **The first comment rotates**, deterministically from the post key — a re-run renders the
-  identical comment while consecutive posts differ. `avoidIndex` is the belt-and-braces on top, and
-  **both paths use it now** (`post.js` and `first-comment.js` share `comment-state.js`); a dry run
-  must not move the rotation on. Roughly `episodeMixRatio` of comments quote a real guest wish from
-  the RSS feed. **Freshness must never block a comment** — an unreachable feed falls back to a
-  plain variant.
+  identical comment while consecutive posts differ. `avoidIndex` is the belt-and-braces on top,
+  and **both paths use it** (`post.js` and `first-comment.js` share `comment-state.js`); a dry run
+  must not move the rotation on. ⚠ **Inert today**: one variant, `episodeMixRatio` 0, so there is
+  nothing to rotate between. This is the rule for the day a second one comes back.
 - **A ZERNIO 502 ON A COMMENT WAS OUR OWN OVER-LONG BODY, AND IT READ AS THEIRS TWICE**
-  (2026-09-18). An episode variant quotes a guest's wish verbatim off the feed, so its length is
-  whatever the guest said — **580 characters against Threads' 500**, which Zernio answers with a
-  `502` (a `400` on 2026-08-24, same shape). Both times it was written off as a platform having a
-  bad minute; the 24 Aug post kept its CTA only because the feed happened to be unreachable an hour
-  later and a plain variant fit. **`platforms.commentMax` is the cap and `voice.firstComment({
-  maxLength })` composes within it**, giving up **the tags first, then the quote, and the link
-  never** — nothing is truncated, because half a url published under a post is worse than one loud
-  failure and an hourly retry. **The comment cap is NOT the caption cap**: LinkedIn 1,250 against a
-  post's 3,000, YouTube 10,000 against a description's 5,000; Threads is 500 either way. Zernio's
-  own `validate:post-length` is where the caption numbers come from.
-- **AN EPISODE IS A GUEST SHOW; A LIVE STREAM IS NOT ONE, AND THE `/episodes/` FILTER IS WHAT KEEPS
-  THAT TRUE IN CODE.** `latestEpisodes()` drops any feed item whose link does not match
-  `/\/episodes\//` (`voice.js`), which is the whole reason the `firstComment.episode` variants can
-  say *"that's what someone brought to the show"* without checking anything else. Widen that filter
-  and a solo stream starts being quoted as a guest's wish. Mate, 2026-08-21: *"there are no episodes
-  about this, it was live on youtube, uncut version is visible."*
+  (580 characters against Threads' 500; a `400` of the same shape on 2026-08-24). **A platform
+  error on a comment is ours until proven otherwise.** `platforms.commentMax` is the cap and
+  `voice.firstComment({ maxLength })` composes within it, giving up the tags first, then the
+  quote, and the link never — nothing is truncated, because half a url published under a post is
+  worse than one loud failure and an hourly retry.
+- **The comment cap is NOT the caption cap**: LinkedIn 1,250 against a post's 3,000, YouTube
+  10,000 against a description's 5,000; Threads is 500 either way.
+- **AN EPISODE IS A GUEST SHOW; A LIVE STREAM IS NOT ONE**, and `latestEpisodes()`'s `/episodes/`
+  filter (`voice.js`) is what keeps that true in code — widen it and a solo stream starts being
+  quoted as a guest's wish. Mate, 2026-08-21: *"there are no episodes about this, it was live on
+  youtube, uncut version is visible."* ⚠ Inert today, same as the rotation above.
 
 ## Hashtags
 
@@ -164,11 +133,6 @@ absolute: **would someone who does NOT work in technology already know this word
 themselves?** If they would look it up, it is wrong (mate, 2026-08-21). Backtested: 79% of tags we
 had already published were jargon the rule rejects.
 
-- **A product name is fine when ordinary people know the product.** #Xero, #Canva, #Dropbox yes;
-  #Cloudflare, #GitHub, #Docker no. That distinction is the rule, not an exception to it.
-- **Fewer good tags beat more weak ones, and none is an acceptable answer.**
-- The prompt in `topic-tags.js` is the primary defence; `blocked` in `voice.json` is the hard
-  backstop. The backstop caught 1 of 45 on the rerun — it is what stops a bad day going out.
 - **Tags chosen for WHO they reach are allowed on a manual post** (mate, 2026-08-20), reversing the
   subject-matter-only rule. Evidence worth not re-deriving: `#NoCode` reaches the supply side, not
   the buyer; `#LearnAI` reaches the already-using-AI crowd; `#SmallBusiness` runs ~1,800 posts/hour
@@ -183,11 +147,9 @@ had already published were jargon the rule rejects.
 
 ## Transcripts and topic tags
 
-- **`RULES_VERSION` in `topic-tags.js` is what makes a tag-rule change take effect.** The cache is
-  per post and returned a hit unconditionally, so a rule rework would have changed **nothing** for
-  any already-processed video. A hit now only counts if `cached.rules === RULES_VERSION`; a bump
-  re-derives from the **stored transcript** — one model call, no re-transcription. **Bump it when
-  the RULE changes, never when the code does.**
+- **`RULES_VERSION` in `topic-tags.js` is what makes a tag-rule change take effect** — bump it
+  when the RULE changes, never when the code does. Its header carries the version log and why a
+  cache hit that ignores it would have made a rule rework change nothing.
 - **Anything already drafted from a cached result is stale too.** 16 dashboard proposals carried
   the old tags after the fix; approving one would have published exactly what had just been
   corrected. **After any voice or tag change, check what is already queued for approval.**
@@ -210,128 +172,81 @@ had already published were jargon the rule rejects.
 ## Links, and where a url actually works
 
 - **A POST POINTS AT WHAT IT IS ABOUT, AND `mwkshow.com` IS THE SHOW'S ADDRESS AND NOTHING
-  ELSE'S** (mate, 2026-09-22, an hour after the first Dial Countdown pin went live: *"for these
-  we can use always the original page with a link instead of the show... the mwkshow.com is
-  really just the show otherwise use full link. this rule has to be generic"*). Two rules, and
-  they are separate:
-  - **`queue_item.link` is the post's own destination** (`--link` on `queue-add.js`, a field on
-    the dashboard form). Null means the show, which is every item written before 2026-09-22.
-    When it is set, **every link slot points there**: Pinterest's `link`, X's caption link and
-    the `{show}` slot in the first comment. `linkFor()` returns it before it mints anything.
-  - **A code is minted for the show and for nothing else** (`shortlink.isShowLink()`). A domain
-    named after the show standing in for Elgato's marketplace is a worse link than the real
-    one: a reader cannot tell where it goes, and the show's name is doing the vouching.
-    `trackLinks()` therefore leaves every non-show url in a custom comment exactly as written.
-  - **The cost is real and it is his**: a project link is no longer counted. `/links` on the
-    dashboard still mints by hand for anything, for the day a number is worth more than the
-    clarity. `mwkshow.com/dial` stays alive — a live code is never broken — it is simply not
-    used again.
-  - ⚠ **`matewishkey.com/` JOINED `markers[]` IN THE SAME COMMIT, AND IT HAD TO.** A comment
-    carrying `matewishkey.com/projects/...` matches no other marker, so the watcher would add a
-    SECOND comment under every post that names a project page, for ever. The new marker is
-    broad on purpose: under the current voice the CTA *is* a mention of his site. The cost is
-    the other direction — a viewer who links his site makes the watcher skip that post — and a
-    missing comment we can add by hand beats a duplicate Instagram cannot delete.
-  - **It reaches nothing already published.** Pinterest cannot edit a pin's destination, so the
-    2026-09-22 Dial pin still opens `/show`; the parameter rename (`showUrl` to `linkUrl`) is
-    cosmetic and changes no rendered text.
+  ELSE'S** (mate, 2026-09-22: *"the mwkshow.com is really just the show otherwise use full link.
+  this rule has to be generic"*). `queue_item.link` is the post's own destination (`--link`, and
+  a field on the dashboard form); null means the show. The reasoning is in
+  `shortlink.js`'s header, at `isShowLink()`. What is not there:
+  - **The slots and the comment do not agree, on purpose.** The pin's destination and X's
+    caption link go wherever he said. The COMMENT only follows when the destination is one of
+    his (`voice.carriesCta`) — `firstComment()` refuses a body carrying no marker, and that
+    throw is outside post.js's per-account catch, so a vendor url there killed the whole post.
+  - **The watcher cannot look a queue item up**, so the publisher writes the destination into
+    `comment-state.js` under `__links`. Threads has no native first comment, so without that
+    every Threads comment on a `--link` post said the show.
+  - ⚠ **`matewishkey.com/` had to join `markers[]`**, or the watcher would add a SECOND comment
+    under every post naming a project page, for ever. Broad on purpose — under the current voice
+    the CTA *is* a mention of his site. The cost runs the safe way: a viewer who links his site
+    makes us skip that post, which is a comment added by hand rather than one Instagram cannot
+    delete.
+  - **A live code is never broken.** `mwkshow.com/dial` still resolves; it is simply not used
+    again. And nothing reaches what is already published — Pinterest cannot edit a pin's
+    destination, so the 2026-09-22 Dial pin still opens `/show`.
 
 - **A URL IS NOT CLICKABLE EVERYWHERE, and for three weeks this pipeline acted as though it was**
-  (2026-08-22, on mate's instinct). Instagram makes NOTHING clickable — not a caption, not a
-  comment, not a Reel. TikTok the same. **YouTube deliberately renders urls in SHORTS descriptions
-  and comments as plain text**; long-form is fine. Measured damage: five TikTok and five Instagram
-  codes took **0 and 1** human clicks, which reads as "nobody cared" rather than "nobody could".
+  (2026-08-22). Instagram makes NOTHING clickable — not a caption, not a comment, not a Reel.
+  TikTok the same, including the bio on an account under 1,000 followers. **YouTube deliberately
+  renders urls in SHORTS descriptions and comments as plain text**; long-form is fine. Measured
+  damage: five TikTok and five Instagram codes took **0 and 1** human clicks, which reads as
+  "nobody cared" rather than "nobody could".
 - **`linkClickable` is the fact; `linkPlacement` is the decision, and `platforms.linkProblems()`
-  refuses to let them disagree.** A test asserts it returns empty.
-- **`linkPlacement: 'profile'` means: say where the link is, mint nothing.** Instagram only, since
-  2026-09-14. **TikTok is `'none'`: the bio link is plain text too** on a personal account under
-  1,000 followers (mate checked in the app: *"I have less than 1000 follower, so not tapable"*), so
-  for three weeks every TikTok caption said "link in my bio" about a line nobody could tap. `'none'`
-  carries no link and makes no claim; `linkProblems()` refuses it on any platform with a live slot.
-  `{show}` renders as `voice.profileCta(platform)`, and any variant carrying a url is dropped from
-  the pool — that url is exactly as dead. **Every phrasing MUST be in `markers[]`** or the guard
-  cannot recognise its own comment and re-comments for ever. `profileCtaBy.youtube` says "channel
-  page" because under a Short the clickable thing is the CHANNEL, not a bio.
-- **`commentWatched()` is not `linkPlacement === 'comment'`** — it is `commentsApi === true &&
-  !['caption','reply'].includes(linkPlacement)`. Instagram is `'profile'` and IS watched, because
-  its CTA is still a comment. X has a comments API and is NOT watched, because its CTA ships inside
-  the post. post.js printed "the watcher adds it" about a platform it cannot reach **twice**, so it
-  is derived from one function now and a test pins `first-comment.js`'s `ALL_PLATFORMS` to exactly
-  that set.
-- **Every link carries a campaign, and it is part of the MINT KEY** (`campaign`, `medium`,
-  `created_by`, `note`). Same destination from a bio and from a reply = two codes, or "which one
-  earned this" has no answer. `medium` is the *placement*, `platform` is the source.
-- **`clip_id` was declared and never written — 0 of 55 links carried one.** Every mint now carries
-  the queue item id, so **click → `link.clip_id` → `queue_item.media_key`** is one join. A test
-  reads `post.js` and fails if any `linkFor()` call omits its medium.
-  - **THE FIX LANDED IN ONE OF THE TWO MINTING PATHS, AND THE OTHER SAID IN A COMMENT THAT IT
-    COULD NOT BE DONE** (2026-09-20). `first-comment.js` only sees a published post, so it minted
-    with no clip id — 16 Threads codes orphaned, against 82 publisher-minted codes that all had
-    one. **The join existed the whole time**: `run-queue.js` writes each platform's own post id
-    into `queue_item.result`, and the watcher's `post_key` is `<platform>:<that same id>`.
-    `resolveClipId()` in `web/src/api.js` does the lookup, so neither caller has to know.
-    **A comment asserting an impossibility is still a claim — check it before believing it.**
-  - ⚠ **`clip_id` IS PART OF mint()'s DEDUPE KEY, so backfilling and deploying are ORDERED.**
-    Filling the column changes what an existing row matches: ship the resolution first and the
-    watcher mints a SECOND code for every post it has already commented on. Backfill, then deploy,
-    then prove it by re-minting one key and getting the same code back.
-  - **A `post_key` with no queue item behind it is null BY NATURE, not orphaned** — an external
-    YouTube VOD, a `manual:`/`new:`/`reality-check:` code, and the four pre-pipeline Threads
-    posts. A LinkedIn *reshare* WAS a third case until 2026-09-20 — `result` recorded the native
-    post alone; it now carries each repost's own id too (*LinkedIn reshares*, below), so only a
-    repost that was still `scheduled` when the item was written stays unresolvable.
-  - ⚠ **A FACEBOOK POST ID CONTAINS `_`, WHICH IS A LIKE WILDCARD.** Unescaped, the lookup matches
-    ids it is not. The test carries a decoy row differing only at that position, and asserts the
-    unescaped needle matches BOTH before asserting the escaped one matches one.
-- **A code is bound by PURPOSE, not by destination.** `target` is part of the mint key, so a code
-  identified only by where it points stops being findable the moment it is repointed, and the next
-  mint quietly makes a second one. Bind anything whose destination can move
-  (`manual:pretalk-public`).
-  - **The repoint is proven, not theoretical**: both booking calendars were replaced and repointed
-    in one `UPDATE`, and the website was never touched.
-- **A PROFILE LINK NAMES ITS ACCOUNT, OR IT IS USELESS.** With three LinkedIn accounts and Facebook
-  posting only to Pages, `linkedin bio` answers nothing. Every bio code carries
-  `post_key = 'account:<zernio id>'` (resolve from `accounts:list`, never type one, never commit
-  one) or `manual:<slug>` where the pipeline has no account. **`postKey` is part of the mint key**,
-  so minting without it creates a *second* code for the same profile.
+  refuses to let them disagree.** Which slot a platform uses is the TABLE's answer, never this
+  file's. Two things about it that are not in the table:
+  - **Every CTA phrasing MUST be in `markers[]`** — `'profile'` and `'none'` carry no url, so
+    the guard has only the words to recognise its own comment by. `voice.js` throws at load if a
+    `profileCtaBy` phrase is missing from the list.
+  - **`commentWatched()` is not `linkPlacement === 'comment'`** — Instagram is `'profile'` and IS
+    watched, because its CTA is still a comment; X has a comments API and is NOT, because its CTA
+    ships inside the post. post.js printed "the watcher adds it" about a platform it cannot reach
+    **twice**, so it is derived from one function now and a test pins `ALL_PLATFORMS` to that set.
+- **The MINT KEY is (`target`, `platform`, `clip_id`, `post_key`, `campaign`, `medium`)** —
+  `created_by` and `note` are recorded, not keyed. Same destination from a bio and from a reply =
+  two codes, or "which one earned this" has no answer. `medium` is the *placement*, `platform` is
+  the source. A test reads `post.js` and fails if any `linkFor()` call omits its medium.
+  - **A code is bound by PURPOSE, not by destination.** `target` is in the key, so a code
+    identified only by where it points stops being findable the moment it is repointed and the
+    next mint quietly makes a second one. Bind anything movable (`manual:pretalk-public`) — both
+    booking calendars were repointed in one `UPDATE` and the website was never touched.
+  - **A PROFILE LINK NAMES ITS ACCOUNT, OR IT IS USELESS.** With three LinkedIn accounts and
+    Facebook posting only to Pages, `linkedin bio` answers nothing. Every bio code carries
+    `post_key = 'account:<zernio id>'` (resolve from `accounts:list`, never type one) or
+    `manual:<slug>`. **`postKey` is in the key**, so minting without it makes a second code for
+    the same profile.
+  - **`clip_id` → `queue_item.media_key` is the click-to-video join.** `resolveClipId()` in
+    `web/src/api.js` owns it and its header carries every trap: the two minting paths, the
+    backfill-before-deploy ordering, the post keys that are null by nature, and the Facebook
+    post id whose `_` is a LIKE wildcard. **A comment asserting an impossibility is still a
+    claim** — that is how sixteen Threads codes went unjoined.
 - **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwkshow.com/s5`.** Nobody can click a url under a
-  Short, so the only route is reading it off screen and typing it, and `mwkshow.com/8x2kq` is not a
-  thing anyone types. `mint({ codePrefix: 's' })` allocates base 10 (base32 mixes confusable
+  Short, so the only route is reading it off screen and typing it, and `mwkshow.com/8x2kq` is not
+  a thing anyone types. `mint({ codePrefix: 's' })` allocates base 10 (base32 mixes confusable
   characters). **A low number on one of these is neither indifference nor unreachability — it is
-  how many people cared enough to type it.**
-  - **`codePrefix` NARROWS the attribute dedupe rather than sitting under it.** Every Short already
-    owned an episode code, so a plain attribute match handed all thirteen straight back. The old
-    code is untouched — never reused, still resolving, same `clip_id`.
-  - **A clip can legitimately own two codes, so the lookup is `ORDER BY created_at`.** `.first()`
-    over an unordered pair flips the rendered description every sync and re-proposes for ever.
+  how many people cared enough to type it.** How `codePrefix` narrows the dedupe, and why the
+  lookup is ordered, are at `mint()` in `web/src/api.js`.
 - **A PERSONAL SHARE IS A NAME ON THE END OF ANY LINK — `mwkshow.com/mmm/natalie`.** One code
   serves everybody; the name is a word HE types, stored on the CLICK as `tag`. **A code he has to
   copy from somewhere is a code he will not use from a phone**, which is why `mint()` takes a
-  chosen code now — and a chosen code SKIPS the attribute dedupe (he asked for `mmm`, so he gets
-  `mmm` or an error, never somebody else's).
-  - **`decodeURIComponent` BEFORE normalising**, then fold accents to ASCII, or `Ödön` stores as
-    `c3-96d-c3-b6n`. Found by curling the live redirect with a real name; an ASCII test passes.
-    **The folding is not a compromise to be undone**: no accents anywhere, on anything (mate,
-    2026-09-18), so the ASCII form IS the spelling and this is the house rule, not a limitation.
+  chosen code — and a chosen code SKIPS the attribute dedupe.
   - **It says the link labelled natalie was opened, NOT that Natalie opened it.** Links get
     forwarded. Do not let a summary quietly upgrade it.
 - **`bot = 0` WAS NOT ENOUGH, AND IT OVERSTATED EVERY CLICK NUMBER BY ABOUT FOUR TIMES**
-  (2026-08-27). The User-Agent regex catches the fetchers that announce themselves and misses the
-  ones that present as a browser — 182 "human" clicks, ~49 that stand up. **A click counts only if
-  it arrived ALONE**: no other hit on that code within 60s either side (`web/src/lib/clicks.js`,
-  which holds the measured distribution and the reasoning). **The referer is NOT a positive
-  control** — Facebook's scraper sends `Referer: www.facebook.com`, so a facebook referer proves
-  the hit came from Facebook's infrastructure, never that a person was holding the phone.
-  - **Symmetric, not backward-looking.** Collapsing a wave to its first hit still counts the wave:
-    on the real table that is 30 YouTube-description clicks against 2. A test pins the `ABS(`.
-  - **ALONE ON ITS CODE WAS NOT ENOUGH EITHER: ONE FETCHER WALKS EVERY CODE ON A PAGE**
-    (2026-09-21). Five hits on five codes inside two seconds, each code hit once, all five
-    counted — three "X clicks" and both booking buttons in one sweep. The nearest other-code hit
-    sits at 0-2 s for 14 of 120 counted hits and then nothing until 20 s, so `alone()` now also
-    demands no hit on ANY other code within `CROSS_CODE_SECONDS` (10). It took 14 off the
-    all-time count (120 to 106) and 3 off X's week. The test pins both windows and the gap.
-  - `click.bot` stays `0 counted, 1 crawler, 2 unknown`; the UA is still read to DECIDE and
-    discarded. It is now the first of two filters, never the only one.
+  (2026-08-27) — 182 "human" clicks, ~49 that stand up. A click counts only if it arrived ALONE:
+  no other hit on that code within 60s either side, **and** no hit on ANY OTHER code within 10s,
+  because one fetcher walks every code on a page (that second filter took the all-time count from
+  120 to 106). The windows, the measured distribution and the reasoning are in
+  `web/src/lib/clicks.js`; tests pin both windows and the symmetry.
+  - **The referer is NOT a positive control** — Facebook's scraper sends
+    `Referer: www.facebook.com`, so a facebook referer proves the hit came from Facebook's
+    infrastructure, never that a person was holding the phone.
 - **A click is attributed platform-first, referer-second, then unattributed.** Referer matching is
   **anchored**, so `notfacebook.com` maps to nothing: naming the wrong channel is worse than
   admitting we cannot tell.
@@ -342,416 +257,261 @@ had already published were jargon the rule rejects.
   (2026-08-26). YouTube's channel page carries the website field in
   `channelExternalLinkViewModel` and LinkedIn's company page renders it behind `trk=about_website`
   — both readable from this box with plain curl. X reads out of the fxtwitter user object. The
-  other seven profiles render no website field to a logged-out fetch at all, so a miss there is
-  unknowable, never "not done".
+  other seven render no website field to a logged-out fetch, so a miss there is unknowable, never
+  "not done".
   - **The positive control is the FIELD, not the code**: if the selector finds no field, the read
     proved nothing. `linkedin.com/company/<slug>/about/` renders no field while
     `linkedin.com/company/<slug>/` does — the more specific URL is the one that answers nothing.
-  - He updates these by hand, so **when he says a bio is done, read it** rather than believing it.
-    Two of the ten were still on the plain url after he said they were updated.
-- **`/links` on the dashboard can mint by hand.** Anything he pastes himself — a bio, a newsletter,
-  a talk — was a raw url and invisible before that. The `campaign = bio` codes are the whole
-  conversion path on Instagram and TikTok.
-  - **Measured 2026-08-27, on counted clicks: 3 of 10 bio codes have one** — his personal Facebook
-    3, X 2, Instagram 1; the other seven zero, YouTube's among them. A click proves the link is
-    live; **a zero proves nothing** — not pasted and pasted-but-unclicked look identical. (Same
-    3-of-10 as the 2026-08-26 reading, different codes: that one predates the click fix above.)
+  - He updates these by hand, so **when he says a bio is done, read it**. Two of the ten were
+    still on the plain url after he said they were updated.
+- **`/links` on the dashboard can mint by hand**, for anything, including a destination the
+  pipeline would now leave unshortened. Anything he pastes himself — a bio, a newsletter, a talk —
+  was a raw url and invisible before that. **A zero proves nothing**: not pasted and
+  pasted-but-unclicked look identical.
 
 ## YouTube descriptions
 
-- **AN EPISODE IS WRITTEN FROM THE SITE, NOT FROM THE TAPE** (#40, live 2026-09-20 on all ten).
-  `scripts/lib/show-notes.js` renders the description from `content.json`: the `E00N - UNCUT -
-  with <guest>` line, his `outcome` verbatim, the topic links, the wishes read off
-  `wishes[].episodes[]`, the chapter list with `0:00 Start` prepended (YouTube ignores a list
-  that does not start there), `MORE WITH <GUEST>` off the OTHER episodes' `guests[]`, previous
-  and next by `number`, the UNCUT line off `raw.minutes`, then the tail and the tags. No model,
-  so it is the same bytes every run and the sync **converged on the third run** (`0 proposed`).
-  **In `sync()` the episode branch comes BEFORE the swap path** — every episode already carried
-  our tail, so `ours === tail` would have said "nothing to do" for ever; a test pins the order.
-  **`learned[]` is deliberately not printed**: paragraphs, not lines, and the cap is 5,000
-  (E010 renders at 4,265 with 34 chapters). Its optional `at` is therefore never touched.
-  Over the cap, `render()` throws naming the episode rather than truncating. The doc is fetched
-  with `curl -4` — Cloudflare answers on IPv6 and this box has no route.
-- **The tail is written from `matewishkey.com/brand`** — not a paraphrase of it. First person, the
-  viewer as the subject, plain language, the host never an expert or teacher, never
-  "free"/"guaranteed"/"safe", never a claim that anyone became a developer.
-- **The show notes narrated his own show in the THIRD PERSON, and the prompt was why** (2026-08-25).
-  One of its rules read *"The host teaches rather than doing it for the guest"* — that handed the
-  model the phrase, and nothing asked for first person. It now demands first person, bans the
-  phrase, requires the guest to be **named** rather than labelled, and says **the transcript wins
-  over the title**.
-  - That last rule exists because a left-over stream title put a guest in a video he is not in:
-    `_6zckinR5VI` is titled "Istvan David: Exploring Light" and its notes credited Istvan with
-    mate's own projects. 1,368 words of transcript, no mention of him.
+- **AN EPISODE IS WRITTEN FROM THE SITE, NOT FROM THE TAPE** (#40).
+  `scripts/lib/show-notes.js` renders it from `content.json` — no model, so it is the same bytes
+  every run. **Its header is the contract**: the sections in order, why `learned[]` is not
+  printed, the 5,000 cap it throws at rather than truncates, and why the doc is fetched with
+  `curl -4`. **In `sync()` the episode branch comes BEFORE the swap path** — every episode
+  already carried our tail, so `ours === tail` would have said "nothing to do" for ever; a test
+  pins the order.
+- **The tail is written from `matewishkey.com/brand`**, not paraphrased from it. Its rules sit
+  beside the text in `config/voice.json` → `youtubeDescription._showBlurb`, and
+  `test/links.test.js` pins them — including **NO SECOND ADDRESS AND NEVER ANOTHER PLATFORM**
+  (mate, 2026-08-25: *"why we are promoting twitch on the youtube 'live' at all"*), which the
+  test enforces by walking every tail shape.
+- **THE TRANSCRIPT WINS OVER THE TITLE**, and the prompt in `yt-description.js` says so because a
+  left-over stream title put a guest in a video he is not in: `_6zckinR5VI` is titled "Istvan
+  David: Exploring Light" and its notes credited Istvan with mate's own projects — 1,368 words of
+  transcript, no mention of him. The prompt also demands first person and bans "the host", after
+  it narrated his own show in the third person for weeks.
 - **EVERY PROPOSAL APPROVES ITSELF, AND THE PAGE THAT COLLECTED APPROVALS IS GONE** (mate,
-  2026-09-15: *"I do not want to approve your youtube content change always by hand, just approve
-  it"* and *"remove that page from social.matewishkey.com it is boring"*). This widened the
-  2026-09-13 rule, which approved only a `swap` or an `append` and held a `rebuild` back because a
-  model had written the opening. `autoState()` now returns `'approved'` unconditionally, stamped
-  `decided_by: auto:approved`. **`boilerplateOnly()`, `tailOnly()` and `web/src/pages/youtube.js`
-  went with it** — nothing reads them once `autoState` stops asking; the route, the POST action and
-  the nav entry went too. Git has them if the gate ever comes back.
-  **The WHERE clause is untouched, and it is now the whole of his protection**: a REJECTED row is
-  still excluded from the re-file, so a no stays a no, and an unchanged re-file is still a no-op.
-  A test reads the SQL rather than the state to pin that, because with every kind approving the
-  state would pass either way.
-  ⚠ **The 14-day expiry below is now inert**, not wrong: nothing is ever filed `proposed`, so
-  there is nothing for it to expire. It is left in as the safety net if the gate is reinstated.
-- **A REWRITE HE HAS NOT ANSWERED IN 14 DAYS IS A NO, AND AN UNDECIDED ONE IS NEVER RE-DRAFTED**
-  (2026-09-14). Four `rebuild` proposals were re-built by the model nightly for a week and re-filed
-  with `proposed_at` reset, so "drafted hours ago" sat on proposals he had scrolled past for weeks.
-  `/youtube/pending` first expires anything `proposed` older than 14 days to `rejected`
-  (`decided_by: auto:14-days`), then returns `skip` — every video waiting or refused — and `sync()`
-  holds those before `build()`. One look; silence means keep what is there.
+  2026-09-15: *"just approve it"*). `autoState()` in `web/src/api.js` returns `'approved'`
+  unconditionally; its header carries the reasoning and what went with it. **His protection is
+  now the WHERE clause alone**: a REJECTED row stays excluded from the re-file, so a no stays a
+  no. A test reads the SQL rather than the state, because with every kind approving, the state
+  would pass either way.
+  ⚠ **The 14-day expiry is inert**, not wrong: nothing is ever filed `proposed`, so there is
+  nothing to expire. Left in as the safety net if the gate comes back.
 - **`--repropose <id…>` is how a voice change reaches what is already written.** `sync()` cannot:
-  a recognisably-ours description takes the swap path, which is right for a stale tail and useless
-  for a wrong opening. It files proposals and never writes.
-- **UNCHANGED IS NOT THE SAME AS CURRENT.** The loop skipped on "matches what we last wrote" before
-  `build()` was reached, so no change to the constant tail could land on a video that already had
-  one — a change would have reached **2 videos out of 23**. **The tail itself is the honest test**:
-  if the text carries it, we wrote it, whichever route it took. Same disease `RULES_VERSION` cures,
-  in a second place — when adding anything to the constant part of a generated artefact, ask how it
-  reaches the ones already written.
-- **A stale tail is SWAPPED, never rebuilt.** `build()` regenerates the opening with a model, so a
-  rebuild hands him rewritten summaries to re-approve — words he already said yes to. Two tests pin
-  that the plain and tracked blurbs differ on exactly ONE line, or the "one-line change" the
+  a recognisably-ours description takes the swap path, which is right for a stale tail and
+  useless for a wrong opening. It files proposals and never writes.
+- **UNCHANGED IS NOT THE SAME AS CURRENT.** When adding anything to the constant part of a
+  generated artefact, ask how it reaches the ones already written — the same disease
+  `RULES_VERSION` cures, in a second place. Here the loop skipped before `build()` was reached,
+  so a tail change would have landed on **2 videos out of 23**. **The tail itself is the honest
+  test**: if the text carries it, we wrote it, whichever route it took.
+- **A stale tail is SWAPPED, never rebuilt.** `build()` regenerates the opening with a model, so
+  a rebuild hands him rewritten summaries to re-approve — words he already said yes to. Two tests
+  pin that the plain and tracked blurbs differ on exactly ONE line, or the "one-line change" the
   dashboard shows him is a lie.
-- **`voice.findBlurb()` recognises our tail whatever went into its link slot**, by matching the
-  constant halves either side of `{show}`. Two silent failures it now handles:
-  - **A blurb ending with `{show}`** leaves no constant text after the slot, and `indexOf('')`
-    answers with the slot's own start — the swap would strand the old url. The slot runs to the end
-    of ITS LINE.
-  - **LONGEST WINS.** Today's blurb and the one it retired share every word before the slot, so the
-    newer matches a strict prefix of the older; first-match-wins left the orphaned line underneath
-    — the exact line the change existed to delete, surviving the change.
-- **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or every video gets
-  rebuilt.** The wording *around* the slot is part of the key. Nothing is ever deleted from that
-  list; a video written a year ago still carries the blurb of its day.
-- **A VIDEO YOUTUBE NEVER CAPTIONS FAILED EVERY RUN, FOR EVER, AND NOBODY WAS TOLD.** `build()`
-  needs a transcript, so three videos failed silently — one for 131 hours. Past the grace the tail
-  is proposed on its own (`kind: 'append'`, his words kept whole, no topic tags). **Only the
-  missing-transcript message is recovered** — a model error or failed mint still throws, or every
-  real fault becomes a quietly degraded description.
+- **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or every video
+  gets rebuilt.** The wording *around* the slot is part of the key, and nothing is ever deleted
+  from that list. `voice.findBlurb()` matches the constant halves either side of `{show}`; its
+  two silent failures (a blurb that ends on the slot, and a newer blurb shadowing an older one
+  it is a prefix of) are documented at the function.
+- **A VIDEO YOUTUBE NEVER CAPTIONS FAILED EVERY RUN, FOR EVER, AND NOBODY WAS TOLD.** Past
+  `MWK_CAPTION_GRACE_HOURS` the tail is proposed on its own (`kind: 'append'`, his words kept
+  whole). **Only the missing-transcript message is recovered** — a model error or a failed mint
+  still throws, or every real fault becomes a quietly degraded description.
   - **Age comes from `%(timestamp)s`, and yt-dlp prints the literal string `NA`.** `Number('NA')`
     is NaN and NaN compares false against the grace, so an unguarded read takes the impatient
     branch on every video lacking a timestamp. `null` means wait.
-- **A `kind` THE BOX FILES AND THE DOOR DOES NOT KNOW IS SILENTLY NULL.** `propose()` dropped
-  `append` to NULL and the dashboard fell back to guessing from the diff, which calls an append a
-  rewrite. `PROPOSAL_KINDS` now, and a test reads the kinds out of `yt-description.js` and fails if
-  `api.js` would drop one.
-- **NO SECOND ADDRESS, AND NEVER ANOTHER PLATFORM** (mate, 2026-08-25: *"why we are promoting
-  twitch on the youtube 'live' at all"*). Half the line aimed at the platform the reader is already
-  on, the other half at a competitor — and on a Short it printed two urls beneath a CTA that had
-  been DENIED a url. A test walks every tail shape and fails on a second url or the word twitch.
+- **Adding a proposal kind is TWO files.** `propose()` dropped an unknown kind to NULL and the
+  dashboard then guessed from the diff, which calls an append a rewrite. `test/dashboard.test.js`
+  reads the kinds out of `yt-description.js` and fails if `api.js`'s `PROPOSAL_KINDS` misses one.
 - **"THE YOUTUBE DESCRIPTION IS THE BIGGEST CLICK SOURCE WE HAVE" WAS A MEASUREMENT ARTEFACT**
-  (retracted 2026-08-27). It read 37 of 90 human clicks, and by 27 Aug 87 of 182 — all of it
-  crawlers the UA test missed. The bursts land at the minute we WRITE the description
-  (`yt_proposal.applied_at` 2026-08-26T05:41:48 against hits at 05:40:45–05:46:01), and code `s8`
-  took four "human" clicks inside 5.5 seconds. Under the rule above the YouTube description has
-  **2** clicks, and exactly **one** counted hit in the whole table carries a `www.youtube.com`
-  referer. **The description is still worth writing — it is what a viewer reads — but it is not a
-  click channel, and no decision may rest on that number again.**
-- **The show-notes loop did not converge** until `/youtube/pending` returned what was last WRITTEN
-  as well as what is approved: `build()` regenerates the opening every run, so an applied
-  description never matches byte for byte and re-proposed itself.
+  (retracted 2026-08-27). It read 87 of 182 human clicks — all crawlers the UA test missed. The
+  bursts land at the minute we WRITE the description (`yt_proposal.applied_at`
+  2026-08-26T05:41:48 against hits at 05:40:45–05:46:01), and code `s8` took four "human" clicks
+  inside 5.5 seconds. Under the counting rule it has **2** clicks, and exactly **one** counted
+  hit in the whole table carries a `www.youtube.com` referer. **The description is still worth
+  writing — it is what a viewer reads — but it is not a click channel, and no decision may rest
+  on that number again.**
 
 ## Live streams
 
-- **HE GOES LIVE STRAIGHT ON YOUTUBE, SO A LIVE STREAM NEVER ENTERS `posts:list`** — and for eleven
-  days that meant it could not be seen by the first-comment watcher at all. The per-platform
-  analytics sweep was deleted with the Restream mirror on the premise that *everything goes out
-  through this pipeline now*; live events are the standing exception. Found 2026-08-31: 19 streams
-  on the channel, **9 with no CTA anywhere**, four of them with a perfectly good description.
-  `sources()` sweeps `analytics:posts --platform youtube` again — **YouTube only**, and a test
-  fails if that becomes a loop over every platform.
-- **A stream with the link already in its description is SKIPPED, and that is the right answer to
-  "does a first comment make sense?"** — on long-form YouTube a description url is clickable, so a
-  comment repeating it is noise. The comment is the net for a stream whose description has not been
-  written or approved yet.
+- **HE GOES LIVE STRAIGHT ON YOUTUBE, SO A LIVE STREAM NEVER ENTERS `posts:list`** — for eleven
+  days that meant the first-comment watcher could not see one at all, and 9 of 19 streams had no
+  CTA anywhere. `sources()` sweeps `analytics:posts` for it. **Two named sweeps, YouTube and
+  Facebook, never a loop over `opts.platforms`** — and Facebook is VIDEOS ONLY, because a
+  hand-made post on the page is his, not a stream. `test/links.test.js` pins both literals and
+  the video filter.
+- **A stream with the link already in its description is SKIPPED**, and that is the right answer
+  to "does a first comment make sense?" — on long-form YouTube a description url is clickable, so
+  a comment repeating it is noise. The comment is the net for a stream whose description has not
+  been written yet.
 - **`--sync` proposes but cannot act on an UPCOMING stream** — yt-dlp refuses a scheduled live
-  event (`This live event will begin in N hours`), so it fails that video every run until it airs.
-  Its comments are closed too. Both are expected; neither is a fault to chase.
-- **RESTREAM IS BACK (2026-09-13), AND THE EXTERNAL SWEEP ONLY REACHES YOUTUBE.** A Restream reel
-  lands as a Facebook Reel *and* a YouTube Short in the same minute; `sources()` sees the Short
-  (~90 min behind, via `analytics:posts`) and, until 2026-09-20, was blind to the Reel for ever,
-  so the Facebook copy needed a comment by hand. **The sweep now reads Facebook too, VIDEOS
-  ONLY**: `collectPosts()` drops an image or text post from that source, because a hand-made post
-  on the page is his, not a stream. Two named sweeps, never a loop over `opts.platforms` — the
-  test pins both the Facebook literal and the video filter. **Restream also mirrors a live stream
-  as TWO YouTube videos**, one vertical and one landscape, same title and duration; both are
-  public and both want the CTA.
-- **A test stream is still a video on the channel.** Five carried the placeholder title *Watch Me
-  Work* and the description *Testing desktop view*, two of them a duplicate pair of the same
-  5-hour stream. The description sync files a proposal; **nothing here writes a TITLE**, so a
-  placeholder title is his to fix and no automation will notice it. **That is our gap, not the
-  API's** (measured 2026-09-15): `posts:update-metadata` takes `--title`, and also `--tags`,
-  `--categoryId`, `--privacyStatus`, `--thumbnailUrl`, `--madeForKids` and `--playlistId`. Five
-  videos were still called *Watch Me Work* three weeks on because no code had ever set one.
-  **The title write is EXERCISED now, not merely documented** (2026-09-18): `title` and
-  `thumbnailUrl` went out in ONE `POST /posts/_/update-metadata`, addressed by `{platform, videoId,
-  accountId}`, onto an `isExternal: true` live VOD, and both were read back off YouTube. What is
-  still true is the *gap*: no code path sets a title on its own, so it stays a by-hand fix.
-- **A STREAM WENT OUT UNDER THE PREVIOUS EPISODE'S CARD, AND NOTHING HERE COULD NOTICE**
-  (2026-09-18). `gUAo3DSGf-o` — Adrienn, E010 — was live for 3h40m carrying E009's Detti card and a
-  hand-typed title. **Nothing here reads either field**: the description sync files a proposal and
-  never looks at the title or the picture, so a wrong guest's face sits there until he sees it.
-  How the old card reached the new broadcast was NOT established — do not write down a mechanism
-  nobody measured.
-- **`content.json`'s `raw.url` IS the episode-to-video join, and it is a field rather than a guess**
-  (exercised 2026-09-19). Every episode names its own uncut recording, so the channel can be synced
-  to the site without matching anything by hand: nine videos took the site's title and that
-  episode's redrawn card in one `update-metadata` call each, all nine verified off YouTube. The
-  card comes from `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`.
-  - **GROUPING VIDEOS BY TITLE IS THE WRONG TEST, AND IT INVENTED A TWIN.** Two videos sharing a
-    title were called a Restream pair; one was 6 minutes and three days later — a separate video
-    wearing a left-over title, not a mirror. **Duration and upload date settle it**, and a real
-    Restream pair matches on both to within seconds.
-  - **THE SITE NAMES THE VERTICAL COPY OF A PAIR, WHICH IS THE OPPOSITE OF WHAT ANYONE ASSUMES.**
-    E008 and E009's `raw.url` point at the 1080x1920 upload, so deleting "the vertical duplicate"
-    would leave both episode pages linking to a dead video. Repoint first, then delete.
-  - **THE VERTICAL HALF OF A RESTREAM PAIR IS NOT WANTED, AND NO MORE ARE BEING RECORDED**
-    (mate, 2026-09-19). Four existed — two episode VODs, two `Watch Me Work` — and they are being
-    deleted by hand, since no API deletes a YouTube video. **Before deleting one, check what names
-    it**: `content.json`'s `raw.url` pointed at the VERTICAL copy of E008 and E009, so the site had
-    to be repointed first. Both landscape copies were given the title and card so either half was
-    safe to keep.
-  - **A DUPLICATE-PAIR SEARCH MUST HAVE NO LENGTH FLOOR.** Pairs were matched on duration within 5s
-    and opposite orientation, but filtered to over three minutes to keep the short clips out — and
-    that hid a 2m47s vertical sitting beside its 2m51s landscape. The floor was a proxy for "is
-    this a session", and it was not one. Re-run without it: four pairs, not three.
-  - **Of 21 vertical videos on the channel, 17 are this pipeline's own short clips** — they have no
-    landscape partner, which is the test. "Delete the verticals" is never a channel-wide query.
+  event, and its comments are closed. Both are expected; neither is a fault to chase.
+- **RESTREAM MIRRORS A LIVE STREAM AS TWO YOUTUBE VIDEOS**, one vertical and one landscape, same
+  title and duration, both public and both wanting the CTA — and as a Facebook Reel in the same
+  minute, which is why the Facebook sweep exists.
+- **NOTHING HERE READS A TITLE OR A THUMBNAIL, SO A WRONG ONE SITS THERE UNTIL HE SEES IT.** A
+  stream went out for 3h40m under the previous episode's guest card (`gUAo3DSGf-o`, 2026-09-18);
+  five others carried the placeholder title *Watch Me Work* for three weeks. **That is our gap,
+  not the API's** — `posts:update-metadata` takes `--title` and `--thumbnailUrl` and both are
+  EXERCISED (2026-09-18, read back off YouTube, on an `isExternal` VOD). No code path sets a
+  title on its own, so it stays a by-hand fix. *How* the old card reached the new broadcast was
+  never established — do not write down a mechanism nobody measured.
+- **`content.json`'s `raw.url` IS the episode-to-video join, and it is a field rather than a
+  guess** (exercised 2026-09-19 — nine videos took the site's title and that episode's card in
+  one `update-metadata` call each, all nine verified off YouTube). The card comes from
+  `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`.
+  - ⚠ **THE SITE NAMES THE VERTICAL COPY OF A PAIR, WHICH IS THE OPPOSITE OF WHAT ANYONE
+    ASSUMES.** E008 and E009's `raw.url` point at the 1080x1920 upload, so deleting "the vertical
+    duplicate" would leave both episode pages linking to a dead video. **Before deleting
+    anything, check what names it**; repoint first.
+  - **The vertical half of a Restream pair is not wanted and no more are recorded** (mate,
+    2026-09-19) — memory: `mwk-no-vertical-copies`. Most vertical videos on the channel are this
+    pipeline's own short clips, which have no landscape partner; "delete the verticals" is never
+    a channel-wide query.
 
 ## Thumbnails
 
-- **A custom thumbnail CAN be pushed to an already-published video, and Zernio's docs say it
-  cannot** (verified live 2026-08-25). `POST /posts/_/update-metadata` with `thumbnailUrl` works.
-  The API's `updatedFields` echo proves nothing on its own — it was checked at YouTube's end, where
-  the served `maxresdefault.jpg` changed bytes.
-  - **Round-tripping a video's OWN current thumbnail is the safe positive control**: the byte
-    change proves the write, the picture never moves.
-  - **`i.ytimg.com` SERVES THE OLD BYTES FOR MINUTES, SO THAT CONTROL RETURNS A FALSE NEGATIVE**
-    (2026-09-18). A plain re-fetch of `maxresdefault.jpg` was byte-identical for over three minutes
-    after a write that had in fact landed. **Bust the cache** (`?cb=$RANDOM`), and **never compare
-    against the file you uploaded** — YouTube re-encodes that URL to 1280x720, so a correct write is
-    a different hash from a correct source. Compare against the BEFORE bytes. The tell that it had
-    landed: yt-dlp reported `maxresdefault` as 1920x1080 while the CDN still handed back 720p.
-  - ⚠ **"SHORTS CANNOT TAKE ONE" WAS WRONG, AND IT WAS WRONG BECAUSE NOBODY EVER TRIED**
-    (overturned 2026-09-22). YouTube's help and Zernio's own page both say custom thumbnails are
-    videos-only, and this line repeated them while admitting it was "not write-tested". It was
-    tested on `msRZswGIkCY`, a Short published that morning: `update-metadata` with a
-    `thumbnailUrl` changed the served `maxresdefault.jpg` from `c965c70f…` to `1769a116…`,
-    cache-busted, stable six minutes later, and the picture is the frame we sent.
-    - **What changes is the 16:9 thumbnail**: search, the channel's video grid, embeds,
-      suggested, every share card.
-    - **What does NOT change is the vertical cover in the Shorts feed.** Measured at the same
-      moment: the channel's Shorts shelf still serves YouTube's own pick (`oar2.jpg`, a frame
-      from ~10 s in). No API documents a way to set that one; it is the mobile app's *Edit
-      cover*. **Never flatten the two into "we can set the thumbnail".**
-    - `thumbnails.set`'s own reference page says nothing about Shorts at all — the exclusion is
-      a product rule stated in help pages, and the API did not enforce it here.
-    - **It is not a cache, which was the obvious objection and was checked.** The 16:9 changed
-      inside a minute; twenty minutes later the vertical set still held `oar1/2/3.jpg`, three of
-      YouTube's OWN candidates (the opening, a middle frame, and the closing *Prompt it
-      yourself!* card) and none of them the file we uploaded. A cache would have served one
-      picture late, not three different ones.
+- **A custom thumbnail CAN be pushed to an already-published video** — `POST
+  /posts/_/update-metadata` with `thumbnailUrl` — **and it works on a SHORT, which both YouTube's
+  help and Zernio's docs deny.** Exercised 2026-09-22; the measurement, and the cache check that
+  rules out the obvious objection, are in `scripts/lib/cover.js`'s header.
+  - **What changes is the 16:9 thumbnail**: search, the channel's video grid, embeds, suggested,
+    every share card. **What does NOT change is the vertical cover in the Shorts feed** — that is
+    YouTube's own pick and no API sets it; it is the mobile app's *Edit cover*. **Never flatten
+    the two into "we can set the thumbnail".**
+  - **Verify at YOUTUBE's end, never by the API's echo**, and **bust the cache** (`?cb=$RANDOM`):
+    `i.ytimg.com` served the old bytes for over three minutes after a write that had landed.
+    **Never compare against the file you uploaded** — YouTube re-encodes it — compare against the
+    BEFORE bytes. Round-tripping a video's own current thumbnail is the safe positive control.
 - **THE CARD IS DRAWN IN THE WEBSITE REPO AND IS ALREADY ON THE SHARE — do not draw one here.**
-  `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes
-  `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`: the upload size, inside
-  Zernio's 2 MB cap. `scripts/episode-card.mjs`'s header carries every rule with the date it was
-  asked for — read it there, never edit that repo. **The episode's own `title` IS the card's
-  headline**, so a YouTube title that disagrees with the card means one of the two was set by hand.
-- **YouTube's own spec** (not a blog): 3840×2160 recommended now, min width 640, 16:9, JPG or PNG,
-  2 MB mobile / 50 MB desktop — but **Zernio's own 2 MB cap is what binds us**. The account must be
-  verified, and ours is. **YouTube publishes no safe-zone guidance at all**; the "1100×620" and
-  "bottom-right 15%" figures circulating are blog claims. What IS observable: the duration badge
-  sits over the bottom-right, so branding does not go there.
-- **A/B testing thumbnails has no API and would not conclude here.** Test & Compare is Studio-only,
-  excludes Shorts, and a variant wants 1,000–5,000 impressions to settle — our best long-form video
-  has 95 views lifetime. Do not re-research until a video clears four figures.
+  `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes it at the upload size,
+  inside Zernio's 2 MB cap; `scripts/episode-card.mjs`'s header carries every rule with the date
+  it was asked for — read it there, never edit that repo. **The episode's own `title` IS the
+  card's headline**, so a YouTube title that disagrees with the card means one of the two was set
+  by hand.
+- **YouTube's own spec** (not a blog): 3840×2160 recommended, min width 640, 16:9, JPG or PNG —
+  but **Zernio's 2 MB cap is what binds us**, and the account must be verified. **YouTube
+  publishes no safe-zone guidance at all**; the "1100×620" and "bottom-right 15%" figures
+  circulating are blog claims. What IS observable: the duration badge sits over the bottom-right,
+  so branding does not go there.
+- **A/B testing thumbnails has no API and would not conclude here.** Test & Compare is
+  Studio-only, excludes Shorts, and a variant wants 1,000–5,000 impressions to settle — our best
+  long-form video has 95 views lifetime. Do not re-research until a video clears four figures.
 - **We do not make the show's pictures here** (mate, 2026-08-26). A picture reaches this pipeline
-  already branded; what is ours is the aspect and format checks either side of it. Do not rebuild
-  card generation for the show here. (`scripts/reality-check/` is a separate thing and stays —
-  it renders its own cards from the brand, and its README says so.)
+  already branded; what is ours is the aspect and format checks either side of it.
+  (`scripts/reality-check/` is a separate thing and stays — it renders its own cards from the
+  brand, and its README says so.)
 
 ## The platform table — wire it or do not add it
 
-**Five fields have shipped declared-and-never-read**: `linkPlacement`, `landscapeOk`,
-`hashtagsInCaption`, `shortsAreDead`, `captionMax` — all wired now. (`commentMax` landed already
-wired, with `commentProblems()` asserting the table agrees with itself and a test reading both
-composition call sites for it. So did `captionOverlaysShort`, in one commit with
-`captionForPlatform()` reading it, `flowFor()` rendering the condition on the workflow page and a
-test pinning the set to exactly four.) (`verifiable` and
-`mediaUrlAvailable` were on this list too and no longer exist at all; they went with the mirror.)
-The config page renders **many** of them, which makes an unread one look implemented — it is a
-curated eight (`captionMax`, `foldAt`, `hashtagsInCaption`, `videoMaxSec`, `imageOk`, `imageMax`,
-`deletable`, `estCostCents`), so `landscapeOk`, `commentMax`, `aspectRange` and the rest are on
-the table and on no page. The hazard is real; the absolute was not. This is the single most
-repeated failure in this repo.
+**A field on `platforms.js` that nothing reads is the single most repeated failure in this
+repo.** Five shipped declared-and-never-read — `linkPlacement`, `landscapeOk`,
+`hashtagsInCaption`, `shortsAreDead`, `captionMax` — and `hashtagsInCaption` being decorative
+meant LinkedIn, Facebook and YouTube posted with no hashtags at all for weeks. All are wired now,
+and everything since has landed with its reader in the same commit. **The config page renders
+only a curated eight plus whatever `flowFor()`'s derived steps expose**, so a field can be on the
+table, on no page, and read by nothing without anything looking wrong.
 
-- **`hashtagsInCaption`** was decorative from the beginning, so LinkedIn, Facebook and YouTube
-  posted with no hashtags at all until 2026-08-21.
 - **`shortsAreDead`** — a link can be dead for one CLIP and live for another.
   `platforms.linkDeadFor(name, probe)` decides it; `run-queue.js` computes the list per post.
-- **A PLATFORM HIS WORDS WILL NOT FIT WAS DECIDED NINE HOURS AFTER ANYBODY WAS LOOKING**
-  (2026-09-21). A 318-character caption was queued for "wherever it fits" and announced as
-  going to all eight platforms; at 10:45 the next morning `captionForPlatform` did exactly the
-  right thing — X takes 280, his words are never truncated — dropped X and logged the reason
-  into a journal nobody reads. **The publisher was not wrong; the knowledge was in the wrong
-  place.** `scripts/lib/captions.js` now holds the ONE `captionLength` (post.js imports it
-  rather than defining its own, and a test fails if it grows one back) plus `wontFit()`, which
-  `queue-add.js` runs at queue time. The split is whether he named the platform:
-  **named → throw** (he asked for X, X cannot take it, say so while it is one edit);
-  **implied → record and print it on the `queued` line itself**, and on the `--dry-run` output,
-  because "wherever it fits" already licenses a drop and what was missing was anybody being
-  told. A warning higher up the output is the journal problem again, so a test pins WHERE it
-  prints. Historical rate: 8 of 46 bodies exceed 280, so this fires often enough to matter and
-  rarely enough that refusing every one would have been wrong.
 - **`captionMax`** became load-bearing the day X's link joined his words. `captionForPlatform()`
-  gives up **the tags first, then the link, and his words never** — if his words alone do not fit,
-  the platform is dropped with a reason rather than truncated. **X counts every url as 23
-  characters** however long it is. Composition is caught per account: a throw there is before the
-  requests, so one over-long post would otherwise take every platform with it.
-- **`captionOverlaysShort` — ON A SHORT THE CAPTION IS THE TITLE LINE AND THE TAGS, BECAUSE THE
-  PLAYER PRINTS IT OVER HIS OWN SUBTITLES** (mate, 2026-09-22: *"the text what you are sending is
-  overlaying my captions... keep the title and the hashtags, keep it super short, to drive them
-  into the video. It is only rules for the shorts, and not for the comments"*). Both halves
-  decide it — the platform has a short-form player, **and** the clip is one (`platforms.isShort`,
-  vertical under three minutes, now shared with `linkDeadFor` rather than written twice). So
-  Facebook and YouTube compose in full for the wide cut and short for the tall one, on the same
-  day, from the same words.
+  gives up **the tags first, then the link, and his words never** — if his words alone do not
+  fit, the platform is dropped with a reason rather than truncated. **X counts every url as 23
+  characters** however long it is. Composition is caught per account, so one over-long post does
+  not take the others with it.
+  - **A PLATFORM HIS WORDS WILL NOT FIT WAS DECIDED NINE HOURS AFTER ANYBODY WAS LOOKING**
+    (2026-09-21). The publisher was right; the knowledge was in the wrong place. So the split is
+    whether he NAMED the platform: **named → throw at queue time** (one edit, while he is still
+    there); **implied → print it on the `queued` line and the dry run**, because "wherever it
+    fits" already licenses a drop and what was missing was anybody being told. A warning higher
+    up the output is the journal problem again, so a test pins WHERE it prints.
+    `scripts/lib/captions.js` holds the one `captionLength` and `wontFit()`.
+- **`captionOverlaysShort` — ON A SHORT THE CAPTION IS THE TITLE LINE, THE TAGS AND ANY BARE
+  CREDIT, BECAUSE THE PLAYER PRINTS IT OVER HIS OWN SUBTITLES** (mate, 2026-09-22). Both halves
+  decide it: the platform has a short-form player **and** the clip is one (`platforms.isShort`,
+  shared with `linkDeadFor` rather than written twice). So Facebook and YouTube compose in full
+  for the wide cut and short for the tall one, from the same words. Procedure: `mwk-post` §1b.
   - **Nothing is truncated and this is not the give-up order bending.** The rest of his words are
-    not squeezed to fit a cap, they are deliberately not sent; **the first comment still carries
-    everything**, which is the half of his sentence that is easy to drop.
-  - **It is measured per platform, not assumed.** Facebook was the one in doubt and it is in:
-    a 9:16 page post published as `facebook.com/watch/?v=<id>` carries
-    `og:url = facebook.com/reel/<id>`. Instagram's own post URL is `/reel/`, TikTok has no other
-    player, YouTube is the Short test it already runs. Threads, LinkedIn, X and Pinterest are out
-    — text-first surfaces, **not measured with a ruler**; if he says the text covers a clip on one
-    of them, add it to the table.
-  - **A LINE OF PURE TAGGING RIDES WITH THE TITLE**, wherever in the body it sits — *"add tag
-    chris, and his tag as well"* arrived in the next breath after the rule above, and the rule
-    would have deleted it on the four platforms where a @handle actually notifies somebody.
-    `captions.splitCredits()` lifts out every line that is only `@mentions` and `#tags`;
-    **prose does not qualify**, so `Thanks @thechrisgoor #couchtocreator` stays in the body and
-    is dropped on a short, while `@thechrisgoor #couchtocreator` survives. Write a credit bare.
+    deliberately not sent; **the first comment still carries everything.**
+  - **It is measured per platform, not assumed.** Facebook was the one in doubt and is in — a
+    9:16 page post carries `og:url = facebook.com/reel/<id>`. Threads, LinkedIn, X and Pinterest
+    are out as text-first surfaces, **not measured with a ruler**; if he says the text covers a
+    clip on one of them, add it to the table.
+  - **A BARE CREDIT LINE RIDES WITH THE TITLE, AND PROSE DOES NOT.**
+    `Thanks @thechrisgoor #couchtocreator` is prose and is dropped on a short;
+    `@thechrisgoor #couchtocreator` survives. Write a credit bare.
   - **THE CREDIT IS COMPOSED LAST, AFTER OUR TAGS, EVERYWHERE** (*"put my tags first not chris
-    one"*, an hour later the same day). Our tag line is appended after everything of his, so
-    that is the only order in which his brand tags precede somebody else's handle — and it is
-    why the credit is lifted out of the body rather than left where he typed it. It is **never
-    given up to fit a cap**: he asked for the tag, so it ranks with his words, and the hashtags
-    then the link are still what go first.
-  - **The title line is `captions.titleLine()` and it now has four readers** — the YouTube title
-    (Zernio takes the first line, capped at 100 and refused at queue time), the Pinterest pin
-    title, and this. `queue-add.js` prints which platforms will get the title alone on the
-    `queued` line itself, because deciding it correctly at publish time and telling nobody is the
-    2026-09-21 mistake exactly.
+    one"*). It is **never given up to fit a cap** — he asked for the tag, so it ranks with his
+    words.
   - **So the body is written title-first**: line one stands alone as the whole caption on four
-    platforms, and the story goes underneath.
+    platforms, and the story goes underneath. `captions.titleLine()` is the one definition of
+    that line, and `queue-add.js` prints which platforms will get it alone.
 - **`coverFrame` — WE NEVER SENT A COVER, SO EVERY PLATFORM USED ITS OWN DEFAULT AND THEY
-  DISAGREE** (mate, 2026-09-22: *"the key frames are incorrect"*). Nothing had failed. Instagram's
-  `thumbOffset` defaults to **0** — the literal first frame — TikTok's `video_cover_timestamp_ms`
-  to **1000**, Pinterest's `coverImageKeyFrameTime` to **0**. On a clip that opens on an empty
-  shot, frame 0 is a picture of nothing. `platforms.coverMsFor(probe)` gives one number in
-  milliseconds and `coverFor(name, ms)` converts it per platform; `MWK_COVER_MS` moves it with no
-  deploy and a typo in it falls back rather than throwing.
-  - **Three platforms take a timestamp and they disagree about everything.** TikTok's field is in
-    the **top-level `tiktokSettings`** (the consent-flag trap again), Instagram's and Pinterest's
-    in `platformSpecificData` — and **Pinterest counts SECONDS** where the other two count
-    milliseconds. Each also has an image override (`video_cover_image_url`, `instagramThumbnail`
-    /`reelCover`, `coverImageUrl`) which nothing sends yet. Read off the Zernio platform pages
-    2026-09-22.
-  - **YouTube takes an IMAGE and never a timestamp, and it DOES work on a Short** — see
-    *Thumbnails* below, where the measurement is. It is the one platform whose cover is set
-    after publishing, so `run-queue` pushes it once the video exists.
-  - **Every other platform's page was read on 2026-09-22 and documents NO cover at all**:
-    Facebook, LinkedIn, Threads, and X — **whose page is `/platforms/twitter`**; `/platforms/x`
-    404s, which is not the same as the capability being absent.
-  - ⚠ **A COVER IMAGE ON TIKTOK EDITS THE VIDEO.** For an account not connected through the
-    TikTok for Business app, Zernio *"downloads the image, rehosts it, stitches it in as a
-    single frame at the start of the video"*. Ours is a developer-app account, so
-    `video_cover_image_url` would prepend a frame to the clip itself. The timestamp does not,
-    which is why the timestamp is what we send.
-  - ⚠ **"THE TENTH FRAME" IS NOT A TIME.** At 60 fps it is 167 ms and at 30 fps 333 ms, and on
-    the clip that prompted this it is the empty field the complaint was about — measured: 0 and
-    167 ms nobody in shot, 1,000 ms he has walked in, 2,000 ms steady, 10,000 ms the title card
-    has gone. The default is **2,000 ms** for that reason and the setting is a duration.
-  - **YouTube's cover is a PICTURE PUSHED AFTER THE FACT, and `run-queue` now does it** — the
-    frame at the same offset, cut, uploaded and set through `update-metadata` once the video
-    exists (`scripts/lib/cover.js`). Caught on its own: the post is already live, so a cover
-    that fails is a journal line and never the item's verdict.
-  - **A cover cannot be fixed after publishing on the other three.** Instagram and TikTok have
-    no edit path and a pin cannot be edited beyond its description — so there the frame is
-    decided before it goes out or not at all. YouTube is the one that can be fixed later.
-- **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X, Pinterest; **not YouTube**
-  (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
-  we have never built one, so it is "not built", not "impossible" — **and mate declined building
-  them, 2026-08-26 closing #27**, so "not built" is the decision, not a gap). `imageAspectRange` is not
-  `aspectRange` — IG video tops out at square while its images run to 1.91:1. Procedure: `mwk-image`.
-- **`landscapeOk`** routes the two cuts. **One video per post, on every platform** — a vertical and
-  a landscape cut are two posts, never one. `queue_item.media_wide_key` carries the second.
-- **A GALLERY IS SEVERAL STILLS IN ONE POST, AND IT IS THE OPPOSITE OF THE TWO CUTS** (2026-08-27).
-  `media_wide_key` is *the other video*; `queue_item.media_extra` (JSON array of R2 keys) rides
-  **with** `media_key` in a single post. `queue-add.js --media` takes a comma-separated list, the
-  first being the post's media. **Stills only** — one video per post is the hard limit above, so
-  `platforms.galleryFor()` collapses a set with any non-image in it back to one item rather than
-  half-publishing a mixed post. Verified live on the first use: 3 `mediaItems` on facebook+linkedin,
-  instagram+threads and twitter alike.
-  - **`imageMax` is the cap, and it has THREE readers** — `galleryFor()` caps the set,
-    `galleryProblems()` asserts the table agrees with itself, and the config page renders it.
-    The field and the first reader landed in the same commit deliberately. LinkedIn 20, Facebook 10, Instagram 10, Threads 10,
-    **X 4** (Zernio's own platform pages, 2026-08-27) and **Pinterest 1**, which is why a pin is
-    never part of a gallery — `galleryProblems()` asserts that the way `linkProblems()` does.
-    **Read the numbers out of `platforms.js`, not out of this line** — it has been a platform
-    behind twice now.
-  - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is the
-    natural way to write it and is wrong: X and LinkedIn share a first image and have caps of 4 and
+  DISAGREE** (mate, 2026-09-22: *"the key frames are incorrect"*). Nothing had failed: Instagram
+  defaults to the literal first frame, and on a clip that opens on an empty shot that is a
+  picture of nothing. `platforms.coverMsFor(probe)` gives one number in milliseconds and
+  `coverFor(name, ms)` converts it per platform; `MWK_COVER_MS` moves it with no deploy.
+  **The per-platform fields, the unit each one counts in, and the frame measurements behind the
+  2,000 ms default are in `platforms.js`'s own header.** What matters here:
+  - ⚠ **"THE TENTH FRAME" IS NOT A TIME** — 167 ms at 60 fps, 333 ms at 30, and on the clip that
+    prompted this both land on the empty field he was complaining about. The setting is a
+    duration.
+  - ⚠ **A COVER IMAGE ON TIKTOK EDITS THE VIDEO.** On a developer-app account Zernio rehosts the
+    image and stitches it in as a frame at the start of the clip. The timestamp does not, which
+    is why the timestamp is what we send.
+  - **YouTube is the one platform whose cover is set AFTER publishing**, and `run-queue` does it
+    (`scripts/lib/cover.js`), caught on its own so a failed cover is a journal line and never the
+    item's verdict. On Instagram, TikTok and Pinterest the frame is decided before it goes out or
+    not at all.
+- **`imageOk`** says who can take a still at all — **not YouTube** (nothing to post it *as*) and
+  **not TikTok** (photo posts exist in its API and **mate declined building them**, 2026-08-26
+  closing #27, so "not built" is the decision, not a gap). `imageAspectRange` is not
+  `aspectRange` — IG video tops out at square while its images run to 1.91:1. Procedure:
+  `mwk-image`.
+- **`landscapeOk`** routes the two cuts. **One video per post, on every platform** — a vertical
+  and a landscape cut are two posts, never one. `queue_item.media_wide_key` carries the second,
+  and with no wide cut the tall one goes everywhere, so YouTube normally gets a Short.
+- **A GALLERY IS SEVERAL STILLS IN ONE POST, AND IT IS THE OPPOSITE OF THE TWO CUTS.**
+  `media_wide_key` is *the other video*; `queue_item.media_extra` rides **with** `media_key` in a
+  single post. **Stills only** — `platforms.galleryFor()` collapses a set with any non-image in
+  it back to one item rather than half-publishing a mixed post. Caps are `imageMax`; read the
+  numbers out of `platforms.js`, never out of a doc.
+  - ⚠ **`galleryProblems()` only checks that `imageOk` and `imageMax` agree.** It does NOT pin
+    any cap — `galleryFor()` applies them, and Pinterest's 1 (which is why a pin is never part of
+    a gallery) is the one number no test covers.
+  - **GROUP ON THE WHOLE SET, NEVER THE FIRST FILE.** Keying the publish groups on `set[0]` is
+    the natural way to write it and is wrong: X and LinkedIn share a first image and cap at 4 and
     20, so X would be handed twenty. A test fails if the key stops covering every file.
-  - **CHECK EVERY IMAGE, NOT JUST THE CUT.** `check()` ran on the cut alone, which was right while a
-    post carried one file and became a hole the moment a second could ride along — an image outside
-    a platform's aspect range would reach Zernio unchecked with the item already claimed. A platform
-    is dropped whole and told which file; **never quietly sent a shortened gallery**, because a
-    silent 5-of-6 reads as success.
-  - **Instagram forces ONE aspect across a carousel**, so a set of mixed shapes gets cropped by
-    Instagram itself. Pad them all to a common ratio before queueing — the padding rule in
-    `mwk-image` applies to the SET, not just to each file passing on its own.
+  - **CHECK EVERY IMAGE, NOT JUST THE CUT**, and drop a platform whole rather than sending it a
+    shortened gallery — a silent 5-of-6 reads as success.
 - **A CAPTION IS COMPOSED PER PLATFORM, and `publish()` groups by the caption a platform gets** —
   not by any fixed split. His words never vary; the link and the hashtags do.
-- **`linkPlacement: 'caption'` IS live, on X, and this line said the opposite for two days.** It
-  was true while TikTok's CTA sat in the caption and TikTok moved to the profile; then X's link
-  joined his words on 2026-08-24 (`platforms.js`, the `twitter` entry) and nobody came back here.
-  `linkInCaption()` runs on every X post — `post.js` composes the caption link and groups the
-  accounts by it. **Read the table, never this file, for which slot a platform uses**: the note is
-  a copy and the copy is what drifted.
+- ⚠ **READ THE TABLE, NEVER THIS FILE, FOR WHICH SLOT A PLATFORM USES.** This section once said
+  `linkPlacement: 'caption'` was live nowhere while it had been live on X for two days. The note
+  is a copy, and the copy is what drifts.
 
 ## Reality check cards
 
-- **`scripts/reality-check/` renders the cards; the episode is a json and lives on the
-  SHARE, not here.** This repo is public and does not need to carry a specific claim to
-  carry the format. `example.json` is the shape, and it renders.
-- **The brand is vendored from `matewishkey/mwk-og-image-generator`, not approximated.**
-  Reading that repo's `brand/` corrected three things at once: the red is `#e2342b` (not
-  the #DE2725 that had been guessed), `redDeep #f0524a` is the only red allowed at BODY
-  size, and the type is Fraunces 700 / JetBrains Mono 700 uppercase / Manrope, not Anton
-  and Inter. **The RedBlock is the only logo and is never a bare mark.** Fonts are OFL
-  with their licences beside them.
-- **`validate.js` runs before anything renders, because the failure that matters is a card
-  that comes out WRONG and looks fine.** Two of four icons once rendered as empty squares
-  after a rename and nothing said so. It refuses an unknown icon, a tone that is not a
-  tone, a bar with no period, a last row that is not the answer, and a stamp with no year.
-  A test walks the icon list against the renderer's own, because the two lists living
-  apart is how the squares happened.
-- **The renderer measures its own overflow and says `OVERFLOW`** rather than cropping. A
-  card that quietly loses its bottom row is the one that gets published.
-- **Portrait is THREE cards, not a cut-down.** Instagram takes nothing taller than 4:3, and
-  the landscape card does not fit inside that — so 1080x1350 x3 as a carousel, verified as
-  a gallery on all five image platforms. **Do not sit on exactly 0.75 or 1.91**; the same
-  float edge that rejects a 1.91 image rejects these.
-- **One scale across every bar, and every bar names its window.** Two scales let $126 and
-  $3,600 draw the same length, which is the opposite of what a chart is for.
-- **Say where the numbers were counted generously.** Admitting the overestimate is what
-  makes the conclusion hard to argue with; a card that only accuses reads as an axe being
-  ground. Same reason the one case where the thing being checked WINS stays on the card.
+- **`scripts/reality-check/` renders the cards; the episode is a json and lives on the SHARE, not
+  here.** This repo is public and does not need to carry a specific claim to carry the format.
+  `example.json` is the shape, and it renders. Its README carries the brand rules.
+- **The brand is vendored from `matewishkey/mwk-og-image-generator`, not approximated** — the red
+  is `#e2342b`, not the `#DE2725` an early draft guessed, and reading the real thing corrected
+  two more in the same pass. **The RedBlock is the only logo and is never a bare mark.**
+- **`validate.js` runs before anything renders, because the failure that matters is a card that
+  comes out WRONG and looks fine** — two of four icons once rendered as empty squares after a
+  rename and nothing said so. Its header lists what it refuses and `test/reality-check.test.js`
+  has a case for each. **The renderer measures its own overflow and prints `OVERFLOW`** rather
+  than cropping.
+- **Portrait is THREE cards, not a cut-down.** Instagram takes nothing taller than 4:3 and the
+  landscape card does not fit inside that, so 1080x1350 x3 as a carousel — verified as a gallery
+  on the five platforms that take one (Pinterest takes a single image). **Do not sit on exactly
+  0.75 or 1.91**; the same float edge that rejects a 1.91 image rejects these.
+- **One scale across every bar, and every bar names its window.** Two scales let $126 and $3,600
+  draw the same length, which is the opposite of what a chart is for.
+- **Say where the numbers were counted generously.** Admitting the overestimate is what makes the
+  conclusion hard to argue with; a card that only accuses reads as an axe being ground. Same
+  reason the one case where the thing being checked WINS stays on the card.
 
 ## Publishing and the queue
 
@@ -759,302 +519,211 @@ repeated failure in this repo.
   timetable per profile; ours is a rate limit across accounts spanning two profiles. The full
   reasoning, and why the publisher cannot move into the Worker (ffprobe, ffmpeg and Whisper are
   binaries), is in `docs/playbook.md` — read it before proposing either again.
-- **"Post it" means QUEUE it. Only publish when he says publish** (mate, 2026-08-21). The procedure
-  is the `mwk-post` skill's opening section — read it there, this is the decision only.
-- ⚠ **"THERE IS NO TIME-OF-DAY POSTING WINDOW" WAS REVERSED ON 2026-09-21.** It was mate's call on
-  2026-08-21 (the audience spans timezones, so holding for a "good hour" only delays) and it is his
-  call again: *"i think better morning is better"*. `lib/pace.js` now refuses outside
-  **07:00-11:00 Brisbane**, on top of the daily cap and the gap. The day boundary for the cap is
-  still the audience's timezone, or it resets twelve hours early.
-- **THE WINDOW IS 07:00-11:00 BRISBANE, BECAUSE THAT IS 17:00-21:00 NEW YORK** (mate,
-  2026-09-21: *"the morning giving us the best coverage"*, *"i do not care about hungary at
-  all"*). Start inclusive, end exclusive. It is 23:00-03:00 in Budapest and he has ruled the
-  European audience irrelevant — **do not re-propose an evening slot for Europe.**
-  - **The hours live in `pace.DEFAULTS.window` and NOWHERE else.** `queue-add.js` derives
-    `--at`'s unlock from it, so a held item cannot unlock at an hour the pace will then refuse;
-    a test fails if it stops reading `pace.DEFAULTS.window`.
-  - **`--at`'s stored instant straddles midnight UTC.** 07:00-11:00 Brisbane is 21:00-00:59
-    UTC, so a hold for the 22nd is stored on the 21st in UTC for most of the window.
-    **Asserting a UTC date on `not_before` is the trap** — two tests did and both were wrong
-    the moment the window moved off midnight. Assert the BRISBANE day.
-  - The offset is derived by asking what hour midnight UTC is in `cfg.tz`, not hardcoded +10.
-  - **`MWK_WINDOW`** ("7-11", or "off") changes it with no deploy. An unparseable value is
-    treated as no window rather than throwing: a typo in an env var must not stop the queue.
-  - **The cost is the point** — something queued at noon waits until tomorrow morning.
-  ⚠ **That the hour affects anything is UNMEASURED, and the number that looked like proof was
-  not one.** Over 253 posts, the 04:00-08:00 Brisbane block read 1.75x its platforms' medians
-  — and its posts are a median 32 days old against 11 for the morning block, so most of it was
-  views still accruing. Matched on age it is 1.33x on 8-21 posts. Zernio's own
-  `analytics:best-time` is worse: its top slots rest on ONE post each. **No platform reports
-  audience geography** (checked every field `analytics:posts` returns), so "the US is awake" is
-  a reasoned guess and must never be quoted as a finding.
-- **TWO A DAY, AND IT IS HIS NUMBER** (mate, 2026-09-21: *"enable only 2 posts per a day, you
-  spammed pinterest... only override this one if i say so"*). It was six. The Pinterest backfill
-  put **eight pins out in one day** at `--priority -1`, every one of them legal under the old cap
-  and the gap, and the day read as a machine emptying a list. **The cap is the only thing between
-  a backfill and a feed nobody wants to follow** — a priority below zero orders the queue, it does
-  not slow it down. `test/daily-cap.test.js` pins the DEFAULT rather than a fixture, because the
-  pace tests all pass their own `perDay` and would not notice it moving. Raising it needs him to
-  say so in words.
-  - ⚠ **IT WAS DROPPED TO ONE FOR AN HOUR ON A MISREADING** (same day). *"I want to focus one
-    short per a day instead of overdo it... i think it is better i am learning things"* is about
-    **what he shoots**, not what the queue releases — asked directly, he answered *"the two limit
-    is good, no worries about that"*. **His production rate and the publisher's cap are different
-    numbers**, and only the second one is in `pace.js`. The two sentences are easy to hear as one.
-- **A CONSTANT GAP IS A FINGERPRINT, AND OURS WAS 95 MINUTES ON THE DOT** (mate, 2026-09-21:
-  *"make sure we are randomizing stuff"*). Measured over 42 publishes: a constant 90-minute
-  minimum plus the five-minute timer put consecutive posts 95 minutes apart nearly every time,
-  and 20 of the 42 landed at :04-:08 past the hour. Separately **every `--at` item went out at
-  10:05 Brisbane, eleven days running** — a bare date unlocks at 00:00 UTC and :05 is the next
-  tick. THREE jitters, and they are different mechanisms **on purpose**:
-  - **THE DAY'S OPENING SLIDES, BECAUSE THE GAP ONLY EVER MOVES THE SECOND POST** (added
-    2026-09-21). The first post of a day has no gap to wait out, so the window start plus the
-    first tick put it at **07:05 Brisbane every morning** — half of everything we publish, and
-    the half that sets the pattern. `pace.openingFor(day)` hashes the Brisbane DAY to 0-180 minutes past 07:00, and `whyNotNow`
-    gives its own refusal for it ("inside the window, but today opens at 09:34") because at 07:10
-    *"outside the window"* would be a lie. **The range stops an hour short of 11:00** so the day
-    always keeps an hour of five-minute ticks to publish in.
-    - ⚠ **FNV-1a ALONE DOES NOT SPREAD CONSECUTIVE DATES** — it shipped that way for a minute
-      and a week came out 107, 112, 137, 142, 127, 132, 157: a two-hour band, neighbouring days
-      five minutes apart. A date changes in its LAST character and the avalanche is weak in the
-      low bits, so `openingFor` runs the hash through murmur3's finalizer (`mix`). `jitterFor`
-      is deliberately NOT changed — its seed is a full timestamp and already spreads. A test
-      walks a year and fails under 120 distinct openings.
-  - **The gap is HASHED off the last post's timestamp** (`pace.jitterFor`, 0-60 min on top of
-    the minimum). The pace is recomputed every five minutes, so a fresh `Math.random()` per tick
-    is not a 0-60 minute delay — it is the MINIMUM of a dozen rolls, which collapses to about
-    zero and is biased small. A test walks every tick across the window and fails if an item
-    gets through early.
-  - **An unlock is a real roll, made ONCE and stored** (`queue-add.js unlockAt`): `--at` still
-    takes a plain day and writes `<day>T00:MM:00Z`. A timestamp compares against the claim's ISO
-    now exactly as the bare date did, so the Worker is unchanged — but `not_before` is no longer
-    a date, and the queue page renders it through `when()` in his timezone.
-  - **`nextSlot()` must apply the same jitters as `whyNotNow()`** — the gap one AND the
-    opening — or the dashboard promises a time the publisher then refuses. A test asserts the
-    instant the page shows is accepted, from five different starting hours.
-- **An item that has put ANYTHING live is never queued again** (learned expensively). A throw in
-  one publish group used to unwind the run and requeue the item: X's media upload failed at 99%
-  after five platforms had published, and the next tick reposted everything, three times over.
-  Each group is caught where it happens and `verdict()` returns `posted` with the failures named.
-  **A retry after a partial publish is a human's decision, not the code's.**
-- **`run-queue.js` REFUSES AN UNKNOWN ARGUMENT NOW, AND `--help` PRINTS THE HEADER** (#37, closed
-  2026-09-20). It read its three flags with `includes()`, so `--help`, `--dryrun` and `--dry_run`
-  were all a live publish — and on 2026-08-27 `--help` claimed an item and posted it to three
-  platforms while somebody looked up the flag list. Instagram and TikTok cannot be deleted through
-  the API, so that class of slip is permanent. It is the one script that publishes and it was the
-  one script that did not check.
-  ⚠ **"Every sibling already did" was overstated, AND THE CORRECTION WAS WRONG TOO** (2026-09-21,
-  re-measured the same day). **Four** scripts refuse: `queue-add.js` and `run-queue.js` throw on an
-  `unknown argument`, `post.js` and `first-comment.js` `exit 2` on an `unknown option`. The gap is
-  **`yt-description.js`, `ship-events.js` and `ship-stats.js`**, which read their flags with bare
-  `argv.includes()` and swallow a typo silently; none of the three publishes, so the stakes are
-  lower. **The verification command in this line was ALSO wrong and returned a clean absence** —
-  `grep -l 'Unknown' scripts/*.js` matches nothing, because the code spells it lowercase in two
-  forms. `grep -ln 'unknown argument\|unknown option' scripts/*.js` is the actual list.
-- **A publish call that times out has NOT necessarily failed, and since 2026-09-14 the code
-  agrees.** The request aborts at the client and Zernio keeps processing. `post.js` now reconciles
-  a timeout by searching `posts:list` for the exact caption, minutes old; found, it waits on it like
-  any other; not found, the platforms are recorded **`unknown`** — and `verdict()` never turns an
-  unknown into `failed`, because failed is what the dashboard offers Re-queue on. A platform still
-  `processing` when `waitForResults` gives up is unknown the same way. The queue page shows
-  *"unknown, check by hand"* and no button. For three weeks this note described a reconciliation no
-  code performed, and a slow Zernio was marked failed over content that was live.
-- **A 207 WITH THE POST INSIDE IS A POST, NOT AN ERROR** (2026-09-20, the first Pinterest pin).
-  Zernio answers `207 "Post created but publishing failed"` with `error: true` AND the created
-  post, its platform `pending` and *"video processing timeout after 60s. Will retry with
-  backoff."* `api()` threw on the error flag, so run-queue recorded the item FAILED — the
-  Re-queue state — over a post Zernio was still publishing. `api()` now returns a 207 that
-  carries `post._id`; the caller polls it and a still-pending platform lands as **unknown**, the
-  same rule that protects a timeout. A 207 without a post, and any other `error: true`, still
-  throw. Pinterest transcodes video slowly; expect the first poll to see `pending`.
-- **A claim older than 40 minutes is a run that died** (killed by earlyoom, SIGTERM, a reboot —
-  all in the journal) and `claim()` marks it **failed with a note, never re-queued**: it may have
-  published before it died. Before this it sat at `claimed` for ever, skipped by every claim and
-  invisible to the waiting count.
+- **"Post it" means QUEUE it. Only publish when he says publish** (mate, 2026-08-21). The
+  procedure is the `mwk-post` skill's opening section — read it there, this is the decision only.
+- **THE PACE IS HIS, AND THE NUMBERS LIVE IN `pace.DEFAULTS`** — read them there and quote
+  `pace.status().nextAt`, never a figure from a doc. Three decisions sit behind them:
+  - ⚠ **THE WINDOW REVERSES HIS OWN EARLIER CALL.** "No time-of-day window" was mate's on
+    2026-08-21; the morning window is mate's on 2026-09-21 (*"the morning giving us the best
+    coverage"*). It is Brisbane morning because that is New York evening — *"i do not care about
+    hungary at all"* — so **do not re-propose an evening slot for Europe.**
+  - ⚠ **TWO A DAY IS HIS NUMBER AND RAISING IT NEEDS HIM TO SAY SO IN WORDS.** It was six until
+    a Pinterest backfill put eight pins out in one day, every one legal, and the day read as a
+    machine emptying a list. **The cap is the only thing between a backfill and a feed nobody
+    wants to follow** — `--priority -1` orders the queue, it does not slow it down. His "one
+    short a day" is what he SHOOTS, not what the queue releases; mistaking the two cost a revert
+    the same day, and `pace.js` records the misreading above `perDay`.
+  - ⚠ **THAT THE HOUR AFFECTS ANYTHING IS UNMEASURED, and the number that looked like proof was
+    not one.** Over 253 posts the 04:00-08:00 block read 1.75x its platforms' medians — and its
+    posts are a median 32 days old against 11, so most of it was views still accruing; matched
+    on age it is 1.33x on 8-21 posts. Zernio's `analytics:best-time` is worse, its top slots
+    resting on ONE post each. **No platform reports audience geography**, so "the US is awake" is
+    a reasoned guess and must never be quoted as a finding.
+- **A CONSTANT GAP IS A FINGERPRINT** (mate, 2026-09-21: *"make sure we are randomizing stuff"*)
+  — ours was 95 minutes on the dot, and every `--at` item went out at 10:05 Brisbane eleven days
+  running. The measurement is in `test/jitter.test.js`'s header. THREE jitters, and they are
+  different mechanisms **on purpose**:
+  - **THE DAY'S OPENING SLIDES, BECAUSE THE GAP ONLY EVER MOVES THE SECOND POST.** The first post
+    of a day has no gap to wait out, so it landed at 07:05 every morning — half of everything we
+    publish, and the half that sets the pattern. `pace.openingFor(day)` hashes the Brisbane DAY,
+    and `whyNotNow` gives it its own refusal ("inside the window, but today opens at 09:34")
+    because at 07:10 *"outside the window"* would be a lie. **The range stops an hour short of
+    the close** so the day always keeps an hour of ticks to publish in.
+    - ⚠ **A HASH THAT DOES NOT SPREAD CONSECUTIVE DATES LOOKS LIKE IT WORKS.** Plain FNV-1a gave
+      a whole week inside a two-hour band — a date changes in its LAST character and the
+      avalanche is weak in the low bits. `openingFor` runs it through murmur3's finalizer;
+      `jitterFor` is deliberately NOT changed, its seed being a full timestamp. A test walks a
+      year and fails under 120 distinct openings.
+  - **The gap is HASHED off the last post's timestamp**, never `Math.random()`: the pace is
+    recomputed every five minutes, so a fresh roll per tick is the MINIMUM of a dozen rolls,
+    which collapses to about zero and is biased small.
+  - **An unlock is a real roll, made ONCE and stored.** `--at` takes a plain day and writes a
+    timestamp inside the window, so held items stop all landing at the same minute.
+  - **`nextSlot()` must apply the same jitters as `whyNotNow()`** — the gap AND the opening — or
+    the dashboard promises a time the publisher then refuses.
+  - ⚠ **`--at`'s stored instant straddles midnight UTC**, so **asserting a UTC date on
+    `not_before` is the trap**: two tests did and both broke the moment the window moved off
+    midnight. Assert the BRISBANE day. The offset is derived from `cfg.tz`, never hardcoded.
+  - **`MWK_WINDOW` changes the hours with no deploy**, and an unparseable value is treated as no
+    window rather than throwing: a typo in an env var must not stop the queue.
 - **QUEUEING IS ONLY A REVIEW GATE IF SOMETHING IS WAITING, AND ON A QUIET DAY NOTHING IS**
-  (2026-09-15, learned by publishing). "Post it means queue it" assumes the queue holds it long
-  enough for him to look. With `pace.status().why === null` the next `mwk-queue` tick is
-  **minutes away**: the timer is `*:05,10,...,45`, so five minutes for most of the hour and up to
-  twenty between `:45` and `:05`. Either way an item queued and announced in the same breath is
-  live before he reads the message — it happened, and four of five platforms had to be unpublished, with Instagram
-  permanently stuck because it has no delete API. **`--at` is day-granularity only**, so there is
-  no way to hold for an hour today. Either check the pace before calling a queue a gate, or say
-  plainly that it goes out at the next tick. **His own dictated words need no gate**; drafts do.
+  (2026-09-15, learned by publishing). With `pace.status().why === null` the next tick is minutes
+  away — the timer runs nine times an hour, twenty minutes being the widest gap — so an item
+  queued and announced in the same breath is live before he reads the message. It happened, and
+  four of five platforms had to be unpublished with Instagram permanently stuck. **`--at` is
+  day-granularity only**, so there is no way to hold for an hour today. Either check the pace
+  before calling a queue a gate, or say plainly that it goes out at the next tick. **His own
+  dictated words need no gate**; drafts do.
+- **An item that has put ANYTHING live is never queued again.** A throw in one publish group used
+  to unwind the run and requeue the item — X's upload failed at 99% after five platforms had
+  published, and the next tick reposted everything three times over. Each group is caught where
+  it happens and `verdict()` returns `posted` with the failures named. **A retry after a partial
+  publish is a human's decision, not the code's** (`test/queue-verdict.test.js`).
+- **A publish call that times out has NOT necessarily failed.** The request aborts at the client
+  and Zernio keeps processing, so `post.js` reconciles by searching `posts:list` for the exact
+  caption, minutes old; not found, the platforms are recorded **`unknown`** — and `verdict()`
+  never turns an unknown into `failed`, because failed is what the dashboard offers Re-queue on.
+  A platform still `processing` when we stop waiting is unknown the same way. The queue page
+  shows *"unknown, check by hand"* and no button.
+- **A 207 WITH THE POST INSIDE IS A POST, NOT AN ERROR.** Zernio answers `207 "Post created but
+  publishing failed"` with `error: true` AND the created post, still `pending`. `api()` threw on
+  the flag, so run-queue recorded FAILED over a post Zernio was still publishing. It now returns
+  a 207 carrying `post._id`; the caller polls and a still-pending platform lands as **unknown**.
+  A 207 without a post, and any other `error: true`, still throw. Pinterest transcodes slowly;
+  expect the first poll to see `pending`.
+- **A claim older than 40 minutes is a run that died** (earlyoom, SIGTERM, a reboot — all in the
+  journal) and `claim()` marks it **failed with a note, never re-queued**: it may have published
+  before it died.
+- **THE ONE SCRIPT THAT PUBLISHES WAS THE ONE THAT DID NOT CHECK ITS FLAGS** (#37). `run-queue.js`
+  read them with `includes()`, so `--help` claimed an item and posted it to three platforms while
+  somebody looked up the flag list — and Instagram and TikTok cannot be deleted, so that class of
+  slip is permanent. **Four scripts refuse an unknown argument now; `yt-description.js`,
+  `ship-events.js` and `ship-stats.js` still swallow a typo silently.** ⚠ The verification
+  command recorded here was itself wrong once and returned a clean absence — the list is
+  `grep -ln 'unknown argument\|unknown option' scripts/*.js`.
 - **A dry run hands its item back as `released`, not `queued`** — `queued` counts as an attempt,
   and three dry runs used to mark a good item failed.
 - **`--no-first-comment` used to hold for about an hour** — post.js sent none, then the watcher
-  found a published post with no CTA and posted one. `comment-state.js` is shared by both:
-  `run-queue.js` writes a suppression entry keyed `<platform>:<native post id>`. **It never
-  overwrites an existing entry**, or a post really commented on would be rewritten to look as
-  though it never was.
-- **Media: `scripts/lib/media.js`.** `probe(file)` → duration/aspect/codec/audio; `check(platform,
-  probe)` → an ARRAY of problem strings, empty when fine. Note the argument order and return shape.
-  `run-queue.js` probes once and drops any platform that would reject it, rather than letting the
-  platform fail an already-claimed item.
+  found a published post with no CTA and posted one. `comment-state.js` is shared by both.
+  **It never overwrites an existing entry**, or a post really commented on would be rewritten to
+  look as though it never was.
+- **Media: `scripts/lib/media.js`.** `probe(file)` → duration/aspect/codec/audio;
+  `check(platform, probe)` → an ARRAY of problem strings, empty when fine. Note the argument
+  order and the return shape. `run-queue.js` probes once and drops any platform that would
+  reject it, rather than letting the platform fail an already-claimed item.
 - **`zernio media:upload` infers the content type from the FILE EXTENSION** and rejects a file
   without one. The download cache names files from a hash, so the extension has to be put back.
 - **X refuses a non-AAC audio track, and only at 99% of the upload.** Opus in an MP4 is legal and
-  every other platform published the same file. It gets in through yt-dlp: constrain the video codec
-  and leave `+ba` free and you get YouTube's best audio, which is Opus. `check('twitter', …)`
-  refuses it up front, before the bytes are paid for.
-- **TikTok settings go in `tiktokSettings` at the TOP LEVEL**, not `platformSpecificData` — getting
-  it wrong is silent, because `platformSpecificData` echoes any key. Six flags, all required,
-  all defaulting false. TikTok's live `maxVideoDurationSec` is **3600**, not the 600 the static
-  table assumed — read `accounts:tiktok-creator-info`.
+  every other platform published the same file; it gets in through yt-dlp if you constrain the
+  video codec and leave `+ba` free. `check('twitter', …)` refuses it before the bytes are paid
+  for.
+- **TikTok settings go in `tiktokSettings` at the TOP LEVEL**, not `platformSpecificData` —
+  getting it wrong is silent, because `platformSpecificData` echoes any key. Six keys, all
+  required; `post.js`'s `tiktokSettings()` reads the three interaction flags off
+  `accounts:tiktok-creator-info` rather than assuming them, and TikTok's live
+  `maxVideoDurationSec` is **3600**, not the 600 the static table once assumed.
 - **TikTok returns a publish token, not a video ID**; the numeric ID arrives with the analytics
-  sync. ⚠ **"It returns no post URL at all" is no longer true** (re-measured 2026-09-20): all 21
-  TikTok posts carry a `platformPostUrl`, with TikTok's own `utm_campaign=tt4d_open_api` on it.
+  sync. It does carry a `platformPostUrl`, with TikTok's own `utm_campaign=tt4d_open_api` on it.
 - **TIKTOK IS THE VIEW NUMBER WORTH LOOKING AT, AND THE DOCS HERE ONLY EVER RECORDED ITS GAPS.**
-  Measured 2026-09-20: views, likes, comments and shares all arrive; 21 posts, best 647 views,
-  typical 180-300. YouTube's clips sit at 2-3. What is still missing via the API is comments, DMs
-  and FYP analytics — that is the real limit, not the numbers.
-- **TikTok has NO delete API.** TikTok and Instagram are both manual-only for deletion; everything
-  else deletes through `posts:unpublish <id> --platform <p>`. Image swap on a published post =
-  unpublish + recreate (`posts:edit` is text-only).
+  Measured 2026-09-20: views, likes, comments and shares all arrive; best 647 views, typical
+  180-300, against YouTube's clips at 2-3. What is missing is comments, DMs and FYP analytics —
+  that is the real limit, not the numbers.
+- **TikTok has NO delete API**, and neither has Instagram; everything else deletes through
+  `posts:unpublish <id> --platform <p>`. Image swap on a published post = unpublish + recreate
+  (`posts:edit` is text-only).
 - **Everything publishes through the queue; the mirror is gone** (mate, 2026-08-20). **Do not
   reintroduce a "is a copy already over there?" check** — it existed only because Restream put
-  copies somewhere we could not see. A post made outside the pipeline is a one-off, handled by hand.
-- **`posts:list` is the whole universe now** — it carries a pipeline post the instant it publishes,
-  where `analytics:posts` lags minutes behind.
+  copies somewhere we could not see. A post made outside the pipeline is handled by hand.
+- **`posts:list` is the whole universe now** — it carries a pipeline post the instant it
+  publishes, where `analytics:posts` lags minutes behind.
 
 ## LinkedIn reshares
 
 - **HIS PROFILE POSTS NATIVELY; THE PAGE AND THE OTHER PROFILE REPOST IT** (since 2026-09-14,
-  reversing the 2026-08-26 shape). `linkedinAccounts().native` is what `run-queue.js` posts to and
-  `.reposters` is who reposts, in order — page first with his words and the tracked CTA, then the
-  other profile **plain**: no words of his on top, no comment in his voice. The page (30 followers)
-  had the native post for a month while the two profiles (7,222) got a repost, and the one under
-  her name said *"Bring me something you wish your computer did."* Words under a person's name have
-  to be that person's. `OWNER_NAME` matches his profile by display name, like the page; with his
-  profile not connected the old shape applies and a test pins the fallback.
-  **EXERCISED 2026-09-14, and it works.** The first real run put the clip on Mate Visky's profile
-  natively (`urn:li:ugcPost:7505403963706490880`), the page reshared it with his words and the
-  tracked CTA, and Zsuzsanna's profile was scheduled plain four hours out — the designed shape, no
-  422, read back off `posts:list` rather than assumed. That closes the three weeks this line spent
-  describing a capability documented rather than one exercised.
-- **"Adding an account is a connection job, never a code change" WAS WRONG.**
-  `linkedinAccounts().personal` was `find` where it needed `filter`, so a third account connected
-  on 2026-08-22 was invisible to the whole pipeline. No error, one fewer repost than anybody
-  expected. `personal` is a LIST and a test fails if it goes back to `find`.
-- **The reposts carried no CTA and no code at all** until 2026-08-24 — the company page (2
-  followers) got the tracked comment and the personals (7,192 between them) got a bare repost.
-  `reshareComment()` composes one **per account** and `quoteReshare` puts it in
-  `platformSpecificData.firstComment`. Failing to compose one never costs the repost.
-- **The reposts are STAGGERED, four hours apart** (mate, 2026-08-22) — the page now, the other
-  profile four hours on. Two accounts reposting in the same minute reads as one person running two. Zernio holds the
-  `scheduledFor`, so nothing stays running on this box. `MWK_RESHARE_LAG_MINUTES` overrides 240.
-- **Each reshare is caught for itself, and the lookup is caught too.** One account's 422 must not
-  cost the others, and none of it may turn an already-published post into a failed one.
+  reversing the 2026-08-26 shape). `linkedinAccounts().native` is what `run-queue.js` posts to
+  and `.reposters` is who reposts, in order — page first with his words and the tracked CTA, then
+  the other profile **plain**. It ran the other way for a month: the 30-follower page held the
+  native post while the two profiles holding 7,222 merely reposted, and the one under her name
+  said *"Bring me something you wish your computer did."* **Words under a person's name have to
+  be that person's.** `OWNER_NAME` matches his profile by display name; with his profile not
+  connected the old shape applies and a test pins the fallback. EXERCISED 2026-09-14 and pinned
+  by `test/reshare.test.js`.
+- **`personal` is a LIST, not a `find`** — it was a `find`, so a third account connected on
+  2026-08-22 was invisible to the whole pipeline. No error, one fewer repost than anybody
+  expected. A test fails if it goes back.
+- **`reshareComment()` composes a CTA per account** and `quoteReshare` puts it in
+  `platformSpecificData.firstComment`. Failing to compose one never costs the repost, and one
+  account's 422 never costs the others.
+- **The reposts are STAGGERED, four hours apart** (mate, 2026-08-22) — two accounts reposting in
+  the same minute reads as one person running two. Zernio holds the `scheduledFor`, so nothing
+  stays running on this box. `MWK_RESHARE_LAG_MINUTES` overrides 240.
 - **A repost with no commentary needs `content` OMITTED, not empty.** `queue_item.reshare` is a
   separate flag from `reshare_text` for exactly this.
-- **The reposts are RECORDED on the item since 2026-09-20** — `queue_item.result` gains one entry
-  per repost (`role: 'repost'`, the account, the native `postId` when Zernio has one, `scheduled`
-  when it does not yet). That is what lets `resolveClipId()` name the clip behind a watcher code
-  minted under the page's repost; ten such codes had nothing to resolve to before. The item's
+- **Each repost is RECORDED on the item** (`queue_item.result`, `role: 'repost'`), which is what
+  lets `resolveClipId()` name the clip behind a code minted under the page's repost. The item's
   status and note are re-sent unchanged, so `verdict()` is not re-run over the extended list.
 
 ## The dashboard
 
 - **The deployment, the three hostnames and the Access reasoning live in `docs/playbook.md` →
-  *The dashboard*** — read it there. It carries the Worker and storage table, **why
-  `workers_dev = false` is load-bearing** (Access binds to a hostname, not a script), the fact
-  that the Worker verifies `Cf-Access-Jwt-Assertion`'s signature, `aud` **and** expiry itself,
-  and the measurement behind separate hostnames (`/l/<code>` on the dashboard host 302s to the
-  Access login before any Worker code runs). **`web/deploy.sh` ships it from this box, never on
-  push** — that one is here because it governs what you do, not what the system is.
-- **Short links: `mwkshow.com/<code>`.** A click stores the code, the time and the referring host:
-  **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A miss
-  redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must never
-  dead-end. **Why it exists:** `clicks` comes back from Facebook and once from LinkedIn; the other
-  five return 0 structurally, so the first-comment mechanic had no scoreboard.
-- **Snapshots over SQL projections, where the box already knows the answer.** `platforms`, `voice`
-  and `pace` are computed on the box and shipped whole — rebuilding them in D1 would only add a way
-  for the two to disagree. What IS a table: the queue, links, clicks, daily metrics and follower
-  points, because those are written at the far end or must outlive Zernio's ~12-month window.
-- **`ship-events.js` every 2 min; the cursor advances only on a 2xx**, and replays are free
-  (`INSERT OR IGNORE` on a stable ULID). It sends an **empty batch when idle** — without that
-  heartbeat "nothing happened" and "the box is off" are the same picture.
+  *The dashboard*** — read it there. **`web/deploy.sh` ships it from this box, never on push** —
+  that one is here because it governs what you do, not what the system is.
+- **Short links: `mwkshow.com/<code>`.** A click stores the code, the time and the referring
+  host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
+  miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must
+  never dead-end. **Why it exists:** `clicks` comes back from Facebook and once from LinkedIn;
+  the other five return 0 structurally, so the first-comment mechanic had no scoreboard.
+- **Snapshots over SQL projections, where the box already knows the answer.** `platforms`,
+  `voice` and `pace` are computed on the box and shipped whole — rebuilding them in D1 would
+  only add a way for the two to disagree. What IS a table: the queue, links, clicks, daily
+  metrics and follower points, because those are written at the far end or must outlive Zernio's
+  ~12-month window.
+- **`ship-events.js` runs every 2 min; the cursor advances only on a 2xx**, and replays are free
+  (`INSERT OR IGNORE` on a stable ULID). It sends an empty batch when idle, but at most every
+  `HEARTBEAT_MS` — without that beat "nothing happened" and "the box is off" are the same
+  picture.
 - **The heartbeat's period must stay UNDER the dashboard's stale threshold** — 10 minutes against
-  15. They were both 15, so the beat always landed just after the page had given up. Two constants
-  in two runtimes that only make sense as a pair.
+  15. Two constants in two runtimes that only make sense as a pair, and each says so at the
+  other.
 - **`MWK_LOG_TOKEN` / `MWK_LOG_URL` live in `td-sops/apps/mwk-social.enc.env`.**
 
 ## Numbers that would otherwise lie
 
-**The reasoning lives in the header of `web/src/pages/stats.js` — read it there, do not restate it.**
-The invariants:
+**The reasoning lives in the header of `web/src/pages/stats.js` — read it there, do not restate
+it.** That header owns: the `OWN_ACTIONS` deduction, that "seen" is three different measurements
+and can never be ranked across channels, the dead site-wide engagement rate, which columns are
+comparable, the age-matching rule and its three failure modes, the three trend guards, and the
+funnel's unmeasurable last stage. What is NOT there, and is why the header is trusted:
 
-- **HIS OWN LIKE AND REPOST COME OFF EVERY POST** (mate, 2026-09-20). No platform says who
-  liked, so it is the flat deduction he named: `OWN_ACTIONS` in `stats.js`, 2 likes and 2 shares
-  per platform-post, applied to `daily` AND `revisions` before anything is summed, clamped at
-  zero, a row with no posts untouched. Comments are not deducted — he did not ask, and the first
-  comment is already explained where the number is shown. **The deduction is on the PAGE, not in
-  the table**: `daily_metric` still holds what the platforms said, so the raw number is recoverable.
-- **"Seen" is three different measurements.** Ours report reach (facebook, instagram, linkedin),
-  views (youtube, tiktok) or impressions (twitter). A percentage built on them cannot be ranked
-  across channels, so every row names its own denominator inline.
-- **On Instagram and Threads, `views` and `impressions` are literally the same number** — measured,
-  990 against 990 and 53 against 53.
-- **A VIEW IS NOT A VIEW: YouTube changed the unit on 24 August 2026** — counted the moment
-  playback begins, where long-form previously needed watch time. A views trend crossing that date
-  is refused with a reason rather than drawn (`viewsUnitBlocked`), the same way a channel younger
-  than the window gets its start date.
-- **The site-wide engagement rate was overstating us by half and is gone.** It counted actions from
-  seven channels over a denominator covering three: 5.5% against a same-set 3.8%. Replaced by
-  **actions per post**, which divides two numbers meaning the same thing everywhere — and it
-  immediately said what the old one hid.
-- **Comparable across channels: posts, actions, actions per post, tracked clicks.** Not comparable:
-  seen, and any rate built on it. Kept because they are what we have, never ranked.
-- **SEEN AND ACTIONS GET THEIR ARROW BACK BY BEING READ AT A MATCHED AGE**
-  (2026-09-15; they had none between 14 and 15 Sep). The 14 Sep removal was right about the
-  fault and wrong about the remedy: `daily_metric` is lifetime accrual attributed to a publish
-  date, so last week sits ~85% settled against the week before at ~97% and a flat channel read
-  −10 to −20% every week. **`daily_metric_revision` is the same number at every age**, so every
-  day on both sides is now read at **one day old** (`TREND_AGE_DAYS`) and the curve cancels
-  instead of being subtracted. The age is forced, not tuned: yesterday is the youngest day in
-  the recent window, so a day is the most maturity both windows are guaranteed to have.
-  **The raw numbers were not a small overstatement** — measured 2026-09-15, raw reach read
-  +495% week on week where the matched figure was +51%, and views +4864% against +238%.
-  A series first written after the cut is **unknown, never zero**; a day that cannot be answered
-  is dropped from **both** windows and the count is printed. **The views row still carries the
-  YouTube unit guard on top** — age-matching fixes a maturity difference and cannot fix a change
-  of unit. Drops are counted ONCE, not per metric: summing across four action columns reported
-  44 missing days where there were 11.
-- **THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE** (2026-09-14; mate: *"fix them"*).
-  "People reached" is *reach, summed* — three platforms' unique reach added up is not a count of
-  anyone. The two booking-button codes on matewishkey.com were 56 of 91 counted hits all-time and
-  16 of 16 in the week the tile read "16 link clicks (people)": every social click query carries
-  `l.platform IS NOT 'website'` now, and the buttons get their own card, called what they are.
-
-- **The settle curve was RECORDED and read by nothing for three weeks, and since 2026-09-15 it is
-  what the seen/actions trend rests on.**
-  `daily_metric` is upserted, and the upsert overwrote the numbers and `updated_at` together, so
-  "is the last complete day settled?" had no answer and the trend excluded today on instinct. A
-  `BEFORE UPDATE` trigger now keeps the superseded value in `daily_metric_revision`, with both
-  timestamps — the gap between them is the lag. **Answered 2026-09-14** (1,071 rows): not settled
-  on any platform but TikTok, not by +7 days on four of six. **And on 2026-09-15 the table stopped
-  being read by nothing** — age-matching is exactly the use it was kept for, and it is now what the
-  seen/actions trend rests on. `valueAtAge()` in `stats.js` is the reader.
-- **THE FUNNEL IS THREE STAGES WE CAN SEE AND ONE WE CANNOT, AND THE LAST IS UNMEASURED RATHER
-  THAN ZERO** (2026-09-15). A social click is somebody leaving a post; a press on one of the two
-  `campaign = 'book'` codes is somebody already on /show opening the booking calendar. What happens
-  inside Google's calendar is not instrumented and will not be. **Writing 0 there would be
-  inventing a measurement to complete a picture** — "nobody booked" is his to say, "we cannot see
-  bookings" is ours. Measured that day, counted clicks: **57 presses, 43 public show and 14
-  private, across 19 separate days** against 38 social clicks all-time. **The social row is NOT a
-  parent of the booking rows** — the buttons are on his own site and most pressers never touched
-  one of our links, so 43 over 38 is not a conversion rate and the page carries no percentage
+- **HIS OWN LIKE AND REPOST COME OFF EVERY POST** (mate, 2026-09-20) — 2 likes and 2 shares per
+  platform-post, because no platform says who liked. **The deduction is on the PAGE, not in the
+  table**: `daily_metric` still holds what the platforms said, so the raw number is recoverable.
+- **A VIEW IS NOT A VIEW: YouTube changed the unit on 24 August 2026.** A YouTube views trend
+  crossing that date is refused with a reason rather than drawn (`viewsUnitBlocked`). ⚠ It
+  refuses the whole YouTube views trend and does NOT know about formats — Shorts had counted
+  from the first frame since March 2025 and were unaffected by the change, but their trend is
+  refused too.
+- **THE RAW NUMBERS WERE NOT A SMALL OVERSTATEMENT.** Measured 2026-09-15, before age-matching:
+  raw reach read **+495%** week on week where the matched figure was **+51%**, and views
+  **+4864%** against **+238%**. And summing drops across four action columns reported **44**
+  missing days where there were **11** — drops are counted once, not per metric.
+- **THE SETTLE TRAIL ANSWERED "IS IT SETTLED?" AND THE ANSWER IS MOSTLY NO.** 2026-09-14, over
+  1,071 rows: not settled on any platform but TikTok, and not by +7 days on four of six. That is
+  why a trend read at face value lies.
+- **THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE** (2026-09-14; mate: *"fix them"*). The two
+  booking-button codes on matewishkey.com were **56 of 91** counted hits all-time and **16 of
+  16** in the week the tile read "16 link clicks (people)". Also: "people reached" is *reach,
+  summed* — three platforms' unique reach added up is not a count of anyone.
+- **THE FUNNEL'S LAST STAGE IS UNMEASURED, NOT ZERO.** What happens inside Google's calendar is
+  not instrumented and will not be. **Writing 0 there would be inventing a measurement to
+  complete a picture** — "nobody booked" is his to say, "we cannot see bookings" is ours. And
+  the social row is NOT a parent of the booking rows: the buttons are on his own site, so 57
+  presses over 38 social clicks is not a conversion rate and the page carries no percentage
   between the stages.
-- **A LINK'S CLICK COUNT IS ALL TIME AND GETS READ AS "RECENTLY"**, so `/links` carries both now
-  (`human` and `human_recent`, the 30-day window computed as `date('now','-30 days')` in SQLite
-  because the optional campaign filter shifts every placeholder number). ⚠ **Two identical columns
-  are a short record, not a finding** — the first click ever recorded is 2026-08-21, so all-time
-  and last-30 are nearly the same window and the page says so, with a control that removes the
-  caveat once the record outgrows it.
-- **Trend guards, each with a positive control**: today is in neither window; a channel younger than
-  the older window gets its start date (`platformSince` is queried over the WHOLE table, not the
-  rendered thirty days); **connecting an account is not growth** — the follower total counts only
-  accounts present at BOTH ends, and the ones left out are named.
+- **A LINK'S CLICK COUNT IS ALL TIME AND GETS READ AS "RECENTLY"**, so `/links` carries both
+  columns. ⚠ **Two nearly identical columns are a short record, not a finding** — the first
+  click ever recorded is 2026-08-21. The caveat and the control that removes it once the record
+  outgrows the window are on the stats funnel card, not on `/links`.
 
 ## "Are we being suppressed?" — the seed test
 
@@ -1091,227 +760,164 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
 
 ## Traps that cost a session
 
-- **A LINK SLOT WANTS A URL, AND `linkFor()` HANDED IT THE WHOLE CUSTOM COMMENT** (2026-09-22,
-  the first Dial Countdown pin). `if (opts.comment) return trackLinks(opts.comment)` ignored the
-  `medium` argument, so with `--comment` set Pinterest's `link` — the destination a tap opens —
-  was the string *"Everything it does: https://mwkshow.com/dial\nInstall it: ...\n\nPrompt it
-  yourself!"*. Pinterest answered **`Invalid URL or request data`**, which its docs give for
-  exactly this, and the pin never went live. X's caption link had the same hole and was spared
-  only because that post was too long for X. **Both callers are link SLOTS** — the comment path
-  composes its own through `commentFor()` and never came through there — so the branch was
-  deleted rather than narrowed. It had been unreachable until a post first combined a custom
-  comment with Pinterest.
-
 - **A TEST WITH A FIXED FIXTURE AND A RELATIVE WINDOW PASSES UNTIL A DATE, THEN LIES**
-  (2026-09-21). `test/dashboard.test.js` asserted the stats page still calls all-time and
-  last-30 "nearly the same window", off a fixture whose first click was 2026-08-21 — and went
-  red the morning that date left the rolling 30 days. **The page was right and the test was
-  stale**, which is the dangerous direction: the obvious reading is that the change under way
-  broke it. The fixture is anchored to `daysAgo(n)` now. Anywhere a test feeds a literal date
-  into something measured against `now`, ask what happens the day it ages out.
+  (2026-09-21). A test asserted the stats page still calls all-time and last-30 "nearly the same
+  window", off a fixture whose first click was a literal date — and went red the morning that
+  date left the rolling 30 days. **The page was right and the test was stale**, which is the
+  dangerous direction: the obvious reading is that the change under way broke it. Anywhere a
+  test feeds a literal date into something measured against `now`, ask what happens the day it
+  ages out. `test/dashboard.test.js`'s `daysAgo()` is the worked case.
 
-- **THIS FILE WAS EMPTY ON `main` FOR AN HOUR (2026-09-20, `beb3a41`) BECAUSE OF
+- **THIS FILE WAS EMPTY ON `main` FOR AN HOUR (`beb3a41`) BECAUSE OF
   `open(p,'w').write(open(p).read()...)`.** Python opens the write handle — truncating the file —
   BEFORE it evaluates the argument, so the read sees nothing and writes nothing back, and the
   script prints its success line. `git status` then showed a clean tree because the empty file
-  had been committed. **Read into a variable first, assert every anchor, write once at the end** —
-  and after any scripted edit of a tracked file, `wc -l` it before committing.
+  had been committed. **Read into a variable first, assert every anchor, write once at the end**
+  — and after any scripted edit of a tracked file, `wc -l` it before committing.
 
 - **Node's `fetch` cannot reach a Meta CDN from this box — and it looks exactly like an expired
   URL.** `ETIMEDOUT` at ~253 ms: no IPv6 route here, the AAAA record wins, and undici's Happy
-  Eyeballs window is 250 ms so it never tries IPv4. Media downloads shell out to curl. If you must
-  use fetch, `net.setDefaultAutoSelectFamilyAttemptTimeout(500)`.
-- **The same trap bites the dashboard hostnames** — use `curl -4` when testing by hand.
-- **A comment read for a video the account doesn't own returns `success` with an EMPTY LIST**, not
-  an error. So "no comments" never proves "not yet commented".
-- **YouTube blocks comments on private videos** — 403, and `firstComment` silently never lands.
-  Unlisted is fine. **A 403 IS NOT ALWAYS PERMANENT, AND TREATING IT AS SUCH COST TWO STREAMS
-  THEIR CTA** (2026-09-13): YouTube closes the comments endpoint *while a stream is live* — live
-  chat is the surface then — so the 10:00 run on a stream that ended 10:18 wrote it off for ever
-  and by 21:55 the comments were open with nothing under either video. A 403 now carries a
-  `retryUntil` (`MWK_COMMENTS_403_RETRY_HOURS`, 24), and that window must stay UNDER the sweep's
-  own `--hours` or the retry falls due after the post has left the window. A test pins the pair.
-  - **THE WINDOW LAPSING WAS READ AS "CLOSED FOR GOOD", AND E010 SAT UNCOMMENTED THROUGH NINE
-    HOURLY RUNS WITH THE COMMENTS WIDE OPEN** (2026-09-19, found 2026-09-20 with 3.5h of the 48h
-    left). `isRetryable()` said "only while `retryUntil` is in the future". After the stream ended
-    the read succeeded every hour, so the loop walked past the 403 branch to the transcript wait
-    and `continue`d WITHOUT touching state — the stale note sat there until its window lapsed, and
-    from then on the pre-loop filter counted the post as recorded. **Zero comments, no GONE line,
-    `0 without a recorded first comment` in the journal.** Two changes: an entry that ever carried
-    `retryUntil` is re-examined until the LOOP writes a permanent verdict, and the moment a read
-    succeeds any 403 note on file is deleted (`open  <key>` in the log). **A `continue` that
-    leaves state untouched is a decision about the NEXT run, not just this one.**
-- **Report every time to him in BRISBANE time** (mate, 2026-08-21). The box stays on `Etc/UTC` and
-  that is correct — so `systemctl`, `journalctl` and every log stamp are UTC, and quoting one
-  verbatim is ten hours wrong to him. `TZ=Australia/Brisbane date '+%H:%M %Z'`. The dashboard
-  already renders Brisbane. AEST is UTC+10 year round.
+  Eyeballs window is 250 ms so it never tries IPv4. Media downloads shell out to curl. If you
+  must use fetch, `net.setDefaultAutoSelectFamilyAttemptTimeout(500)`. **The same trap bites the
+  dashboard hostnames** — use `curl -4` when testing by hand.
+- **A comment read for a video the account doesn't own returns `success` with an EMPTY LIST**,
+  not an error. So "no comments" never proves "not yet commented".
+- **A YOUTUBE 403 ON A COMMENT READ IS NOT PERMANENT** — comments are closed *while a stream is
+  live*, and treating that as final cost two streams their CTA. `MWK_COMMENTS_403_RETRY_HOURS`
+  must stay UNDER the sweep's own `--hours`, or the retry falls due after the post has left the
+  window; a test pins the pair. The generalisation, learned a second time when a stale note sat
+  through nine hourly runs with the comments wide open: **a `continue` that leaves state
+  untouched is a decision about the NEXT run, not just this one.** Detail at `isRetryable` in
+  `first-comment.js`.
+- **Report every time to him in BRISBANE time** (mate, 2026-08-21). The box stays on `Etc/UTC`
+  and that is correct — so `systemctl`, `journalctl` and every log stamp are UTC, and quoting one
+  verbatim is ten hours wrong to him. `TZ=Australia/Brisbane date '+%H:%M %Z'`. AEST is UTC+10
+  year round.
 
 ## Alerting and the box's state
 
-- **A RED UNIT MEANT NOTHING WHILE ONE TRANSIENT ERROR COULD PAINT IT** (#36, closed 2026-09-18).
-  A Zernio 500 on a comment READ failed the hourly watcher over a post that already had its comment
-  and read fine an hour later; the over-length Threads body on 2026-09-18 was genuinely stuck and
-  looked identical in `systemctl --user list-timers`. A post now carries its own consecutive-run
-  count in `__failing` inside the comment state, and only `MWK_COMMENT_STUCK_RUNS` (3) failures in a
-  row exit non-zero or mark the heartbeat — everything under that logs `(n/3, retrying next run)`
-  and stays green. **A SOURCE failure is deliberately still loud on the first run**: a sweep that
-  could not read a source missed posts it never saw (the 2026-09-15 rule). A post that fails its way
-  out of the `--hours` window is reported once as `GONE` and dropped, because an entry nothing can
-  retry would hold the unit red for ever. Driven in the suite across four runs against a fake API in
-  its own process — `spawnSync` blocks the test's event loop, so a server in the test process can
-  never answer the child.
-- **THERE WAS NO ALERT PATH AT ALL UNTIL 2026-09-14.** The product review measured 6,895 timer runs
-  in a week, two self-healed failures, zero errors — and nothing that would tell anybody the box
-  was off, a token had expired, or the queue had stopped. `scripts/lib/health.js` is the one path:
-  three Healthchecks dead-man checks (`heartbeat` from ship-events every 2 min, `posted` from
-  run-queue on a live post, `accounts` from ship-stats hourly on `needsReconnect`/`error`), URLs
-  **would** go in `td-sops apps/mwk-social.enc.env` as `MWK_HC_*_URL`, **unset = no-op** so a job
-  never fails because the alerting did. ⚠ **None is set today** — that file holds
-  `MWK_LOG_TOKEN`, `MWK_LOG_URL` and `ZERNIO_API_KEY` and nothing else (checked 2026-09-21), so
-  every `health.ping` is a no-op and **nothing alerts anybody**. The code is wired, the account
-  is not. A test drives it through a curl shim. The Healthchecks project has to
-  exist first — it is mate's account to create it in.
+- ⚠ **NOTHING ALERTS ANYBODY TODAY.** `scripts/lib/health.js` is wired — three Healthchecks
+  dead-man checks, unset = no-op so a job never fails because the alerting did — but no
+  `MWK_HC_*_URL` is set (checked 2026-09-21), so every `health.ping` is a no-op. The code is
+  ready; the Healthchecks project is mate's account to create.
+- **A RED UNIT MEANT NOTHING WHILE ONE TRANSIENT ERROR COULD PAINT IT** (#36). A post carries its
+  own consecutive-run count (`__failing` in the comment state) and only `MWK_COMMENT_STUCK_RUNS`
+  failures in a row go red. **A SOURCE failure is deliberately still loud on the first run**: a
+  sweep that could not read a source missed posts it never saw. A post that fails its way out of
+  the `--hours` window is reported once as `GONE` and dropped, because an entry nothing can retry
+  would hold the unit red for ever.
 - **A FLAKY OPTIONAL SOURCE TOOK THE WHOLE SWEEP DOWN, AND THE ALERT COULD NOT FIRE BECAUSE THE
-  THROW CAME FIRST** (2026-09-15 02:00 UTC). `first-comment.js` reads `analytics:posts` for YouTube
-  live streams alone; a transient Zernio 503 there exited before a single pipeline post was looked
-  at, so Instagram, Facebook, LinkedIn and Threads went uncommented for an hour over a dependency
-  none of them uses — and the heartbeat ping sits at the END of `main()`, so the one alert path
-  stayed silent about it. `sources()` now returns `{ results, failures }`: `posts:list` stays fatal
-  (nothing to do without it), the optional sweep degrades **loudly** and its failure is counted, so
-  the exit code and the heartbeat both still say a source was missed. **A silent skip there is the
-  nine-streams bug exactly** — the run would report success while the only source that can see a
-  live stream never ran, and `--hours` eventually carries that stream out of the window for good.
-  Driven in the suite through `MWK_ZERNIO_CLI`, a shim for the CLI path, with a healthy run as the
-  positive control.
+  THROW CAME FIRST.** A transient 503 on the live-stream sweep exited before a single pipeline
+  post was looked at, so four platforms went uncommented for an hour over a dependency none of
+  them uses — and the heartbeat ping sits at the END of `main()`. `sources()` returns
+  `{ results, failures }` now: `posts:list` stays fatal, the optional sweeps degrade **loudly**
+  and their failure is counted, so the exit code and the heartbeat both still say a source was
+  missed. **A silent skip there is the nine-streams bug exactly.**
 - **A HUNG JOB IS A TIMER THAT NEVER FIRES AGAIN, AND NOTHING WOULD SAY SO.** systemd refuses to
-  start a oneshot while its last run is still active, so one wedged `yt-dlp` or `ffmpeg` stops that
-  job for good — and with no alert path the only sign is a dashboard number that quietly stops
-  moving. Every unit now carries `TimeoutStartSec` (`install-timers.sh`: ship-events 2min,
-  ship-stats 5min, state-copy 15min, first-comment 20min, queue 30min, yt-notes 90min) and every
-  `execFileSync` that touches the network carries its own (`yt-dlp`/`ffmpeg` 10 min, the Zernio CLI
-  4 min, matching the REST publish timeout). **The unit ceiling is the backstop, not the mechanism**
-  — a subprocess killed by its own timeout fails one video; a unit killed by systemd fails the run.
+  start a oneshot while its last run is still active, so one wedged `yt-dlp` or `ffmpeg` stops
+  that job for good. Every unit carries `TimeoutStartSec` — **read the values out of
+  `install-timers.sh`, not this line** — and every network subprocess carries its own. **The unit
+  ceiling is the backstop, not the mechanism**: a subprocess killed by its own timeout fails one
+  video; a unit killed by systemd fails the run.
 - **The box's disk is not backed up, and `~/.local/state/mwk-social/` is what makes the pipeline
-  idempotent** — the first-comment ledger, 47 cached transcripts Zernio's expired URLs can never
-  re-fetch, the only backup of every description overwritten. `scripts/state-copy.sh` copies it to
-  `~/share/work/mat-mwk-social/state/` nightly (the share IS backed up). README → *A new box* is
-  the rebuild; it is ten commands, and the watcher would not double-comment even without the copy.
+  idempotent** — the first-comment ledger, the cached transcripts Zernio's expired URLs can never
+  re-fetch, the only backup of every description overwritten. `scripts/state-copy.sh` copies it
+  to the share nightly (the share IS backed up); why, in `install-timers.sh`'s state-copy block.
+  Rebuild: README → *A new box*.
 
 ## Not used, and why
 
-- **Webhooks** would replace the hourly poll, but need a public HTTPS endpoint and detection still
-  waits on the same ~90 min sync — the only gain is fewer API calls.
-- **Comment-to-DM on Instagram** is verified working (`zernio automations:*`; `GET
-  /v1/comment-automations` answered on this account) and is the only clickable route out of
-  Instagram — but it is **per post**, so `automations:create` needs `--platformPostId`,
-  `--accountId`, `--profileId`, `--name` and `--dmMessage` after every IG publish, not one setup.
-  **Declined by mate on 2026-08-26**; his reasoning is in memory, and the mechanics above are the
-  only part that belongs here. Do not re-propose without a change on Instagram's side.
+- **Webhooks** would replace the hourly poll, but need a public HTTPS endpoint and detection
+  still waits on the same ~90 min sync — the only gain is fewer API calls.
+- **Comment-to-DM on Instagram** is verified working (`zernio automations:*`) and is the only
+  clickable route out of Instagram — but it is **per post**, so `automations:create` needs
+  `--platformPostId`, `--accountId`, `--profileId`, `--name` and `--dmMessage` after every IG
+  publish, not one setup. **Declined by mate on 2026-08-26.** Do not re-propose without a change
+  on Instagram's side.
 - **Sending a STILL where a clip would go is declined** (mate, 2026-08-26, closing #27: *"no
-  posting photos is fine, so do not do it"*). Two separate proposals died with it: swapping the
-  LinkedIn clip for the branded still, and building TikTok photo posts. The finding underneath the
-  first is still true and is not a reason to re-propose — LinkedIn video came last on impressions in
-  both large 2026 studies and it is the only format we send there. **`imageOk` and the aspect checks
-  stay wired** for a still HE hands us; what is declined is the pipeline choosing one.
-- **Stories**: postable via API but they get no stickers/links/music (Meta limit) — post manually.
+  posting photos is fine, so do not do it"*). Two proposals died with it: swapping the LinkedIn
+  clip for the branded still, and building TikTok photo posts. The finding underneath the first
+  is still true and is **not** a reason to re-propose — LinkedIn video came last on impressions
+  in both large 2026 studies and it is the only format we send there. **`imageOk` and the aspect
+  checks stay wired** for a still HE hands us; what is declined is the pipeline choosing one.
+- **Stories**: postable via API but they get no stickers/links/music (Meta limit) — post by hand.
   An Instagram story shared onward to Facebook has no API analytics on the Facebook side.
-- **Native/past posts**: `analytics:posts` picks up app-made posts on a ~90 min sync, and
-  `--source late|external|all` narrows it. **YouTube is the one platform we still sweep**
-  (`first-comment.js`'s `sources()`, which runs `--platform youtube` and passes no `--source`) —
-  see *Live streams* above. Anywhere else a post made outside the pipeline is handled by hand.
+- **Native/past posts**: `analytics:posts` picks them up on a ~90 min sync. **YouTube and
+  Facebook are the two platforms we sweep** (*Live streams*, above); anywhere else a post made
+  outside the pipeline is handled by hand.
 - **REUSING AN OLD CLIP IS DECLINED — NEW CLIPS INSTEAD** (mate, 2026-09-21: *"do not resend
   anything yet... we will add new clips instead so do not reuse"*). This closes a proposal made
-  the same day off a real coverage gap, so **the gap is not a reason to re-propose it**: TikTok,
-  his second-best reach channel, has never carried four of the strongest August clips, and
-  LinkedIn (the largest audience) is missing from nearly every August winner. The mechanism
-  exists and works — `queue-add.js --media-key` re-queues a clip already in R2, and anything
-  older than 2026-08-21 predates the queue and would come back off YouTube with yt-dlp.
-  **The reasoning against it is his supply, not the platforms**: at two a day a backfill item
-  eats half a day's output, which is the Pinterest complaint again. Revisit only if he says so.
+  the same day off a real coverage gap, so **the gap is not a reason to re-propose it**. The
+  mechanism exists and works (`queue-add.js --media-key`). **The reasoning against it is his
+  supply, not the platforms**: at two a day a backfill item eats half a day's output, which is
+  the Pinterest complaint again.
   - **PINTEREST IS THE ONE CARVE-OUT** (mate, same day: *"Pinterest is fine, because it was
-    never there"*). His line is the definition of the rule: a clip going somewhere it has
-    NEVER run is not a resend, and Pinterest is the only platform where that is true at scale.
-    **Nine of the channel's nineteen Shorts are pinned and ten are not** (counted
-    2026-09-21), the ten including the biggest: the 1,100-view *secret exposed* and the 504,
-    397, 387 and 361 clips. **What he banned
-    was the RATE, not Pinterest** — the two-a-day cap already fixes that, so a pin still costs
-    a slot and still waits for a day with nothing new.
-  - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND WE CAN ONLY SEE 44% OF IT.** The four pins
-    Zernio's analytics returns read **0 impressions, 0 saves, 0 clicks** on 2026-09-21 —
-    but **nine are live**, and `analytics:posts --platform pinterest` returns four of them
-    under every `--source`, so `daily_metric` believes we pinned four (repo issue #43).
-    **Do not quote a Pinterest total as if it covered the pins**; it covers the ones Zernio
-    happened to sync. Pinterest is a search surface that accrues over weeks, so a day proves
-    nothing either way — read it again about a week in, and count from `queue_item.result`.
-  - **A HELD ITEM CAN BE A BACKFILL NOBODY CALLED ONE.** `01M16273CVBA0MJP4RMWQ5EC69` — the Adri
-    review card, queued 2026-08-29 for X and Threads, held to the 22nd — would have published
-    the morning after this decision, and the same card had already run on Instagram on the 20th.
-    It is parked at `not_before = 2026-10-01`. **When a reuse rule lands, read the queue for what
-    is already holding**, the same way a voice change has to reach what is already drafted.
+    never there"*). A clip going somewhere it has NEVER run is not a resend, and Pinterest is
+    the only platform where that is true at scale. **What he banned was the RATE, not
+    Pinterest** — a pin still costs a slot and still waits for a day with nothing new.
+  - ⚠ **PINTEREST HAS EARNED NOTHING YET, AND WE CANNOT SEE ALL OF IT.**
+    `analytics:posts --platform pinterest` returns only some of the live pins under every
+    `--source`, so `daily_metric` undercounts them (repo issue #43). **Do not quote a Pinterest
+    total as if it covered the pins** — count from `queue_item.result`. It is a search surface
+    that accrues over weeks, so a day proves nothing either way.
+  - **A HELD ITEM CAN BE A BACKFILL NOBODY CALLED ONE.** One card queued in August and held to
+    the 22nd would have published the morning after this decision, having already run on
+    Instagram. **When a reuse rule lands, read the queue for what is already holding**, the same
+    way a voice change has to reach what is already drafted.
 
 ## X: follows only
 
 - **The reply pipeline is GONE, and this note stops it being rebuilt** (mate, 2026-08-23: *"Stop
   the reply idea on X, just follow ppl... keep it simple"*). Two reasons, both still true:
-  **X blocked programmatic replies on 23 Feb 2026** on every plan below Enterprise (self-replies
-  are exempt, which is the only reason our own thread CTA ever published); and **the supply was
-  never there** — 168 tweets read across three live runs, **0 on target**.
+  **X blocked programmatic replies on 23 Feb 2026** below Enterprise (self-replies are exempt,
+  which is the only reason our own thread CTA ever published); and **the supply was never
+  there** — 168 tweets read across three live runs, **0 on target**.
 - **MORE FOLLOWS IS NOT THE LEVER — settled, do not re-research** (mate: *"lock in, right now we
   are good with x"*). 118 follows produced at most 8 followers. **The 500-following / 0.6-ratio
-  cliff everyone warns about is DEAD** — `tweepcred` returns 0 hits in the January 2026
-  `xai-org/x-algorithm` release (positive control on the same search: `phoenix` 102, `follower` 96).
+  cliff everyone warns about is DEAD** — `tweepcred` returns 0 hits in the 2026
+  `xai-org/x-algorithm` release (positive control on the same search: `phoenix` 102).
 - **X HAS AN EXPLICIT BOOST FOR ACCOUNTS UNDER 1,000 FOLLOWERS, AND IT EXCLUDES REPLIES AND
-  REPOSTS** (read off `home-mixer/scorers/author_cold_start.rs`, 2026-09-21). We are at 17
-  followers, so this is the only discovery path that applies to us, and I had just told mate the
-  opposite — *"reply to three people, do not post"* — which is right for building a relationship
-  and wrong for being found. `cold_start_base_eligible()` is three conditions:
-  `in_reply_to_tweet_id.is_none() && retweeted_tweet_id.is_none() && author_followers_count <=
-  ColdStartFollowerCap`. The caller adds `age <= ColdStartMaxPostAgeSecs` and
-  `view_count_on_home < ColdStartImpressionThreshold`. Defaults: cap **1,000 followers**,
-  threshold **1,000 impressions**, age **48 h**, injected at slot **15-16**
-  (`ColdStartSlotMin`/`Max`), `EnableViewerColdStart` **true**.
-  - **So an ORIGINAL post is the only shape that gets in front of a stranger.** A reply and a
-    repost are both disqualified by name, on top of `oon_retweet_reply_filter.rs` already
-    dropping an out-of-network reply from the For You candidate set.
-  - **The boost switches off at 1,000 impressions or 48 hours, whichever comes first** — it is a
-    trial, not a subsidy, and it is what makes a daily original post worth more on X than
-    anything else we could do there.
-  - **Re-read the file before quoting any of it.** These are defaults in a live repo, and this
-    section has already carried a stale ranker claim for weeks.
-- **`config/follow.json` is what survived** — 72 handles from 937 authors, ~5% yield. Nothing reads
-  it; it is the record so the next sweep does not re-derive the same names. People, never brands.
-- **X: THE LINK IS IN THE TWEET** (mate, 2026-08-24). It rode in a thread reply before that. The
-  deciding reason: `home-mixer/filters/oon_retweet_reply_filter.rs` partitions out an
-  out-of-network reply, so the CTA was only ever *surfaced* to existing followers. **Say that
-  precisely** — the reply stayed readable to anyone who opened the root tweet; what it could not do
-  is reach a non-follower as a feed item.
-  - **The penalty the thread dodged is not in the ranker.** Grepped `has_url|url_penalty|
-    link_penalty|contains_link|external_link`: only USER dwell-time features and an ads threshold.
-    `open_link_score` is a predicted-engagement term, weighted **positive** (`OpenLinkWeight`
-    0.2). Positive control: `favorite` hits 68 files.
-    ⚠ **"Its weight is NOT in the repo" was true when written and is FALSE since the repo was
-    updated** (re-read 2026-09-21): every weight sits in `home-mixer/params/param.rs` with a
-    comment explaining they multiply PREDICTED probabilities, never raw counts. Reply 5.0,
-    quote 5.0, share-via-DM 5.0, copy-link 20.0, follow-author 4.0, repost 1.0, like 0.5,
-    profile click 0.0; a reply from someone who follows you back is boosted 15x on top; out of
-    network is discounted to 0.75; not-interested -43.2, mute -58.8, report -234. **Re-read the
-    file before quoting a number; it has already changed once under this note.**
-  - **X's "link penalty" is REPORTING, and this note has been wrong in BOTH directions.** What is
-    actually known: two hand-made posts with a link got 1 impression each, on an account with 8
-    followers. That is evidence of 8 followers. **Do not rebuild a mechanic on this claim again.**
-  - **Reversing it is one word in the platform table plus the code git has.** `threadWithLink()`
-    was kept three weeks "in case" and deleted with the dead code on 2026-09-14 (`f8a2490` and
-    earlier carry it). If it ever comes back: `threadItems` **REPLACES the top-level `content`**
-    for that platform, so the media has to ride in `threadItems[0]`.
-- **X's 403s were an ACCOUNT TOGGLE, not the plan.** `PUT /v1/accounts/{id}` takes `xCapabilities:
-  { analytics, inbox }`, **both default `false`**, and both 403 in a way that reads exactly like a
-  plan limit. Both are on and stay on. They unlock `GET /v1/twitter/search` (300 req/15 min) and
-  the X comment endpoints.
+  REPOSTS** (`home-mixer/scorers/author_cold_start.rs`). We are well under the cap, so this is
+  the only discovery path that applies to us — and it is the opposite of the "reply to three
+  people, do not post" advice that had just been given, which is right for building a
+  relationship and wrong for being found. **An ORIGINAL post is the only shape that gets in
+  front of a stranger**: a reply and a repost are disqualified by name, on top of
+  `oon_retweet_reply_filter.rs` dropping an out-of-network reply from the For You candidate set.
+  **The boost is a trial, not a subsidy** — it switches off at an impression threshold or an age
+  limit, whichever comes first.
+  - ⚠ **NONE OF THIS REPO'S NUMBERS ARE MIRRORED HERE AND NOTHING PINS THEM.** The caps, the
+    thresholds and every ranking weight (`home-mixer/params/param.rs`, which multiplies
+    PREDICTED probabilities rather than raw counts) are defaults in a live repo. **Re-read the
+    file before quoting any of them** — this section has already carried a stale ranker claim
+    for weeks, and a weight list here went out of date under the note telling you to re-read it.
+- **X: THE LINK IS IN THE TWEET** (mate, 2026-08-24). It rode in a thread reply before that, and
+  the deciding reason is that an out-of-network reply is partitioned out of the feed — so the
+  CTA was only ever *surfaced* to existing followers. **Say that precisely**: the reply stayed
+  readable to anyone who opened the root tweet; what it could not do is reach a non-follower as
+  a feed item.
+  - **The penalty the thread dodged is not in the ranker.** Grepped
+    `has_url|url_penalty|link_penalty|contains_link|external_link`: only USER dwell-time
+    features and an ads threshold. `open_link_score` is a predicted-engagement term, weighted
+    **positive**. Positive control: `favorite` hits 68 files.
+  - **X's "link penalty" is REPORTING, and this note has been wrong in BOTH directions.** What
+    is actually known: two hand-made posts with a link got 1 impression each, on an account with
+    8 followers. That is evidence of 8 followers. **Do not rebuild a mechanic on this claim
+    again.**
+  - **Reversing it is one word in the platform table plus the code git has** (`threadWithLink()`,
+    deleted 2026-09-13 in `50d94b1`). If it comes back: `threadItems` **REPLACES the top-level
+    `content`** for that platform, so the media has to ride in `threadItems[0]`.
+- **X's 403s were an ACCOUNT TOGGLE, not the plan.** `PUT /v1/accounts/{id}` takes
+  `xCapabilities: { analytics, inbox }`, **both default `false`**, and both 403 in a way that
+  reads exactly like a plan limit. Both are on and stay on.
 - **Costs, measured off `usage:stats` rather than inferred**: a URL tweet is **20c FLAT — the fee
-  replaces the base charge**; a plain tweet 1.5c; a follow 1.5c; a tweet READ 0.5c. Arithmetic
-  checked twice to the cent. (Zernio's `usage:x-pricing` lists `content_create_with_url` with an
-  empty `triggeredBy`; that metadata is wrong.)
-- **X rate-limits follows hard**: 37 went through back to back, then a wall of 429s. Long backoff.
+  replaces the base charge**; a plain tweet 1.5c; a follow 1.5c; a tweet READ 0.5c. (Zernio's
+  `usage:x-pricing` lists `content_create_with_url` with an empty `triggeredBy`; that metadata
+  is wrong.)
+- **X rate-limits follows hard**: 37 went through back to back, then a wall of 429s. Long
+  backoff.
+- **`config/follow.json` is what survived** — 72 handles from 937 authors, ~5% yield. **Nothing
+  reads it**; it is the record so the next sweep does not re-derive the same names. People,
+  never brands.
 
 ## Cross-repo
 
@@ -1331,57 +937,49 @@ Connected **private** repos are named in the internal state note, not in this fi
 before filing a cross-repo issue, and file with `gh issue create -R <owner>/<repo>`. Never edit
 another repo directly.
 
-## Platform gotchas (verified against docs.zernio.com)
+## Platform gotchas — what the TABLE cannot hold
 
-- **Facebook posts to Pages only** — personal timelines are impossible via any API. Tokens ~60 days.
-- **LinkedIn: ARTICLES AND NEWSLETTERS ARE IMPOSSIBLE**, and it is LinkedIn's limit, not Zernio's —
-  long-form has never been exposed by their API. It goes in LinkedIn's web editor by hand, or on
-  `matewishkey.com` with the pipeline linking to it.
-- **LinkedIn**: 3,000-char limit; duplicate content → 422; external links suppress reach
-  (−40–50%), hence the first-comment mechanic. Company page video runs to 30 minutes against a
-  personal profile's 10. **Documents/carousels and polls are documented but have never been tested
-  here** — treat both as unproven until one publishes.
+**Per-platform limits, slots and caps are `scripts/lib/platforms.js`. Read the table, never this
+file** (*The platform table*, above). What is recorded here is only what has no field:
+
+- **Facebook posts to Pages only** — personal timelines are impossible via any API. Tokens ~60
+  days.
+- **LinkedIn: ARTICLES AND NEWSLETTERS ARE IMPOSSIBLE**, and it is LinkedIn's limit, not
+  Zernio's — long-form has never been exposed by their API. It goes in LinkedIn's web editor by
+  hand, or on `matewishkey.com` with the pipeline linking to it. **Duplicate content → 422.**
+  **External links suppress reach (−40–50%)**, which is the whole reason for the first-comment
+  mechanic. **Documents/carousels and polls are documented and have never been tested here** —
+  treat both as unproven until one publishes.
+  - ⚠ **Company page video runs to 30 minutes against a personal profile's 10, and NEITHER is in
+    the table** — LinkedIn has no `videoMaxSec`, so nothing checks it and a 20-minute clip would
+    reach Zernio unchecked.
 - **Instagram**: business account required; media mandatory; caption folds at ~125 chars; no
-  delete/edit via API. Image aspect 0.75–1.91:1, and one at *exactly* 1.91:1 gets rejected (float
-  edge, bitten live) — pad wide screenshots to ~1.78:1 with the screenshot's own bg colour instead
-  of cropping. Tall grabs pad up to 4:5. **A single video IS a Reel and Zernio caps it at 90
-  seconds** — the table said 900 until 2026-09-20 and nothing over 90 s was ever sent, so raise it
-  only after a longer clip has actually published.
-- **Pinterest** (connected 2026-09-20, renamed to `matewishkey` and confirmed live
-  2026-09-21): every pin needs a board, and
-  **`zernio connect:get-pinterest-boards <id>` answers 405** while `GET
-  /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the REST route. The account
-  had no board, so `POST` to the same route created *Mate Wish Key Show* (exercised). The link is
-  `platformSpecificData.link`, the pin's own destination — `linkPlacement: 'link'`, its own SLOT,
-  minted with medium `link` **unless the item names its own page**, which since 2026-09-22 goes
-  out in full and unminted (*Links*, above); a url in the description is plain text. Title is the first line of
-  his words, 100 max. 2:3, 1:1 or 9:16 only, so `landscapeOk: false`. No comments, no DMs, no
-  delete exercised. Analytics: impressions, saves, clicks. **`--media-key` on `queue-add.js`
-  re-queues a clip already in R2 to a platform it has not run on; `--priority -1` keeps a backfill
-  behind anything he writes today.**
-- **TikTok**: `accounts:tiktok-creator-info <accountId> --mediaType <video|photo>` returns the live
-  privacy options and posting limits — read it instead of guessing. API posts have their own daily
-  cap; consent flags required per post; no comments/DMs/FYP analytics via API.
-- **YouTube**: vertical <3min auto-classifies as a Short; Shorts get NO custom thumbnails;
-  impressions/CTR exist only in Studio's UI, not in any API.
-- **PLAYLISTS CAN BE LISTED AND ASSIGNED; ONLY CREATING ONE IS MANUAL.** `posts:update-metadata
-  --playlistId` assigns, verified at YouTube's end rather than by the API's echo, and
-  **`zernio connect:get-youtube-playlists <accountId>`** returns every playlist with its id, title,
-  privacy and `itemCount`. The addressing is the same trick descriptions use: `POST
-  /posts/_/update-metadata` with `{platform, videoId, accountId, ...}` — **the Zernio `_id` from
-  `analytics:posts` 404s here**, because an external video is not a post.
-  ⚠ **"You cannot ask which exist" was WRONG for three days** (written 2026-09-15, corrected
-  2026-09-19). `/v1/youtube/playlists` and `/v1/playlists` really do answer *"No such API
-  endpoint"* — but the working route is under `connect:`, and nothing had run `zernio --help |
-  grep playlist`. **A 404 on the route you guessed is not an absent capability**; grep the CLI's
-  own command list before recording one as impossible. **"There is still no create" was ALSO
-  wrong** (corrected 2026-09-20): Zernio's YouTube page documents `POST
-  /v1/accounts/{accountId}/youtube-playlists` (`title` required, `privacy` defaults private).
-  Documented, NOT exercised — the only playlist we needed already existed. Exercise it before
-  telling him a playlist needs Studio.
-  **The `With Guests` playlist is the UNCUT one** (he created it; 8 of 10 episodes were in it on
-  2026-09-20 and the missing E008 landscape, E009 and E010 were assigned via `update-metadata`,
-  read back off YouTube). `content.json`'s `raw.url` list is the membership test.
-  ⚠ **An empty playlist is invisible from the public side.** `@channel/playlists` and yt-dlp both
-  showed one playlist where the account had two; the empty one only appears through the API. Do not
-  conclude a playlist is missing from a logged-out read.
+  delete or edit via API. **A single video IS a Reel**, and the cap was 900 in the table until a
+  measurement put it at 90 — nothing over 90 s has ever been sent, so raise it only after a
+  longer clip has actually published.
+- **Pinterest**: every pin needs a board, and **`zernio connect:get-pinterest-boards <id>`
+  answers 405** while `GET /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the
+  REST route and **only READS**; it throws if the account has none, and the board we use was
+  created by hand. No comments, no DMs, no delete exercised. Analytics: impressions, saves,
+  clicks.
+- **TikTok**: `accounts:tiktok-creator-info <accountId> --mediaType <video|photo>` returns the
+  live privacy options and posting limits — read it instead of guessing. API posts have their own
+  daily cap; consent flags are required per post; no comments, DMs or FYP analytics via API.
+- **YouTube**: vertical <3min auto-classifies as a Short; impressions and CTR exist only in
+  Studio's UI, not in any API. **Shorts DO take a custom 16:9 thumbnail** — see *Thumbnails*,
+  above; what cannot be set is the vertical cover in the Shorts feed.
+- **PLAYLISTS CAN BE LISTED AND ASSIGNED; CREATING ONE IS DOCUMENTED AND UNEXERCISED.**
+  `posts:update-metadata --playlistId` assigns and `zernio connect:get-youtube-playlists
+  <accountId>` lists. The addressing is the same trick descriptions use: `{platform, videoId,
+  accountId}` — **the Zernio `_id` from `analytics:posts` 404s here**, because an external video
+  is not a post. `POST /v1/accounts/{accountId}/youtube-playlists` is documented; exercise it
+  before telling him a playlist needs Studio.
+  - ⚠ **A 404 ON THE ROUTE YOU GUESSED IS NOT AN ABSENT CAPABILITY.** `/v1/youtube/playlists`
+    really does answer *"No such API endpoint"*, and the working route was under `connect:` the
+    whole time. **`zernio --help | grep <thing>` before recording one as impossible** — this
+    line has been wrong in both directions.
+  - **The `With Guests` playlist is the UNCUT one**, and `content.json`'s `raw.url` list is the
+    membership test.
+  - ⚠ **An empty playlist is invisible from the public side.** `@channel/playlists` and yt-dlp
+    both showed one playlist where the account had two. Do not conclude a playlist is missing
+    from a logged-out read.

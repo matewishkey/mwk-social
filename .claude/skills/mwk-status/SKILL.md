@@ -62,9 +62,9 @@ node -e 'const p=require("./scripts/lib/pace"),e=require("./scripts/lib/events")
 ```
 
 `why: null` means it could go out this minute, and the timer asks every five minutes from `*:05`
-to `*:45`. Three things gate it, all since 2026-09-21: **two a day**, ninety minutes apart plus a
-hashed 0-60 minutes of jitter, and a posting window of **07:00-11:00 Brisbane whose opening slides
-0-180 minutes by the day**, so `why` reading *"inside the window, but today opens at 09:34"* is the
+to `*:45`. Three things gate it — the cap and the window are his 2026-09-21 calls and the
+jitter was added the same day; the ninety-minute gap is older. **Two a day**, ninety minutes apart
+plus a hashed jitter, and a **morning posting window whose opening slides by the day**, so `why` reading *"inside the window, but today opens at 09:34"* is the
 design and not a stall. The live numbers are `pace.DEFAULTS`; read them there
 rather than quoting this line, which has been a day behind once already. Outside the
 window `why` names it and `nextAt` is tomorrow morning — that is the design, not a stall.

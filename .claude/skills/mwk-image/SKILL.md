@@ -111,11 +111,6 @@ the R2 key is derived from it (`queue/<day>-<slug>-<ulid><ext>` — the ULID is 
 posts named the same must not overwrite each other), and `final.png` tells nobody anything
 in six months.
 
-**Draft the words and queue them; do not wait for his dictation** (mate, 2026-08-24: *"The
-accountability is still on your side"*). The queue **is** the review gate — he reads it on the
-dashboard and releases it — so an unqueued post is a stall, not caution. Say plainly that the
-words are yours and easy to replace. If he dictates, his words win untouched.
-
 ## 7. Then say what happened
 
 Read the run output, not your expectations. Six platforms publish, two skip, and the skip lines

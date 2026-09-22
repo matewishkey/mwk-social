@@ -54,11 +54,9 @@ never a paraphrase — read it off the live page rather than typing it from memo
   him as the expert, the teacher"*). The post says the thing is doable and where to come; it does
   not run a lesson. The goal is *"to create curiosity, not to prove that somebody became a
   developer"*.
-- **This is a caption rule, not a comment rule.** The tracked CTA already lands as the first
-  comment (`voice.json` `firstComment.plain[0]` IS the pair), so check for a collision before
-  repeating it: only X puts a CTA in the post itself, and there `linkFor()` returns the bare url
-  with no prose, so a caption landing the line never doubles up. Computed per platform with
-  `voice.firstComment(key, {platform})`.
+- **This is a caption rule, not a comment rule.** Since 2026-09-22 the first comment is the
+  link and the tags and carries no prose at all, so it cannot collide with a caption line. Only
+  X puts a CTA in the post itself, and there it is the bare url.
 - **It was missed once, on a clip that WAS the argument.** A 28s clip about people selling
   themselves as AI experts went out ending *"Worth knowing before the invoice turns up."*
   Diagnosing the problem is not the post; the answer is.
@@ -118,7 +116,9 @@ node -e 'const v=require("./config/voice.json");
   '#ComputerProblems' '#Debugging'
 ```
 
-Omit `--topics` entirely to let the watcher derive them from the clip's own transcript instead.
+**ALWAYS pass `--topics`.** The watcher only reaches a post with NO comment yet, and a pipeline
+post already has one — so omitting them means no topic tags anywhere but Threads, permanently.
+That went out to five platforms on 2026-09-13 and none of them can be edited.
 
 ## 3. The media has to survive every platform it is aimed at
 
@@ -158,8 +158,9 @@ yt-dlp -q --no-warnings --no-playlist --force-ipv4 --merge-output-format mp4 \
   -o clip 'https://www.youtube.com/watch?v=<id>'
 ```
 
-That is the same format string `lib/media.js` uses — copy it, do not shorten it. **Constrain BOTH
-streams.** Three ways it bites:
+**No code holds this string any more** — `downloadYouTube()` was deleted on 2026-08-24, so this
+skill is the copy. Copy it whole, do not shorten it, and **constrain BOTH streams.** Three ways
+it bites:
 
 - It **appends its own extension** (ask for `clip`, get `clip.mp4` — reading that as "downloaded
   nothing" has happened).
@@ -168,9 +169,6 @@ streams.** Three ways it bites:
   TikTok and Threads all publish Opus-in-MP4 without complaint; **X uploads the entire file and
   then fails at 99%** with "media processing failed". `+ba[ext=m4a]` is what gets AAC. This one
   cost a post on 2026-08-21 — the shortened format string in this file is how it got in.
-
-Images: aspect must be 0.75–1.91:1 and **exactly 1.91 is rejected** (float edge, bitten live).
-Pad with the screenshot's own background colour — never crop.
 
 **One VIDEO per post on every platform** (several STILLS do ride together — `mwk-image` §5).
 A vertical and a landscape cut are two posts, or one
@@ -188,8 +186,8 @@ the clip, `MWK_COVER_MS` to change it. Nothing to pass.
   16:9 thumbnail — search, the channel grid, embeds — and **not** the vertical cover inside the
   Shorts feed, which is YouTube's own and has no API. Facebook, LinkedIn, X and Threads document
   nothing at all.
-- **It cannot be fixed after publishing** on any of them. If a clip opens on an empty shot, the
-  cover is decided before it goes out or not at all.
+- **It cannot be fixed after publishing on Instagram, TikTok or Pinterest** — there the cover
+  is decided before it goes out or not at all. YouTube is the exception, above.
 - ⚠ A frame INDEX is not a time — "the tenth frame" is 167 ms at 60 fps and 333 ms at 30.
 
 ## 4. Queue it
@@ -202,10 +200,14 @@ the clip, `MWK_COVER_MS` to change it. Nothing to pass.
 ```
 
 **`--link` when the post is ABOUT something with a page of its own.** A project, an episode, a
-tool. That page becomes the pin's destination, X's caption link and the link in the first
-comment, and it goes out as the **full url** — `mwkshow.com` is the show's address and stands
-for nothing else (mate, 2026-09-22). Leave it off and everything points at the show, which is
-right for a clip off the show. The cost, which is his call: a project link is not counted.
+tool. That page becomes the pin's destination and X's caption link, and it goes out as the
+**full url** — `mwkshow.com` is the show's address and stands for nothing else (mate,
+2026-09-22). Leave it off and everything points at the show, which is right for a clip off the
+show. The cost, which is his call: a project link is not counted.
+
+⚠ **The first comment only follows a destination on HIS OWN site.** A vendor page (Elgato, a
+marketplace) reaches the pin and the caption and not the comment, because the duplicate guard
+could never recognise a comment carrying it. `queue-add.js` prints which one you are getting.
 
 `--dry-run` prints the SQL and writes nothing; `--help` prints the usage. Leaving `--platforms`
 off means "wherever it fits". Local media goes to R2; a URL is stored as-is.
@@ -218,16 +220,12 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 
 ## 5. Say what will actually happen
 
-- The pace releases it: **two a day** (mate, 2026-09-21, after a Pinterest backfill put eight
-  out in one day — and confirmed at two the same evening: *"the two limit is good"*. His own
-  "one short a day" is what he SHOOTS, not this number), ninety minutes apart **plus 0-60
-  minutes of jitter**, inside a posting
-  window of **07:00-11:00 Brisbane** (mate, 2026-09-21, reversing the 2026-08-21 "no window"
-  rule: that is 17:00-21:00 New York, and Europe explicitly does not count). Both numbers are
-  his and only he changes them — say what they will do to a batch rather than working around
-  them. **Something queued after 11:00 waits until the next morning**, so never promise a
-  today that the window will refuse. **The window's opening slides 0-180 minutes by the day**,
-  so do not promise 07:00 either — read `pace.status()`'s `nextAt` and quote that.
+- **The pace releases it, and the numbers are `pace.DEFAULTS`** — read them there, and quote
+  `pace.status().nextAt` rather than any figure from a doc. They are his and only he changes
+  them, so say what they will do to a batch rather than working around them. Two consequences
+  worth stating to him every time: **something queued after the window closes waits until the
+  next morning**, and **the opening slides by the day**, so never promise a clock time you have
+  not read off `nextAt`.
 - The CTA lands as a first comment on Facebook, Instagram, LinkedIn, YouTube (natively at publish)
   and Threads (the hourly watcher).
 - **X takes the link IN THE TWEET** (changed 2026-08-24). It rode in a thread reply for three days;
@@ -240,8 +238,8 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
 - **Pinterest gets the clip as a video pin** (since 2026-09-20): the first line of his words is
   the pin's title (100 max), the words plus up to three tags are the description, and the pin's
   own destination field carries the link — the show by default, or **whatever `--link` names**.
-  A pin cannot be edited afterwards, so the destination is decided now or not at all. 2:3, 1:1
-  or 9:16 only. No comment, no watcher. A pin cannot be edited or, as far as we know, deleted.
+  A pin cannot be edited afterwards (and no delete has been exercised), so the destination is
+  decided now or not at all. 2:3, 1:1 or 9:16 only. No comment, no watcher.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
 - Tags go in the caption **or** the comment, never both. **The 5-cap is Instagram's; "caption and
@@ -257,8 +255,8 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   holding 7,222 merely reposted — which is the reason for the flip, not a detail of it.
 - **A vertical clip under three minutes sent to YouTube is a SHORT, and a url in a Short is plain
   text** — description and comment alike. `run-queue.js` works this out per clip and the CTA names
-  the channel instead of spending a code. The pipeline only sends YouTube the wide cut, so this
-  normally does not arise; it matters if you ever route the tall one there.
+  the channel instead of spending a code. **With no `--media-wide` the tall cut goes everywhere,
+  so this is the normal case, not an edge one.**
 - **`--no-first-comment` means it now.** The publisher records the decision where the hourly watcher
   looks, so the flag is not just a one-hour delay any more.
 

@@ -22,9 +22,10 @@ a whole chapter on deciding whether a copy already existed somewhere. That chapt
 **Two things still arrive from outside, and both are expected.** He goes live straight on YouTube,
 so a live stream never enters `posts:list` at all; and **Restream is posting again (2026-09-13)**,
 which lands a reel on Facebook and YouTube in the same minute. `first-comment.js` sweeps
-`analytics:posts --platform youtube` for exactly this — **YouTube only, on purpose**, with a test
-pinning it there. The Facebook copy is handled by hand. Do not rebuild an "is a copy already over
-there?" check: that was the mirror's job and the mirror is why it hurt.
+`analytics:posts` for exactly this — **two named sweeps, YouTube and Facebook, and Facebook
+VIDEOS ONLY** (a hand-made post on the page is his, not a stream), with a test pinning both
+literals. Never a loop over every platform. Do not rebuild an "is a copy already over there?"
+check: that was the mirror's job and the mirror is why it hurt.
 
 Six ways the call-to-action gets under a post:
 
@@ -35,7 +36,7 @@ Six ways the call-to-action gets under a post:
 | **In the caption** | the link rides in the post itself — X has a comments API, but a comment would be the same link twice under one tweet, and an out-of-network REPLY never reaches the For You feed at all | X |
 | **Nowhere — the bio instead** | a url is dead text in a caption AND a comment, so the CTA names the bio and mints no code | Instagram |
 | **Nowhere, and it says nothing** | the bio is dead text too — a TikTok bio link is tappable only on a Business account or past 1,000 followers, and this account is neither (checked in the app, 2026-09-14). His words and the tags, no link and no claim about one | TikTok |
-| **The pin's own destination** | a pin carries a link field of its own (`platformSpecificData.link`), so the CTA gets a real slot rather than dead text in the description; minted with medium `link` | Pinterest |
+| **The pin's own destination** | a pin carries a link field of its own (`platformSpecificData.link`), so the CTA gets a real slot rather than dead text in the description; minted with medium `link` when the post points at the show, or the post's own `--link` url unshortened | Pinterest |
 
 They compose safely because both read `config/voice.json` and both skip a post that already
 carries the marker — whoever put it there.
@@ -52,13 +53,17 @@ in the wrong place.
   table decides: Facebook, YouTube, LinkedIn, TikTok, X and Pinterest take them in the caption;
   Instagram and Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive
   choice, not a rule Instagram states (see CLAUDE.md).
-  "Prompt it Yourself" is written out in the comment text where it reads as a sentence; as a tag it
-  is just `#PIY`.
+  "Prompt it yourself!" is written out in the CAPTION where it reads as a sentence; as a tag it
+  is just `#PIY`. The comment carries no prose.
+- **On a SHORT the caption is the title line and the tags only** — Instagram, TikTok, Facebook
+  and YouTube, because their players draw it over his own burned-in subtitles (`captionOverlaysShort`).
+  The story still goes out in full on the text-first feeds, and the first comment is unchanged.
 - **Topic tags describe the video**, derived from its own transcript. If it's about trading it
   says `#Trading`. Never audience tags, never marketing, never `#AI` — there's a blocklist that
   enforces it whatever the model suggests.
-- **The comment rotates** so it isn't the same three lines forever, and roughly two in five quote
-  a real guest wish from `matewishkey.com/rss.xml` and link that episode.
+- **The comment is one variant — the link and the tags** (2026-09-22). The rotation, the episode
+  pool and the RSS reader are all still wired and none is reached: `episodeMixRatio` is 0 and
+  `firstComment.episode` is empty.
 - **`matewishkey.com/show` is load-bearing.** It's how we recognise our own comments. Any composed
   comment that loses it is refused rather than posted.
 
@@ -83,12 +88,12 @@ in the wrong place.
 | **Facebook** | yes | yes | Pages only, never personal timelines. ~60-day tokens |
 | **Instagram** | yes | **no** | Business account, media mandatory. **Nothing can be deleted or edited via API — every mistake is permanent.** Caption folds at ~125 chars |
 | **LinkedIn** | yes | yes | 3,000 chars, duplicate content 422s, links cut reach 40–50%. **His own profile posts natively** (2026-09-14) — that is where the followers are and the only place the voice is first person. The company page reposts it with his thought on top and the tracked CTA underneath; any other connected profile reposts **plain**, because words under a person's name have to be that person's. A thought on top is optional and always his |
-| **YouTube** | yes | yes | Vertical under 3 min becomes a Short; Shorts get no custom thumbnail. Private videos 403 on comments — unlisted is fine |
-| **A still picture** | — | — | Six take one: Facebook, Instagram, LinkedIn, Threads, X, Pinterest. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (LinkedIn 20, Facebook/Instagram/Threads 10, X 4, Pinterest 1) and `galleryFor()`, `galleryProblems()` and the config page read it; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
+| **YouTube** | yes | yes | Vertical under 3 min becomes a Short. **A Short DOES take a custom 16:9 thumbnail** (exercised 2026-09-22); what cannot be set is the vertical cover in the Shorts feed. Private videos 403 on comments — unlisted is fine |
+| **A still picture** | — | — | Six take one: Facebook, Instagram, LinkedIn, Threads, X, Pinterest. **YouTube cannot** — there is nothing a picture can be posted as. **TikTok is "not built"** — its API gained photo posts on 4 Aug 2026, this pipeline has never sent one, and mate declined building them (2026-08-26, closing #27), so this is a decision rather than a gap. `imageOk` on the platform table decides it, and the image aspect range is not the video one. **Several stills ride as ONE post** — `imageMax` caps it per platform (read the numbers out of `platforms.js`) and `galleryFor()` applies it; a set with a video in it collapses to the first item, because one video per post is the harder rule. Instagram forces a single aspect across a carousel, so the SET is padded to one ratio, not each file until it passes alone |
 | **Threads** | yes | yes | Same Meta auth as Instagram. 500 chars, 5-minute video. **Invisible to `analytics:posts`** — it can prove presence, never absence |
 | **TikTok** | **none at all** | **no** | No comments API, and a url is dead text there — in the caption, in a comment, and **in the bio**, which is tappable only on a Business account or past 1,000 followers. So a TikTok post carries no link and makes no claim about one (2026-09-14). Consent flags required per post. Its own daily cap. **Nothing can be deleted through the API** — `posts:unpublish` returns "TikTok does not support post deletion via API" (2026-08-21). Manual only, like Instagram |
 | **X** | yes, once switched on | yes | The 403s were `xCapabilities.inbox`, an account toggle defaulting to off — not the plan. **The link is in the tweet** (2026-08-24). It rode in a thread reply from 21 to 24 August; `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate set, so that CTA only ever reached existing followers, and the demotion it was dodging is not in the open-sourced ranker |
-| **Pinterest** | **none at all** | not exercised | Connected 2026-09-20. **Every pin needs a board**, and `connect:get-pinterest-boards` answers 405 while `GET /accounts/{id}/pinterest-boards` returns the list, so `post.js` uses the REST route. The CTA gets its **own slot** — `platformSpecificData.link` is the pin's destination, minted with medium `link`; a url in the description is plain text. Title is the first line of his words, 100 max. **2:3, 1:1 or 9:16 only**, so `landscapeOk: false`, and `imageMax` is **1** — a pin is never part of a gallery. Analytics return impressions, saves and clicks, but `analytics:posts` syncs only some of the live pins (repo issue #43), so count from `queue_item.result` |
+| **Pinterest** | **none at all** | not exercised | Connected 2026-09-20. **Every pin needs a board**, and `connect:get-pinterest-boards` answers 405 while `GET /accounts/{id}/pinterest-boards` returns the list, so `post.js` uses the REST route. The CTA gets its **own slot** — `platformSpecificData.link` is the pin's destination, minted with medium `link` unless the post names its own page with `--link`, which goes out unshortened; a url in the description is plain text. Title is the first line of his words, 100 max. **2:3, 1:1 or 9:16 only**, so `landscapeOk: false`, and `imageMax` is **1** — a pin is never part of a gallery. Analytics return impressions, saves and clicks, but `analytics:posts` syncs only some of the live pins (repo issue #43), so count from `queue_item.result` |
 
 ### The two worth getting right
 
@@ -118,8 +123,8 @@ link terms are user features measuring dwell time on one), and the reply had a c
 certain — `oon_retweet_reply_filter.rs` drops an out-of-network reply before the For You candidate
 set, so the CTA was only ever surfaced to existing followers. It stayed readable to anyone who
 opened the root tweet, and to nobody else. **Reversing it is one word in the platform table** plus the code
-git holds: `threadWithLink()` was kept three weeks "in case" and deleted on 2026-09-14 (`f8a2490`
-and earlier carry it). The note stays because the evidence for the change is an absence in a code
+git holds: `threadWithLink()` was kept three weeks "in case" and deleted on 2026-09-13
+(`50d94b1`; `f8a2490` and earlier carry it). The note stays because the evidence for the change is an absence in a code
 release, which is weaker than a presence.
 
 **`threadItems` replaces the top-level `content` for that platform.** The caption is published as
@@ -347,8 +352,8 @@ things would eventually disagree about what today already holds.
 `posts:list` has a pipeline post the instant it publishes, and for anything the QUEUE sent it is
 the whole universe. **It is not the whole universe full stop** — a live stream started on YouTube
 and a reel Restream posted never enter it, so `first-comment.js` also sweeps
-`analytics:posts --platform youtube` (~90 min behind). YouTube only, deliberately, with a test
-pinning it there; sweeping every platform is what the mirror removal was right to delete.
+`analytics:posts` (~90 min behind) — YouTube and Facebook, named one by one, with a test
+pinning both; sweeping every platform is what the mirror removal was right to delete.
 `analytics:posts` lags minutes behind on everything else and is otherwise only worth its numbers.
 
 Neither `/v1/analytics/posts` nor `/v1/analytics/daily` is a REST route — Zernio answers an unknown
