@@ -35,6 +35,43 @@ test('youtube is the only platform that takes a cover image', () => {
   assert.deepStrictEqual(set, ['youtube']);
 });
 
+/*
+ * THE LIBRARY BEING RIGHT IS NOT THE PUBLISHER CALLING IT.
+ *
+ * `cover.js` was exercised by hand on msRZswGIkCY before the wiring landed, so
+ * the REST call is proven — but no publish had run since, and a cover step
+ * nothing invokes prints nothing and looks exactly like a clip that did not
+ * need one. That is this repo's most repeated failure wearing its other face:
+ * five table fields shipped declared-and-never-read, and here the reader is
+ * what would be missing. Source-read, like the dashboard's SQL and mint()'s
+ * ordering, because the behaviour needs a live publish.
+ */
+test('run-queue actually calls the cover step, after the publish and inside a catch', () => {
+  const s = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+
+  assert.ok(s.includes("require('./lib/cover')"), 'run-queue must load the cover library');
+  const callAt = s.indexOf('cover.setYoutubeCover(');
+  assert.ok(callAt > 0, 'run-queue must actually push a cover — the library is not the feature');
+
+  // AFTER the publish: the video has to exist before a thumbnail can be set,
+  // and `outcome` is what proves the publish returned.
+  const outcomeAt = s.indexOf('for (const o of outcome)');
+  assert.ok(outcomeAt > 0 && outcomeAt < callAt, 'the cover goes on after the publish, not before');
+
+  // The offset comes off the table, never a literal here — MWK_COVER_MS has to
+  // move this without a deploy, and a second copy of 2000 would not notice.
+  assert.ok(s.includes('platforms.coverMsFor('), 'the offset must come from the table');
+  assert.ok(!/setYoutubeCover\(\{[^}]*ms:\s*\d/.test(s), 'the offset must not be a literal at the call');
+
+  // The post is already live: a failed cover is a journal line, never the
+  // item's verdict. Pin that the call sits inside its own try/catch.
+  const tryAt = s.lastIndexOf('try {', callAt);
+  const catchAt = s.indexOf('catch', callAt);
+  assert.ok(tryAt > outcomeAt, 'the cover needs its OWN try, not the publish\'s');
+  assert.ok(catchAt > callAt && s.slice(callAt, catchAt).length < 400,
+    'the catch has to be the one wrapping this call');
+});
+
 test('the two mechanisms do not overlap', () => {
   for (const p of Object.keys(platforms.PLATFORMS)) {
     const both = platforms.coverFor(p, 2000) && platforms.coverImageFor(p);
