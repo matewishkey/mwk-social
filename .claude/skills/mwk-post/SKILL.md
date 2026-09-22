@@ -173,8 +173,11 @@ the clip, `MWK_COVER_MS` to change it. Nothing to pass.
 
 - **Instagram, TikTok and Pinterest** take it. Their own defaults are 0 ms, 1,000 ms and 0 s, so
   before 2026-09-22 two of the three showed the literal first frame.
-- **YouTube takes an image, not a timestamp, and not on a Short at all.** Facebook, LinkedIn, X
-  and Threads document nothing. Do not offer him a cover on those.
+- **YouTube takes an image, not a timestamp — and it DOES work on a Short** (exercised
+  2026-09-22, against the docs). `run-queue` pushes the same frame after publishing. It sets the
+  16:9 thumbnail — search, the channel grid, embeds — and **not** the vertical cover inside the
+  Shorts feed, which is YouTube's own and has no API. Facebook, LinkedIn, X and Threads document
+  nothing at all.
 - **It cannot be fixed after publishing** on any of them. If a clip opens on an empty shot, the
   cover is decided before it goes out or not at all.
 - ⚠ A frame INDEX is not a time — "the tenth frame" is 167 ms at 60 fps and 333 ms at 30.

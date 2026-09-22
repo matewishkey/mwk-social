@@ -30,6 +30,7 @@ const pace = require('./lib/pace');
 const events = require('./lib/events');
 const health = require('./lib/health');
 const platforms = require('./lib/platforms');
+const cover = require('./lib/cover');
 const mediaLib = require('./lib/media');
 const { publish } = require('./post');
 const reshare = require('./lib/reshare');
@@ -350,6 +351,38 @@ async function main() {
             // first-comment watcher files a post under.
             postId: p.platformPostId || null,
             url: p.platformPostUrl || null, error: p.errorMessage || null });
+        }
+
+        /*
+         * YOUTUBE TAKES A PICTURE, NOT A TIMESTAMP, SO ITS COVER IS SET AFTER
+         * THE FACT.
+         *
+         * The other three carry the offset in the publish itself. YouTube has
+         * no such field, so the frame is cut, uploaded and pushed through
+         * update-metadata once the video exists — and it DOES land on a
+         * Short, which is the thing both Zernio's docs and this repo had
+         * wrong until it was exercised (lib/cover.js carries the measurement).
+         * It changes the 16:9 thumbnail; the vertical cover in the Shorts
+         * feed stays YouTube's.
+         *
+         * Caught on its own: the post is already live, so a cover that fails
+         * is a line in the journal, never the item's verdict.
+         */
+        const coverMs = platforms.coverMsFor((set[0] || {}).probe);
+        const coverFile = (set[0] || {}).file;
+        for (const o of outcome) {
+          const isVideo = !!((set[0] || {}).probe && !set[0].probe.isImage);
+          if (!cover.wantsCover(o, { isVideo, coverMs })) continue;
+          const yt = accts.find((x) => x.platform === 'youtube');
+          if (!yt) continue;
+          try {
+            await cover.setYoutubeCover({ file: coverFile, ms: coverMs,
+              videoId: o.postId, accountId: yt.id });
+            console.log(`cover  youtube ${o.postId} — frame at ${coverMs} ms `
+              + '(the 16:9 thumbnail; the Shorts feed keeps YouTube\'s own)');
+          } catch (err) {
+            console.log(`cover  youtube ${o.postId} — not set: ${err.message}`);
+          }
         }
       } catch (err) {
         console.error(`${accts.map((a) => a.platform).join('+')} failed: ${err.message}`);

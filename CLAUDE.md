@@ -471,8 +471,20 @@ had already published were jargon the rule rejects.
     against the file you uploaded** — YouTube re-encodes that URL to 1280x720, so a correct write is
     a different hash from a correct source. Compare against the BEFORE bytes. The tell that it had
     landed: yt-dlp reported `maxresdefault` as 1920x1080 while the CDN still handed back 720p.
-  - **Shorts cannot take one** — 14 of 28 videos. YouTube and Zernio agree; not write-tested,
-    because the only harmless test would be a visible change if it landed.
+  - ⚠ **"SHORTS CANNOT TAKE ONE" WAS WRONG, AND IT WAS WRONG BECAUSE NOBODY EVER TRIED**
+    (overturned 2026-09-22). YouTube's help and Zernio's own page both say custom thumbnails are
+    videos-only, and this line repeated them while admitting it was "not write-tested". It was
+    tested on `msRZswGIkCY`, a Short published that morning: `update-metadata` with a
+    `thumbnailUrl` changed the served `maxresdefault.jpg` from `c965c70f…` to `1769a116…`,
+    cache-busted, stable six minutes later, and the picture is the frame we sent.
+    - **What changes is the 16:9 thumbnail**: search, the channel's video grid, embeds,
+      suggested, every share card.
+    - **What does NOT change is the vertical cover in the Shorts feed.** Measured at the same
+      moment: the channel's Shorts shelf still serves YouTube's own pick (`oar2.jpg`, a frame
+      from ~10 s in). No API documents a way to set that one; it is the mobile app's *Edit
+      cover*. **Never flatten the two into "we can set the thumbnail".**
+    - `thumbnails.set`'s own reference page says nothing about Shorts at all — the exclusion is
+      a product rule stated in help pages, and the API did not enforce it here.
 - **THE CARD IS DRAWN IN THE WEBSITE REPO AND IS ALREADY ON THE SHARE — do not draw one here.**
   `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes
   `~/share/work/mer-matewishkey-web/cards/<slug>/youtube-1920x1080.jpg`: the upload size, inside
@@ -587,8 +599,13 @@ repeated failure in this repo.
     the clip that prompted this it is the empty field the complaint was about — measured: 0 and
     167 ms nobody in shot, 1,000 ms he has walked in, 2,000 ms steady, 10,000 ms the title card
     has gone. The default is **2,000 ms** for that reason and the setting is a duration.
-  - **A cover cannot be fixed after publishing.** Instagram and TikTok have no edit path, a pin
-    cannot be edited beyond its description, and a Short takes no thumbnail. Fix forward.
+  - **YouTube's cover is a PICTURE PUSHED AFTER THE FACT, and `run-queue` now does it** — the
+    frame at the same offset, cut, uploaded and set through `update-metadata` once the video
+    exists (`scripts/lib/cover.js`). Caught on its own: the post is already live, so a cover
+    that fails is a journal line and never the item's verdict.
+  - **A cover cannot be fixed after publishing on the other three.** Instagram and TikTok have
+    no edit path and a pin cannot be edited beyond its description — so there the frame is
+    decided before it goes out or not at all. YouTube is the one that can be fixed later.
 - **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X, Pinterest; **not YouTube**
   (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
   we have never built one, so it is "not built", not "impossible" — **and mate declined building
