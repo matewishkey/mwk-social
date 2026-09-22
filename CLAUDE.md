@@ -189,8 +189,24 @@ had already published were jargon the rule rejects.
     makes us skip that post, which is a comment added by hand rather than one Instagram cannot
     delete.
   - **A live code is never broken.** `mwkshow.com/dial` still resolves; it is simply not used
-    again. And nothing reaches what is already published — Pinterest cannot edit a pin's
-    destination, so the 2026-09-22 Dial pin still opens `/show`.
+    again.
+  - **A PUBLISHED POST WHOSE DESTINATION IS ONE OF OUR CODES IS STILL OURS TO REPOINT, AND THIS
+    FILE SAID THE OPPOSITE** (2026-09-22). It read *"nothing reaches what is already
+    published"* off a true fact about Pinterest — a live pin's destination cannot be edited by
+    any API. But the pin does not hold a destination, it holds `mwkshow.com/<code>`, and the
+    code is a row in our own D1 that `links.js` reads fresh on every hit with no caching. One
+    `UPDATE link SET target` moved the 2026-09-22 Dial pin onto the project page; the pin was
+    never touched. **So the reach of a voice or destination change is the SHORT CODE, not the
+    platform** — ask which codes a change should follow before concluding a post is frozen.
+    - **Only where the code's PURPOSE moved with it.** `1atde` is bound `post_key =
+      'queue:<item>'`, that pin alone, so repointing it is exactly as narrow as the pin. A code
+      several posts share is not repointed, it is superseded. And repointing changes `target`,
+      which is IN the mint key, so the next mint for the old destination makes a NEW code —
+      correct here, and the reason a code is bound by purpose rather than by where it points.
+    - **The comment is a separate decision from the slot, the same way it is at publish time.**
+      The Dial post's first-comment codes were left on `/show`: the comment's job is the show
+      invite, and only the pin's own destination was the thing pointing a Stream Deck plugin at
+      *Apply to be a guest*.
 
 - **A URL IS NOT CLICKABLE EVERYWHERE, and for three weeks this pipeline acted as though it was**
   (2026-08-22). Instagram makes NOTHING clickable — not a caption, not a comment, not a Reel.
