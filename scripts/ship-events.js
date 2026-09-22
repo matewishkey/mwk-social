@@ -32,19 +32,14 @@
  */
 'use strict';
 
-const net = require('net');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-// This box has no IPv6 route and both dashboard hostnames resolve AAAA-first,
-// so undici's default 250 ms Happy Eyeballs window expires before it falls back
-// to IPv4 and every request fails as ETIMEDOUT. Widening the window is the fix;
-// see docs/playbook.md, where the same thing bit the media downloads.
-net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
-
 const events = require('./lib/events');
 const health = require('./lib/health');
+const { endpoint, call } = require('./lib/dashboard');
+const { flags } = require('./lib/args');
 
 const HEARTBEAT_MS = 10 * 60 * 1000;   // under the dashboard's 15-min stale mark, on purpose
 const BATCH = 500;
@@ -64,16 +59,10 @@ function save(cursor) {
 }
 
 async function main() {
-  const argv = process.argv.slice(2);
-  const dryRun = argv.includes('--dry-run');
-  const all = argv.includes('--all');
-
-  const url = process.env.MWK_LOG_URL;
-  const token = process.env.MWK_LOG_TOKEN;
-  if (!url || !token) {
-    console.error('MWK_LOG_URL and MWK_LOG_TOKEN must be set (td-sops apps/mwk-social.enc.env)');
-    process.exit(2);
-  }
+  const { dryRun, all } = flags(process.argv.slice(2), {
+    '--dry-run': { key: 'dryRun' }, '--all': { key: 'all' },
+  });
+  const { url } = endpoint();
 
   const cursor = load(statePath(), { lastId: null, lastSentAt: null });
   const since = all ? null : cursor.lastId;
@@ -96,17 +85,13 @@ async function main() {
     return;
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
-  });
-  const text = await res.text();
-  if (!res.ok) {
+  let text;
+  try {
+    text = await call(url, body, { parse: false });
+  } catch (err) {
     // Cursor untouched on purpose. The next run re-sends, and the sink ignores
     // anything it already has.
-    console.error(`ingest returned ${res.status}: ${text.slice(0, 200)}`);
+    console.error(`ingest failed: ${err.message}`);
     process.exit(1);
   }
 

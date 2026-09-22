@@ -20,14 +20,11 @@
  */
 'use strict';
 
-const net = require('net');
 const os = require('os');
 
-// No IPv6 route on this box and the dashboard hostnames resolve AAAA-first, so
-// undici's 250 ms Happy Eyeballs window expires before it falls back to IPv4.
-net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
-
 const { cli } = require('./lib/api');
+const { endpoint, call } = require('./lib/dashboard');
+const { flags } = require('./lib/args');
 const health = require('./lib/health');
 const platforms = require('./lib/platforms');
 const pace = require('./lib/pace');
@@ -102,17 +99,13 @@ function voiceSnapshot() {
 }
 
 async function main() {
-  const argv = process.argv.slice(2);
-  const dryRun = argv.includes('--dry-run');
-  const days = Number(argv[argv.indexOf('--days') + 1]) || DEFAULT_DAYS;
-
-  const base = process.env.MWK_LOG_URL;
-  const token = process.env.MWK_LOG_TOKEN;
-  if (!base || !token) {
-    console.error('MWK_LOG_URL and MWK_LOG_TOKEN must be set (td-sops apps/mwk-social.enc.env)');
-    process.exit(2);
-  }
-  const origin = new URL(base).origin;
+  const opt = flags(process.argv.slice(2), {
+    '--dry-run': { key: 'dryRun' }, '--days': { key: 'days', value: true },
+  });
+  const { dryRun } = opt;
+  const days = opt.days === null ? DEFAULT_DAYS : Number(opt.days);
+  if (!Number.isInteger(days) || days < 1) throw new Error(`--days wants a whole number of days, got ${opt.days}`);
+  const { origin } = endpoint();
 
   const [rows, folk] = await Promise.all([daily(days), followers()]);
   const snapshots = {
@@ -128,17 +121,7 @@ async function main() {
     return;
   }
 
-  const post = async (path_, body) => {
-    const res = await fetch(`${origin}${path_}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(30000),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`${path_} → ${res.status}: ${text.slice(0, 200)}`);
-    return text;
-  };
+  const post = (route, body) => call(route, body, { parse: false });
 
   const m = await post('/metrics', { daily: rows, followers: folk });
   const s = await post('/events', { source: os.hostname(), events: [], snapshots });

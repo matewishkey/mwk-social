@@ -19,12 +19,9 @@
  */
 'use strict';
 
-const net = require('net');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-
-net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const pace = require('./lib/pace');
 const events = require('./lib/events');
@@ -40,24 +37,8 @@ const cacheDir = () => process.env.MWK_MEDIA_CACHE ||
   path.join(process.env.XDG_STATE_HOME || path.join(os.homedir(), '.local', 'state'),
     'mwk-social', 'media');
 
-function endpoint() {
-  const url = process.env.MWK_LOG_URL;
-  const token = process.env.MWK_LOG_TOKEN;
-  if (!url || !token) throw new Error('MWK_LOG_URL and MWK_LOG_TOKEN must be set (td-sops apps/mwk-social.enc.env)');
-  return { origin: new URL(url).origin, token };
-}
-
-async function call(path_, body, { origin, token }) {
-  const res = await fetch(`${origin}${path_}`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(30000),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`${path_} → ${res.status}: ${text.slice(0, 200)}`);
-  return JSON.parse(text);
-}
+const { endpoint, call } = require('./lib/dashboard');
+const { flags, usageFromHeader } = require('./lib/args');
 
 /*
  * Pull the queued media down to disk. Through curl rather than fetch, for the
@@ -152,12 +133,7 @@ function verdict(outcome) {
   };
 }
 
-/** The header comment, verbatim — it is the usage text and the only copy of it. */
-function usage() {
-  const src = fs.readFileSync(__filename, 'utf8');
-  const header = src.slice(src.indexOf('/*'), src.indexOf('*/'));
-  return header.replace(/^\/\*\n?/, '').replace(/^ ?\* ?/gm, '').trimEnd();
-}
+const usage = () => usageFromHeader(__filename);
 
 /*
  * STRICT, BECAUSE THIS IS THE ONE SCRIPT THAT PUBLISHES. It used to read its
@@ -166,19 +142,20 @@ function usage() {
  * 2026-08-27 `--help` claimed a queued item and posted it to Instagram, Threads
  * and X while somebody was looking up the flag list (#37). Instagram and TikTok
  * cannot be deleted through the API, so a wrong publish there is permanent.
- * queue-add.js and post.js refuse one too; yt-description, ship-events and
- * ship-stats still read their flags with bare argv.includes().
+ * The refusal lives in lib/args.js now, so every job reads its flags the same
+ * way; the usage text is appended here because this is the script where a
+ * wrong guess costs the most.
  */
-const FLAGS = { '--dry-run': 'dryRun', '--scheduled': 'scheduled', '--now': 'ignorePace', '--help': 'help', '-h': 'help' };
+const FLAGS = {
+  '--dry-run': { key: 'dryRun' }, '--scheduled': { key: 'scheduled' }, '--now': { key: 'ignorePace' },
+  '--help': { key: 'help' }, '-h': { key: 'help' },
+};
 function parseArgs(argv) {
-  const opts = { dryRun: false, scheduled: false, ignorePace: false, help: false };
-  for (const a of argv) {
-    if (!(a in FLAGS)) {
-      throw new Error(`unknown argument: ${a}\n\n${usage()}`);
-    }
-    opts[FLAGS[a]] = true;
+  try {
+    return flags(argv, FLAGS);
+  } catch (err) {
+    throw new Error(`${err.message}\n\n${usage()}`);
   }
-  return opts;
 }
 
 async function main() {
@@ -195,7 +172,7 @@ async function main() {
     if (why) { if (!scheduled) console.log(`not this run — ${why}`); return; }
   }
 
-  const claimed = await call('/queue/claim', {}, api);
+  const claimed = await call('/queue/claim', {});
   if (!claimed.item) { if (!scheduled) console.log('nothing queued'); return; }
   const item = claimed.item;
   console.log(`claimed ${item.id} — ${item.body.replace(/\s+/g, ' ').slice(0, 60)}`);
@@ -292,7 +269,7 @@ async function main() {
       }
       // 'released', not 'queued': a dry run is not an attempt, and three of
       // them used to mark the item failed.
-      await call('/queue/result', { id: item.id, status: 'released', note: 'dry run' }, api);
+      await call('/queue/result', { id: item.id, status: 'released', note: 'dry run' });
       return;
     }
 
@@ -397,7 +374,7 @@ async function main() {
     }
     const call_ = verdict(outcome);
     anyLive = call_.anyLive;
-    await call('/queue/result', { id: item.id, ...call_.result }, api);
+    await call('/queue/result', { id: item.id, ...call_.result });
 
     /*
      * "No first comment" has to mean it, past the first hour.
@@ -503,7 +480,7 @@ async function main() {
         postId: r.postId || null, url: r.url || null, zernioId: r.id || null, error: null,
       }));
       if (reposts.length) {
-        await call('/queue/result', { id: item.id, ...call_.result, result: [...outcome, ...reposts] }, api)
+        await call('/queue/result', { id: item.id, ...call_.result, result: [...outcome, ...reposts] })
           .catch((err) => console.error(`could not record the reposts on the item (the reposts themselves are fine): ${err.message}`));
       }
     }
@@ -523,7 +500,7 @@ async function main() {
     // and Instagram the second copy cannot be deleted afterwards.
     await call('/queue/result', anyLive
       ? { id: item.id, status: 'posted', note: `stopped after publishing: ${err.message}`.slice(0, 200) }
-      : { id: item.id, status: 'queued', note: err.message.slice(0, 200) }, api)
+      : { id: item.id, status: 'queued', note: err.message.slice(0, 200) })
       .catch(() => {});
     events.emit('queue.failed', { message: err.message, level: 'error',
       dedupeKey: `queue.failed|${item.id}|${Date.now()}`, data: { queueId: item.id } });

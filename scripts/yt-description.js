@@ -33,10 +33,10 @@ const { execFileSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const net = require('net');
-net.setDefaultAutoSelectFamilyAttemptTimeout(1000);
 
 const { api, cli } = require('./lib/api');
+const { call } = require('./lib/dashboard');
+const { flags } = require('./lib/args');
 const { topicsFor } = require('./lib/topic-tags');
 const voice = require('./lib/voice');
 const shortlink = require('./lib/shortlink');
@@ -248,30 +248,11 @@ async function build(id) {
 /** Has the show blurb been chosen, or is it still my paraphrase? */
 const blurbChosen = () => !/PENDING/.test((voice.config().youtubeDescription || {})._showBlurb || '');
 
-function dashboard() {
-  const base = process.env.MWK_LOG_URL;
-  const token = process.env.MWK_LOG_TOKEN;
-  if (!base || !token) throw new Error('MWK_LOG_URL and MWK_LOG_TOKEN must be set (td-sops apps/mwk-social.enc.env)');
-  const origin = new URL(base).origin;
-  return async (path_, body) => {
-    const res = await fetch(`${origin}${path_}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(body || {}),
-      signal: AbortSignal.timeout(30000),
-    });
-    const text = await res.text();
-    if (!res.ok) throw new Error(`${path_} → ${res.status}: ${text.slice(0, 200)}`);
-    return JSON.parse(text);
-  };
-}
-
 const setDescription = async (id, description) =>
   api('POST', '/posts/_/update-metadata',
     { body: { platform: 'youtube', videoId: id, accountId: await account(), description } });
 
 async function sync({ dryRun = false, limit = 50 } = {}) {
-  const call = dashboard();
 
   // Anything approved since last time goes out first — he has already decided,
   // and making him wait a cycle for a decision he made is just rude.
@@ -481,7 +462,6 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
  * replacing them is his call, on the dashboard, like everything else.
  */
 async function repropose(ids) {
-  const call = dashboard();
   const proposals = [];
   for (const id of ids) {
     try {
@@ -500,13 +480,14 @@ async function repropose(ids) {
 }
 
 async function main() {
-  const argv = process.argv.slice(2);
-  const apply = argv.includes('--apply');
-  const emptyOnly = argv.includes('--empty-only');
-  const restore = argv.includes('--restore');
-  if (argv.includes('--sync')) return sync({ dryRun: argv.includes('--dry-run') });
-  let ids = argv.filter((a) => !a.startsWith('--'));
-  if (argv.includes('--repropose')) {
+  const opt = flags(process.argv.slice(2), {
+    '--apply': { key: 'apply' }, '--empty-only': { key: 'emptyOnly' }, '--restore': { key: 'restore' },
+    '--sync': { key: 'sync' }, '--dry-run': { key: 'dryRun' }, '--repropose': { key: 'repropose' },
+  }, { positional: true });
+  const { apply, emptyOnly, restore } = opt;
+  if (opt.sync) return sync({ dryRun: opt.dryRun });
+  let ids = opt._;
+  if (opt.repropose) {
     if (!ids.length) throw new Error('--repropose needs at least one video id');
     return repropose(ids);
   }

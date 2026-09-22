@@ -357,12 +357,7 @@ function overlayLine(file, wanted) {
     + 'the first comment is unchanged';
 }
 
-/** The usage block at the top of this file, so there is one copy of it. */
-function usage() {
-  const src = fs.readFileSync(__filename, 'utf8');
-  const header = src.slice(src.indexOf('/*'), src.indexOf('*/'));
-  return header.replace(/^\/\*\n?/, '').replace(/^ ?\* ?/gm, '').trimEnd();
-}
+const usage = () => require('./lib/args').usageFromHeader(__filename);
 
 function main() {
   const opt = parse(process.argv.slice(2));

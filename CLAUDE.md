@@ -636,10 +636,11 @@ table, on no page, and read by nothing without anything looking wrong.
 - **THE ONE SCRIPT THAT PUBLISHES WAS THE ONE THAT DID NOT CHECK ITS FLAGS** (#37). `run-queue.js`
   read them with `includes()`, so `--help` claimed an item and posted it to three platforms while
   somebody looked up the flag list — and Instagram and TikTok cannot be deleted, so that class of
-  slip is permanent. **Four scripts refuse an unknown argument now; `yt-description.js`,
-  `ship-events.js` and `ship-stats.js` still swallow a typo silently.** ⚠ The verification
-  command recorded here was itself wrong once and returned a clean absence — the list is
-  `grep -ln 'unknown argument\|unknown option' scripts/*.js`.
+  slip is permanent. **Every script refuses one now** (2026-09-22): the four with positionals
+  keep their own parser, the rest go through `scripts/lib/args.js`, and `test/args.test.js`
+  runs each job with `--bogus` and fails if it gets past the flag — so a new `main()` without a
+  refusal fails the suite, not a Tuesday. ⚠ A grep was the verification here once and returned
+  a clean absence; the test is the list.
 - **A dry run hands its item back as `released`, not `queued`** — `queued` counts as an attempt,
   and three dry runs used to mark a good item failed.
 - **`--no-first-comment` used to hold for about an hour** — post.js sent none, then the watcher

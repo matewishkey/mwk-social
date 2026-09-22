@@ -23,8 +23,10 @@
  */
 'use strict';
 
-const { execFileSync } = require('child_process');
-const { api } = require('./lib/api');
+// `cli` under its old local name: the CLI wrapper lived here as a second copy
+// of lib/api's, minus the non-JSON guard and minus MWK_ZERNIO_CLI, so a shim
+// that drove every other job could not drive this one.
+const { api, cli: zernio } = require('./lib/api');
 const voice = require('./lib/voice');
 const platformTable = require('./lib/platforms');
 // One implementation, shared with queue-add.js: the thing that QUEUES a post
@@ -37,8 +39,6 @@ const commentState = require('./lib/comment-state');
 const fs = require('fs');
 const path = require('path');
 
-const REPO = path.join(__dirname, '..');
-const CLI = path.join(REPO, 'node_modules', '.bin', 'zernio');
 
 /*
  * Platforms whose platformSpecificData accepts firstComment (docs.zernio.com
@@ -93,24 +93,6 @@ function usage() {
   console.log('               [--title TEXT] [--topics a,b,c] [--comment-variant N]');
   console.log('               [--no-first-comment] [--draft] [--schedule ISO]');
   console.log('               [--no-wait] [--dry-run]');
-}
-
-function zernio(args) {
-  let out;
-  try {
-    // stderr is piped, not inherited: the CLI echoes its JSON error bodies there
-    // and they would otherwise litter the journal alongside our own log lines.
-    out = execFileSync(CLI, args,
-      // Four minutes, matching the REST publish timeout: the CLI talks to
-      // Zernio and a hung call must not outlive the job that made it.
-      { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'], timeout: 240000 });
-  } catch (err) {
-    out = (err.stdout || '').toString();
-    if (!out.trim()) throw new Error(`zernio ${args[0]} failed: ${err.message}`);
-  }
-  const json = JSON.parse(out);
-  if (json && json.error) throw new Error(`zernio ${args[0]}: ${json.message || 'error'}`);
-  return json;
 }
 
 function resolveAccounts(opts) {
