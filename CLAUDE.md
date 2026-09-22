@@ -83,6 +83,24 @@ this file loads every session whether it is relevant or not.
     blurb says "we build it". Mate, 2026-08-24: *"For sure keeping we here is great."* That "we" is
     him and the guest. **Do not raise it again** — it reads like a fresh finding every time
     somebody re-reads the brand page.
+- **NOBODY IS ASKED TO COME. THE SITE IS MENTIONED, AND THAT IS ALL** (mate, 2026-09-22:
+  *"i changed come to the show to apply... i want a more unique flavour instead of the beg to
+  come... we keep using mwkshow.com but stop using the beg to come, just mention the site,
+  that's it"*). He renamed `/show` to **Apply to be a guest** and the CTA follows the site.
+  - **What went**: *"Bring me something you wish your computer did"* (the tail on every YouTube
+    description), *"come to the show"*, *"Bring me yours"*, *"Yours could be next"*.
+  - **What a variant is now**: a true statement, then the site. *"Nobody who has been on the
+    show had written a line of code before."* *"Guests apply, and I pick every one myself."*
+    **Applying is not begging** — it is selective, which is the flavour he was after, and it is
+    the site's own word.
+  - **`plain[0]` is untouched**: the brand's three lines are the argument, not a plea.
+  - **The link did not move.** `mwkshow.com` stays, `markers[]` is unchanged, so the duplicate
+    guard still recognises every comment written before today — the phrasing was never what it
+    matched on.
+  - **The tail change reaches the back catalogue by itself.** The old blurb went to
+    `showBlurbPast` (five entries now), so `findBlurb()` still recognises what is on the channel
+    and the nightly sync takes the SWAP path: one line replaced on each video, his approved
+    openings untouched.
 - **SHORT IS THE HOUSE STYLE** (mate, 2026-08-24: *"Keep the text simple short and concise, so we
   will not do AI issues"*). The description went 819 characters to 347. His reasoning: length is
   what reads as machine-written, so a long correct paragraph loses to a short one.

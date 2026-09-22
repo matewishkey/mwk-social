@@ -40,6 +40,12 @@ never a paraphrase — read it off the live page rather than typing it from memo
 - **The pair is the full form**: *Why let others solve your problems with AI?* then *Prompt it
   yourself!* Use both where the caption has not already asked the question. Where the clip asks
   it out loud, the answer alone is right and repeating it is padding.
+- **DO NOT ASK ANYONE TO COME** (mate, 2026-09-22). He renamed `/show` to *Apply to be a
+  guest* and killed the begging register: *"stop using the beg to come, just mention the site,
+  that's it"*. **Prompt it yourself!** still ends a caption — that is the argument, not a plea —
+  but *"come to the show"*, *"bring me yours"* and *"yours could be next"* are gone. A line
+  states something true and then names the site. Applying is the site's own frame and is the
+  opposite of begging: he picks every guest.
 - **"Invite" is not "teach", and the brand page bans the second one outright** (*"Never position
   him as the expert, the teacher"*). The post says the thing is doable and where to come; it does
   not run a lesson. The goal is *"to create curiosity, not to prove that somebody became a

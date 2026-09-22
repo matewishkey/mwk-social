@@ -202,27 +202,28 @@
     },
     "_profileCtaBy": "Per-platform overrides of profileCta, for a surface where \"my bio\" is the wrong words. YouTube is the one so far: a url in a SHORT's description or comment is plain text, deliberately, to cut spam — but the CHANNEL's own links stay clickable and are YouTube's documented route out of a Short. Every value here MUST also be in markers[] above, exactly like profileCta, or the duplicate guard stops recognising a comment we wrote and the watcher comments again on every one of them for ever.",
     "_profileCta": "What {show} becomes on a platform where a url in a post or a comment is PLAIN TEXT but the BIO is live — Instagram alone since 2026-09-14, when TikTok moved to linkPlacement 'none': its bio link is plain text too on a personal account under 1,000 followers, so a TikTok post now says nothing about a link at all. Printing a tracked short code there burns a code nobody can click and reads in the numbers as 'posted, no interest' rather than 'never reachable': five TikTok codes took zero human clicks between them. This string MUST also appear in markers[] above, or the duplicate guard stops recognising these comments and the watcher re-comments on every one, for ever.",
-    "_register": "Plain, correct English. Capitals, apostrophes and full stops as normal. This REVERSED an earlier decision to write informally on purpose — lowercase openings, dropped commas, 'dont' — which mate called on 2026-08-24: it read as careless rather than relaxed, and a comment under a video is the show's shop window. Warmth comes from the ROTATION and from what the sentences say, not from dropped punctuation. Still hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker.",
+    "_register": "Plain, correct English. Capitals, apostrophes and full stops as normal. This REVERSED an earlier decision to write informally on purpose — lowercase openings, dropped commas, 'dont' — which mate called on 2026-08-24: it read as careless rather than relaxed, and a comment under a video is the show's shop window. Warmth comes from the ROTATION and from what the sentences say, not from dropped punctuation. Still hand-written, never mangled at runtime, so every possible output has been read by a human. Never alter the URL and never break the marker. NOBODY IS ASKED TO COME (mate, 2026-09-22): he renamed /show to \"Apply to be a guest\" and said to drop the begging flavour — keep mwkshow.com, \"stop using the beg to come, just mention the site, that's it\". A variant now STATES something true and names the site. \"Bring me yours\", \"come to the show\" and \"yours could be next\" are gone. Applying is the site's own frame and is the opposite of begging: he picks every guest himself.",
     "plain": [
       "Why let others solve your problems with AI?\nPrompt it yourself!\n\n{show}",
-      "One wish is one show. Bring me something you wish your computer did.\n\n{show}",
+      "An unscripted show. A guest brings wishes, and we try them live on their own computer.\n\n{show}",
       "Something you wish your computer did. That's the whole show.\n\n{show}",
       "Don't let someone else prompt it for you. Build it yourself.\n\n{show}",
-      "No experience needed. Your own problem and your own computer is the whole list.\n\n{show}",
+      "Nobody who has been on the show had written a line of code before.\n\n{show}",
       "You keep what we build, and you can change it without me.\n\n{show}",
       "Your problem, your computer, built while we talk.\n\n{show}",
-      "If you need help taking the first few steps, come to the show.\n\n{show}",
+      "Guests apply, and I pick every one myself.\n\n{show}",
       "Every episode is online, start to finish: {episodes}\n\n{show}"
     ],
     "episode": [
-      "\"{wish}\"\n\nThat's what someone brought to the show. {episodeTitle}. Yours could be next.\n\n{show}",
-      "Someone turned up and said: \"{wish}\"\n\nWe built it, unedited: {episodeUrl}\n\nWhat's yours? {show}",
-      "The last one on the show wished for this: \"{wish}\"\n\n{episodeTitle}: {episodeUrl}\n\nBring me yours: {show}"
+      "\"{wish}\"\n\nThat's what someone brought to the show. {episodeTitle}.\n\n{show}",
+      "Someone turned up and said: \"{wish}\"\n\nWe built it, unedited: {episodeUrl}\n\n{show}",
+      "The last one on the show wished for this: \"{wish}\"\n\n{episodeTitle}: {episodeUrl}\n\n{show}"
     ]
   },
   "youtubeDescription": {
-    "showBlurb": "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way.\n\nBring me something you wish your computer did: {show}",
+    "showBlurb": "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is an unscripted vibe-coding show. A guest brings wishes. We try them live on their computer and see how far we get.\n\nApply to be a guest: {show}",
     "showBlurbPast": [
+      "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way.\n\nBring me something you wish your computer did: {show}",
       "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way.\n\nBring me something you wish your computer did: {show}\n\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey",
       "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way.\n\nSomeone turns up with a real problem out of their own work, or an idea they have never tested, and we build it on their own computer while we talk. About three to four hours. You can bring up to three wishes, and you do not have to choose which one first. The mistakes and wrong turns stay in.\n\nNo terminal and no experience needed. A problem you actually have and your own computer is the whole list. You keep what we build, and you can change it afterwards without me.\n\nBring me something you wish your computer did: {show}\n\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey",
       "Why let others solve your problems with AI? Prompt it yourself.\n\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way. Someone turns up with a real problem out of their own work, or an idea they have never tested, and we build it on their own computer while we talk. Three to four hours, up to three wishes, and the mistakes and wrong turns stay in.\n\nNo terminal and no experience needed. A problem you actually have and your own computer is the whole list. You keep what we build, and you can change it afterwards without me.\n\nBring me something you wish your computer did: {show}\n\nLive on https://youtube.com/@matewishkey and https://twitch.tv/matewishkey",

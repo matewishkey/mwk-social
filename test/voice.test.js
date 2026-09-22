@@ -468,7 +468,15 @@ test('a description carrying a retired blurb is still recognised as ours', () =>
     const swapped = doc.replace(found, voice.showBlurb('https://mwkshow.com/abcde'));
     assert.ok(swapped.startsWith('An opening a model wrote.'), 'the opening was rebuilt');
     assert.ok(swapped.includes('#MWKShow #PIY #Invoicing'), 'the tags were disturbed');
-    assert.ok(swapped.includes('curious people taking their first steps'),
+    /*
+     * TODAY'S BLURB, not a copy of its words. This asserted the phrase
+     * "curious people taking their first steps" and went red on 2026-09-22
+     * when the blurb was rewritten — the change was correct and the test was
+     * a transcript of the old prose, which is the dangerous direction: the
+     * obvious reading is that the edit broke something. The invariant is that
+     * the swap lands whatever showBlurb() currently says.
+     */
+    assert.ok(swapped.includes(voice.showBlurb('https://mwkshow.com/abcde')),
       "today's wording did not land");
   }
 });
