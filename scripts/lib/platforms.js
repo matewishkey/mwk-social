@@ -22,6 +22,41 @@
  */
 
 /*
+ * `coverFrame` — WHICH FRAME THE PLATFORM SHOWS BEFORE ANYBODY PRESSES PLAY.
+ *
+ * Mate, 2026-09-22: "the key frames are incorrect". They were, and not
+ * because anything failed: we never sent a cover, so every platform used its
+ * own default, and the defaults are documented and different.
+ *   Instagram  thumbOffset defaults to 0 — the very first frame.
+ *   TikTok     video_cover_timestamp_ms defaults to 1000.
+ *   Pinterest  coverImageKeyFrameTime defaults to 0.
+ * On a clip that opens on an empty shot, frame 0 is a picture of nothing.
+ *
+ * Each entry says where the field goes and what unit it is in, because the
+ * three disagree on both: TikTok's lives in the top-level `tiktokSettings`
+ * and counts milliseconds, Instagram's is `platformSpecificData.thumbOffset`
+ * in milliseconds, Pinterest's is `platformSpecificData.coverImageKeyFrameTime`
+ * in SECONDS. Sending seconds where milliseconds are expected is a cover
+ * 1,000x further into the clip than intended, which on a 38-second video is
+ * silently the last frame.
+ *
+ * Read off docs.zernio.com/platforms/{tiktok,instagram,pinterest} on
+ * 2026-09-22. NOT on this table for the others, and each absence is a
+ * different thing:
+ *   youtube    takes a custom IMAGE on the media item, never a timestamp —
+ *              and "custom thumbnails work on videos only, not Shorts", which
+ *              is Zernio's own line and YouTube's rule. Everything vertical
+ *              this pipeline sends is a Short, so there is nothing to set.
+ *   facebook   no cover field documented at all.
+ *   linkedin   no cover field documented at all.
+ *   twitter    Zernio has no X platform page for it; nothing documented.
+ *   threads    nothing documented.
+ * `imageUrl` names the field that OVERRIDES the timestamp with a picture,
+ * which nothing here sends yet — it is recorded so the next person does not
+ * have to re-read the docs to find out whether it exists.
+ */
+
+/*
  * `captionOverlaysShort` — THE CAPTION IS DRAWN OVER HIS OWN SUBTITLES.
  *
  * Mate, 2026-09-22: "the text what you are sending is overlaying my captions,
@@ -55,6 +90,10 @@ const PLATFORMS = {
   instagram: {
     landscapeOk: false,           // aspectRange rejects it outright — reels are vertical
     captionOverlaysShort: true,   // a single video is a Reel; the caption sits on it
+    // Default 0 — the FIRST frame, which is why Instagram's covers were the
+    // worst of the three.
+    coverFrame: { field: 'thumbOffset', where: 'platformSpecificData', unit: 'ms',
+      imageUrl: 'instagramThumbnail' },
     commentsApi: true,             // inbox:* works; the watcher can reach it
     reshare: 'none',
     metrics: { views:'yes', reach:'yes', impressions:'yes', likes:'yes', comments:'yes',
@@ -116,6 +155,10 @@ const PLATFORMS = {
     imageMax: 0,             // imageOk is false — no still at all, so no gallery either
     landscapeOk: false,           // a vertical surface by definition
     captionOverlaysShort: true,   // the caption is drawn on the video; there is no other player
+    // Lives in tiktokSettings at the TOP LEVEL, not platformSpecificData —
+    // the same trap the six consent flags carry. Default 1000.
+    coverFrame: { field: 'video_cover_timestamp_ms', where: 'tiktokSettings', unit: 'ms',
+      imageUrl: 'video_cover_image_url' },
     commentsApi: false,            // no comments API at all — a first comment is impossible
     reshare: 'none',
     metrics: { views:'yes', reach:'no', impressions:'no', likes:'yes', comments:'partial',
@@ -222,6 +265,9 @@ const PLATFORMS = {
     imageOk: true,
     imageMax: 1,             // one image or one video per pin, no carousel
     landscapeOk: false,      // 2:3, 1:1 or 9:16 — the wide cut has no shape here
+    // SECONDS here, where the other two count milliseconds. Default 0.
+    coverFrame: { field: 'coverImageKeyFrameTime', where: 'platformSpecificData',
+      unit: 's', imageUrl: 'coverImageUrl' },
     commentsApi: false,      // Pinterest exposes no comments and no DMs
     reshare: 'none',
     metrics: { views:'no', reach:'no', impressions:'yes', likes:'no', comments:'no',
@@ -481,6 +527,73 @@ function linkDeadFor(name, probe) {
 }
 
 /*
+ * HOW FAR INTO THE CLIP THE COVER SITS, in milliseconds, for every platform
+ * that takes one.
+ *
+ * 2,000 ms, and it is a measurement rather than a taste. On the clip that
+ * prompted this (2026-09-22, 37.7 s at 60 fps) the frames read: 0 ms and
+ * 167 ms — the title card up and an EMPTY FIELD, nobody in shot; 1,000 ms —
+ * he has walked in, title still up; 2,000 ms — in shot, title up, steady.
+ * By 10,000 ms the title card is gone. So the window that works is roughly
+ * one to four seconds, and 2,000 sits in the middle of it.
+ *
+ * ⚠ "THE TENTH FRAME" DOES NOT DO WHAT IT SOUNDS LIKE. He asked for frame 10
+ * to keep it simple; at 60 fps that is 167 ms, which on this clip is the
+ * empty field — the exact picture the complaint was about. A frame index is
+ * not a time: the same index is 167 ms at 60 fps and 333 ms at 30. This is
+ * why the setting is a duration.
+ *
+ * MWK_COVER_MS overrides it with no deploy. An unparseable value falls back
+ * rather than throwing — a typo in an env var must not stop a publish.
+ */
+const COVER_MS = 2000;
+
+/**
+ * The cover offset for THIS clip, clamped to something inside it.
+ *
+ * A clip shorter than the offset would otherwise ask for a frame past the
+ * end, and what a platform does with that is undocumented on all three. Half
+ * way in is always inside.
+ *
+ * @param {object|null} probe the media probe, or null when there is none.
+ * @returns {number|null} milliseconds, or null when there is no video to
+ *   take a frame from.
+ */
+function coverMsFor(probe) {
+  if (!probe || probe.isImage || !Number.isFinite(probe.durationSec)) return null;
+  const asked = Number(process.env.MWK_COVER_MS);
+  const want = Number.isFinite(asked) && asked >= 0 ? asked : COVER_MS;
+  const durationMs = probe.durationSec * 1000;
+  return want < durationMs ? want : Math.round(durationMs / 2);
+}
+
+/**
+ * The cover-frame field this platform wants, ready to spread into a request.
+ *
+ * Returns the destination as well as the value, because the three platforms
+ * that take one disagree about both: TikTok's goes in the top-level
+ * `tiktokSettings`, the other two in the entry's `platformSpecificData`, and
+ * Pinterest counts SECONDS where the others count milliseconds. The caller
+ * passes ONE number in milliseconds and this converts it, so a unit mistake
+ * cannot be made at a call site.
+ *
+ * @param {string} name
+ * @param {number} ms how far into the clip the cover frame sits.
+ * @returns {{where: string, fields: object}|null} null when the platform
+ *   documents no cover field — which is most of them.
+ */
+function coverFor(name, ms) {
+  if (!Number.isFinite(ms) || ms < 0) return null;
+  let cf;
+  try { cf = get(name).coverFrame; } catch { return null; }
+  if (!cf) return null;
+  // Pinterest takes seconds. Rounded, not floored: 1500 ms is nearer 2 s than
+  // 1, and the difference is a frame nobody can see.
+  const value = cf.unit === 's' ? Math.round(ms / 1000) : Math.round(ms);
+  return { where: cf.where, fields: { [cf.field]: value } };
+}
+
+/*
  * Will this platform draw the caption OVER the video for this clip?
  *
  * Then the caption is his title line and the hashtags, and nothing else — the
@@ -600,5 +713,6 @@ function commentProblems() {
 }
 
 module.exports = { PLATFORMS, get, known, flowFor, flows, commentWatched, linkIsLive,
-  isShort, linkDeadFor, captionOverlaysShortFor, linkProblems, galleryFor, galleryProblems,
-  commentProblems, SLOT };
+  isShort, linkDeadFor, captionOverlaysShortFor, coverFor, coverMsFor, COVER_MS,
+  linkProblems, galleryFor,
+  galleryProblems, commentProblems, SLOT };

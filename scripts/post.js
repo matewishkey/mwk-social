@@ -326,11 +326,28 @@ const tagsInCaption = (platform) => {
  * default is the CTA short link. Never fatal — with no dashboard to mint
  * against, the plain sign-up url goes out instead.
  */
+/*
+ * A LINK SLOT WANTS A URL, AND A CUSTOM COMMENT IS PROSE — THIS RETURNED THE
+ * PROSE AND KILLED A PIN (2026-09-22).
+ *
+ * `if (opts.comment) return trackLinks(opts.comment)` ignored `medium`
+ * entirely, so with --comment set every caller got the whole comment body
+ * back. Both callers are link SLOTS: Pinterest's `link`, the destination a tap
+ * opens, and X's caption link. Pinterest was handed "Everything it does:
+ * https://mwkshow.com/dial\nInstall it: ...\n\nPrompt it yourself!" as its
+ * destination url and answered `Invalid URL or request data` — its docs say
+ * exactly that when the url is not one. The pin never went live.
+ *
+ * It had been unreachable until today because no post had ever combined a
+ * custom comment with Pinterest or X. The comment path never came through
+ * here at all: commentFor() composes its own, with trackLinks, and always did.
+ * So the branch could only ever corrupt a slot, never serve one — it is gone
+ * rather than narrowed.
+ */
 async function linkFor(platform, opts, medium) {
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
   const where = { platform, postKey, clipId: opts.clipId || null,
     campaign: opts.campaign || 'clip', medium };
-  if (opts.comment) return shortlink.trackLinks(opts.comment, where);
   return (await shortlink.mint({ ...where, label: opts.title || null }))
     || voice.config().links.show;
 }
@@ -458,6 +475,9 @@ async function publish(opts) {
   // Before resolveMedia, which uploads and hands back urls: the probe wants
   // the local file.
   const compose = { ...opts, probe: probeFor(opts) };
+  // The caller's number wins; a hand-run publish works it out from the clip,
+  // so the cover is not something only the queue remembers to set.
+  if (!Number.isFinite(opts.coverMs)) opts.coverMs = platformTable.coverMsFor(compose.probe);
   const media = resolveMedia(opts.media);
 
   /*
@@ -490,6 +510,8 @@ async function publish(opts) {
     groups.get(c.caption).push(c.account);
   }
 
+  const video = media.some((m) => m.type === 'video');
+
   const bodies = [];
   for (const [caption, accts] of groups) {
     const b = { content: caption };
@@ -507,10 +529,26 @@ async function publish(opts) {
       }
       const pin = await pinFields(a, opts);
       if (pin) entry.platformSpecificData = { ...(entry.platformSpecificData || {}), ...pin };
+      /*
+       * THE COVER FRAME. Only where the platform documents one, and never on
+       * a still — a picture has no frame to pick, and thumbOffset on an image
+       * post is a field the platform has no use for.
+       */
+      const cover = video ? platformTable.coverFor(a.platform, opts.coverMs) : null;
+      if (cover && cover.where === 'platformSpecificData') {
+        entry.platformSpecificData = { ...(entry.platformSpecificData || {}), ...cover.fields };
+      }
       b.platforms.push(entry);
     }
     const tt = accts.find((a) => a.platform === 'tiktok');
-    if (tt) b.tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, media.some((m) => m.type === 'video'));
+    if (tt) {
+      b.tiktokSettings = tiktokSettings(tt.id, opts.tiktokPrivacy, video);
+      // TikTok's cover is the one that does NOT live on the entry: its
+      // settings object sits at the top level of the request, the same trap
+      // the six consent flags carry.
+      const ttCover = video ? platformTable.coverFor('tiktok', opts.coverMs) : null;
+      if (ttCover) b.tiktokSettings = { ...b.tiktokSettings, ...ttCover.fields };
+    }
     bodies.push(b);
   }
 
@@ -528,6 +566,12 @@ async function publish(opts) {
   const inCaption = accounts.filter((a) => linkInCaption(a.platform));
   if (inCaption.length) {
     console.log(`note: ${inCaption.map((a) => a.platform).join(', ')} cannot be commented on — the link goes in the caption`);
+  }
+  const covered = video
+    ? accounts.filter((a) => platformTable.coverFor(a.platform, opts.coverMs)) : [];
+  if (covered.length) {
+    console.log(`note: cover frame at ${opts.coverMs} ms on `
+      + `${covered.map((a) => a.platform).join(', ')} — nowhere else documents one`);
   }
   const overlaid = accounts.filter((a) => platformTable.captionOverlaysShortFor(a.platform, compose.probe));
   if (overlaid.length) {

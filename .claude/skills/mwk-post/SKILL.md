@@ -166,6 +166,19 @@ Pad with the screenshot's own background colour — never crop.
 A vertical and a landscape cut are two posts, or one
 item with `--media-wide`.
 
+## 3b. The cover frame is automatic, and only three platforms have one
+
+`run-queue.js` sends a cover offset with every clip — **2,000 ms** by default, clamped to inside
+the clip, `MWK_COVER_MS` to change it. Nothing to pass.
+
+- **Instagram, TikTok and Pinterest** take it. Their own defaults are 0 ms, 1,000 ms and 0 s, so
+  before 2026-09-22 two of the three showed the literal first frame.
+- **YouTube takes an image, not a timestamp, and not on a Short at all.** Facebook, LinkedIn, X
+  and Threads document nothing. Do not offer him a cover on those.
+- **It cannot be fixed after publishing** on any of them. If a clip opens on an empty shot, the
+  cover is decided before it goes out or not at all.
+- ⚠ A frame INDEX is not a time — "the tenth frame" is 167 ms at 60 fps and 333 ms at 30.
+
 ## 4. Queue it
 
 ```sh

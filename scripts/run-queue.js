@@ -326,6 +326,12 @@ async function main() {
           // all of them — it is what decides whether the caption is his title
           // line (a short) or all of his words (anything else).
           probe: (set[0] || {}).probe || null,
+          // WHICH FRAME THE PLATFORMS SHOW BEFORE ANYBODY PRESSES PLAY.
+          // Every platform that takes one has its own default and they are
+          // all wrong for a clip that opens on an empty shot — Instagram's
+          // is frame zero. One number here, converted per platform by
+          // platforms.coverFor(), clamped to inside this clip.
+          coverMs: platforms.coverMsFor((set[0] || {}).probe),
           accounts: accts.map((a) => a.id),
           all: false,
           media: set.map((m) => m.file),

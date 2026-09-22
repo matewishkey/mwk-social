@@ -566,6 +566,29 @@ repeated failure in this repo.
     2026-09-21 mistake exactly.
   - **So the body is written title-first**: line one stands alone as the whole caption on four
     platforms, and the story goes underneath.
+- **`coverFrame` — WE NEVER SENT A COVER, SO EVERY PLATFORM USED ITS OWN DEFAULT AND THEY
+  DISAGREE** (mate, 2026-09-22: *"the key frames are incorrect"*). Nothing had failed. Instagram's
+  `thumbOffset` defaults to **0** — the literal first frame — TikTok's `video_cover_timestamp_ms`
+  to **1000**, Pinterest's `coverImageKeyFrameTime` to **0**. On a clip that opens on an empty
+  shot, frame 0 is a picture of nothing. `platforms.coverMsFor(probe)` gives one number in
+  milliseconds and `coverFor(name, ms)` converts it per platform; `MWK_COVER_MS` moves it with no
+  deploy and a typo in it falls back rather than throwing.
+  - **Three platforms take a timestamp and they disagree about everything.** TikTok's field is in
+    the **top-level `tiktokSettings`** (the consent-flag trap again), Instagram's and Pinterest's
+    in `platformSpecificData` — and **Pinterest counts SECONDS** where the other two count
+    milliseconds. Each also has an image override (`video_cover_image_url`, `instagramThumbnail`
+    /`reelCover`, `coverImageUrl`) which nothing sends yet. Read off the Zernio platform pages
+    2026-09-22.
+  - **YouTube takes an image and never a timestamp, and NOT ON A SHORT** — Zernio's page says
+    *"custom thumbnails work on videos only, not Shorts"*, which is YouTube's rule, not theirs.
+    Everything vertical this pipeline sends is a Short, so there is nothing to set. Facebook,
+    LinkedIn, X and Threads document no cover field at all.
+  - ⚠ **"THE TENTH FRAME" IS NOT A TIME.** At 60 fps it is 167 ms and at 30 fps 333 ms, and on
+    the clip that prompted this it is the empty field the complaint was about — measured: 0 and
+    167 ms nobody in shot, 1,000 ms he has walked in, 2,000 ms steady, 10,000 ms the title card
+    has gone. The default is **2,000 ms** for that reason and the setting is a duration.
+  - **A cover cannot be fixed after publishing.** Instagram and TikTok have no edit path, a pin
+    cannot be edited beyond its description, and a Short takes no thumbnail. Fix forward.
 - **`imageOk`** says who can take a still at all — FB, IG, LinkedIn, Threads, X, Pinterest; **not YouTube**
   (nothing to post it *as*) and **not TikTok** (photo posts exist in its API since 4 Aug 2026 and
   we have never built one, so it is "not built", not "impossible" — **and mate declined building
@@ -973,6 +996,17 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
   Retention and the monetization icon are Studio-only and no API exposes them.
 
 ## Traps that cost a session
+
+- **A LINK SLOT WANTS A URL, AND `linkFor()` HANDED IT THE WHOLE CUSTOM COMMENT** (2026-09-22,
+  the first Dial Countdown pin). `if (opts.comment) return trackLinks(opts.comment)` ignored the
+  `medium` argument, so with `--comment` set Pinterest's `link` — the destination a tap opens —
+  was the string *"Everything it does: https://mwkshow.com/dial\nInstall it: ...\n\nPrompt it
+  yourself!"*. Pinterest answered **`Invalid URL or request data`**, which its docs give for
+  exactly this, and the pin never went live. X's caption link had the same hole and was spared
+  only because that post was too long for X. **Both callers are link SLOTS** — the comment path
+  composes its own through `commentFor()` and never came through there — so the branch was
+  deleted rather than narrowed. It had been unreachable until a post first combined a custom
+  comment with Pinterest.
 
 - **A TEST WITH A FIXED FIXTURE AND A RELATIVE WINDOW PASSES UNTIL A DATE, THEN LIES**
   (2026-09-21). `test/dashboard.test.js` asserted the stats page still calls all-time and
