@@ -430,9 +430,13 @@ async function main() {
        * publisher wrote it down under this post's key, because nothing here can
        * look a queue item up from a published post.
        */
+      // Only a link to HIM: voice.firstComment refuses a comment carrying no
+      // marker, and the guard could never recognise one again. A vendor page
+      // rides in the pin and the caption; the comment keeps the show.
       const itemLink = commentState.linkFor(state, target.key);
+      const ourLink = itemLink && voice.carriesCta(itemLink) ? itemLink : null;
       const linkUrl = (override || !live) ? null
-        : (itemLink || await shortlink.mint({
+        : (ourLink || await shortlink.mint({
           platform: target.platform, postKey: target.key, label: target.url || null,
           campaign: 'clip', medium: 'comment',
         }));

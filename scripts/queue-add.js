@@ -409,6 +409,9 @@ function main() {
     if (dryLine) console.log(`-- ${dryLine}`);
     if (shortLine) console.log(`-- ${shortLine}`);
     console.log(`-- points at ${opt.link || `${voice.config().links.show} (the show)`}`);
+    if (opt.link && !voice.carriesCta(opt.link)) {
+      console.log('-- the first comment keeps the show — that host is not one of ours');
+    }
     console.log('-- --dry-run: nothing written, nothing uploaded');
     return;
   }
@@ -430,6 +433,9 @@ function main() {
   // Where a tap lands, on the line he already reads — the pin that pointed at
   // the show was correct code and the wrong destination, and nothing said so.
   console.log(`  points at ${opt.link || `${voice.config().links.show} (the show)`}`);
+  if (opt.link && !voice.carriesCta(opt.link)) {
+    console.log('  the first comment keeps the show — that host is not one of ours');
+  }
   console.log('https://social.matewishkey.com/queue');
 }
 

@@ -112,8 +112,8 @@ test('the link slot hands back the item\'s own destination, unminted', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
   assert.match(src, /async function linkFor\(platform, opts, medium\) \{\n\s*if \(opts\.link\) return opts\.link;/,
     'the early return is the rule — anything below it mints');
-  assert.match(src, /opts\.link \|\| await shortlink\.mint\(/,
-    'and the first comment uses the same destination as the slots');
+  assert.match(src, /commentLink\(opts\.link\) \|\| await shortlink\.mint\(/,
+    'the comment uses the same destination, filtered to links that are his');
 });
 
 test('run-queue carries the destination from the row to the publish', () => {
@@ -197,6 +197,40 @@ test('both writer and reader are wired, not just declared', () => {
   assert.match(rq, /commentState\.recordLinks\(/, 'the publisher must write it down');
   const fc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
   assert.match(fc, /commentState\.linkFor\(state, target\.key\)/, 'the watcher must read it');
-  assert.match(fc, /itemLink \|\| await shortlink\.mint\(/,
+  assert.match(fc, /ourLink \|\| await shortlink\.mint\(/,
     'and it must take precedence over minting, or the show comes back');
+});
+
+/*
+ * A DESTINATION THAT IS NOT HIS STILL GETS THE SHOW IN THE COMMENT, AND THE
+ * WHOLE POST USED TO DIE INSTEAD (found in review 2026-09-22).
+ *
+ * `voice.firstComment()` refuses a comment carrying none of `markers[]` — the
+ * duplicate guard could never recognise it again — and `commentFor()` is
+ * called OUTSIDE post.js's per-account catch. So a `--link` at a vendor's page
+ * threw and took the entire publish group with it: nothing went out.
+ */
+test('a vendor page is refused as a comment, which is why it must not reach one', () => {
+  assert.throws(() => voice.firstComment('facebook:1', { platform: 'facebook', noTags: true,
+    linkUrl: ELGATO, linkLive: true }), /markers/,
+  'this is the throw the guard below exists to keep away from a publish');
+});
+
+test('the comment keeps the show when the destination is not his', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
+  assert.match(src, /const commentLink = \(link\) => \(link && voice\.carriesCta\(link\) \? link : null\);/);
+  assert.match(src, /commentLink\(opts\.link\) \|\| await shortlink\.mint\(/);
+
+  const fc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  assert.match(fc, /itemLink && voice\.carriesCta\(itemLink\) \? itemLink : null/,
+    'the watcher needs the same guard — it composes through the same function');
+
+  // The slots do NOT have this guard, on purpose: a pin may point anywhere.
+  assert.match(src, /async function linkFor\(platform, opts, medium\) \{\n\s*if \(opts\.link\) return opts\.link;/);
+});
+
+test('queue-add says so, rather than leaving it to be noticed at publish time', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'queue-add.js'), 'utf8');
+  const notes = src.match(/the first comment keeps the show/g) || [];
+  assert.equal(notes.length, 2, 'on the queued line AND the dry run — the 2026-09-21 lesson');
 });

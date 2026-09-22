@@ -179,6 +179,23 @@ function resolveMedia(items) {
  * LinkedIn, YouTube and Threads a single shared code — so a click told us which
  * link earned it but not which channel.
  */
+/*
+ * A DESTINATION THAT IS NOT OURS STILL GETS THE SHOW IN THE COMMENT, AND THIS
+ * IS WHY THE WHOLE POST DOES NOT DIE (found in review 2026-09-22).
+ *
+ * `voice.firstComment()` refuses to compose a comment carrying none of
+ * `markers[]` — the duplicate guard could never recognise it again. So a
+ * `--link` at a vendor's page (Elgato's marketplace, say) threw here, and
+ * `commentFor` is called OUTSIDE the per-account catch: the throw took the
+ * whole publish group with it, so nothing went out at all.
+ *
+ * `carriesCta()` is the right test and it is already the one definition of
+ * "a link to him". The pin and the caption still point wherever he said; the
+ * comment keeps the show, which is its job — a route back to HIM, not to
+ * whoever is hosting the thing.
+ */
+const commentLink = (link) => (link && voice.carriesCta(link) ? link : null);
+
 async function commentFor(platform, text, opts) {
   const postKey = opts.postKey || `new:${voice.hash(text)}`;
 
@@ -207,7 +224,9 @@ async function commentFor(platform, text, opts) {
   // TikTok `live` is false and neither url can be followed, so the profile
   // phrase still stands in — an unclickable project page is no better than an
   // unclickable show page.
-  const linkUrl = live ? (opts.link || await shortlink.mint({ ...where, label: opts.title || null })) : null;
+  const linkUrl = live
+    ? (commentLink(opts.link) || await shortlink.mint({ ...where, label: opts.title || null }))
+    : null;
 
   /*
    * `avoidIndex` was wired on the watcher's path and nowhere else, so a queued
