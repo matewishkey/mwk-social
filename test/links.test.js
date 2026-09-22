@@ -787,3 +787,50 @@ s.listen(0, '127.0.0.1', () => fs.writeFileSync(${JSON.stringify(portFile)}, Str
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/*
+ * A LINK SLOT WANTS A URL, AND A CUSTOM COMMENT IS PROSE.
+ *
+ * 2026-09-22, the first Dial Countdown pin. linkFor() read `if (opts.comment)
+ * return trackLinks(opts.comment)` and ignored its `medium` argument, so with
+ * --comment set every caller got the comment BODY back. Both callers are link
+ * slots: Pinterest's `link`, the destination a tap opens, and X's caption
+ * link. Pinterest was handed
+ *
+ *   "Everything it does: https://mwkshow.com/dial\nInstall it: ...\n\nPrompt it yourself!"
+ *
+ * as its destination and answered `Invalid URL or request data`, which its own
+ * docs give for exactly that. The pin never went live.
+ *
+ * It was unreachable until that post, because no earlier one had combined a
+ * custom comment with Pinterest or X. X's caption had the same hole and was
+ * spared only because those words were too long for X.
+ *
+ * X is what this drives, because captionForPlatform is the exported way in.
+ * With no ingest credentials mint() returns null and the slot falls back to
+ * the plain sign-up url — which is still a URL, and the assertion is that it
+ * is never the comment's prose.
+ */
+test('a custom comment never lands in a link slot', async () => {
+  const { captionForPlatform } = require('../scripts/post.js');
+  const voice = require('../scripts/lib/voice');
+
+  const was = [process.env.MWK_LOG_URL, process.env.MWK_LOG_TOKEN];
+  delete process.env.MWK_LOG_URL;            // no minting: the fallback path
+  delete process.env.MWK_LOG_TOKEN;
+  try {
+    const comment = 'Everything it does: https://mwkshow.com/dial\n'
+      + 'Install it: https://mwkshow.com/elgato\n\nPrompt it yourself!';
+    const caption = await captionForPlatform('twitter',
+      { text: 'Short words.', topics: [], comment, probe: null });
+
+    assert.ok(!caption.includes('Everything it does'),
+      'the comment body was pasted into the caption where a url belongs');
+    assert.ok(!caption.includes('Install it:'), 'and the rest of it with it');
+    assert.ok(caption.includes(voice.config().links.show),
+      'the slot lost its url as well as gaining prose');
+  } finally {
+    if (was[0] !== undefined) process.env.MWK_LOG_URL = was[0];
+    if (was[1] !== undefined) process.env.MWK_LOG_TOKEN = was[1];
+  }
+});
