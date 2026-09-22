@@ -5,6 +5,64 @@ const voice = require('../scripts/lib/voice');
 
 const KEYS = Array.from({ length: 20 }, (_, i) => `instagram:1814681423553${String(i).padStart(4, '0')}`);
 
+/*
+ * THE VARIANTS THE MACHINERY TESTS RUN AGAINST, as a fixture rather than
+ * whatever config/voice.json happens to say today.
+ *
+ * It said nine prose variants and three episode ones this morning. By the
+ * afternoon it said `{show}` and nothing else — mate, 2026-09-22: "we do not
+ * have to ask a question, just the link... I do not want to push folks". Ten
+ * tests went red, and not one of them was about the thing that changed: they
+ * were rotation, pinning and the give-up order, all still in voice.js and all
+ * still having to work the day a second variant comes back.
+ *
+ * So the CONTENT lives in config/voice.json and is asserted once, below, for
+ * what it now is. The BEHAVIOUR is exercised here against a config that
+ * cannot be edited out from under it.
+ */
+const FIXTURE = {
+  plain: [
+    'Why let others solve your problems with AI?\nPrompt it yourself!\n\n{show}',
+    'Something you wish your computer did. That is the whole show.\n\n{show}',
+    'You keep what we build, and you can change it without me.\n\n{show}',
+    'Your problem, your computer, built while we talk.\n\n{show}',
+    'Nobody who has been on the show had written a line of code before.\n\n{show}',
+    'Every episode is online, start to finish: {episodes}\n\n{show}',
+  ],
+  episode: [
+    '"{wish}"\n\nThat is what someone brought to the show. {episodeTitle}.\n\n{show}',
+    'Someone turned up and said: "{wish}"\n\nWe built it, unedited: {episodeUrl}\n\n{show}',
+  ],
+  episodeMixRatio: 0.4,
+};
+
+/** A config file with the fixture variants in it, plus any override. */
+function richConfig(extra = {}) {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const cfg = JSON.parse(JSON.stringify(voice.config()));
+  Object.assign(cfg.firstComment, JSON.parse(JSON.stringify(FIXTURE)));
+  const mut = extra(cfg) ?? cfg;
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'voice-rich-')), 'voice.json');
+  fs.writeFileSync(file, JSON.stringify(mut));
+  return file;
+}
+
+/*
+ * Run an expression against that config, in a child process — MWK_VOICE_CONFIG
+ * is read once at require time, so there is no way to do it in-process.
+ */
+function inConfig(configPath, fnSource) {
+  const { execFileSync } = require('node:child_process');
+  const out = execFileSync(process.execPath, ['-e',
+    'const v=require(process.env.V);process.stdout.write(JSON.stringify((' + fnSource + ')(v)))'],
+  { env: { ...process.env, MWK_VOICE_CONFIG: configPath, V: require.resolve('../scripts/lib/voice') },
+    stdio: 'pipe', encoding: 'utf8' });
+  return JSON.parse(out);
+}
+
+
 test('every rendered comment keeps the marker intact', () => {
   for (const k of KEYS) {
     const { text } = voice.firstComment(k, { platform: 'instagram', topicTags: ['Debugging'] });
@@ -28,17 +86,35 @@ test('the same post always renders the same comment', () => {
 });
 
 test('consecutive posts do not repeat a variant', () => {
-  let last = -1;
-  for (const k of KEYS) {
-    const r = voice.firstComment(k, { platform: 'instagram', noEpisode: true, avoidIndex: last });
-    assert.notStrictEqual(r.index, last);
-    last = r.index;
-  }
+  const file = richConfig(() => {});
+  const indexes = inConfig(file, `(v) => ${JSON.stringify(KEYS)}.reduce((acc, k) => {
+    const r = v.firstComment(k, { platform: 'instagram', noEpisode: true, avoidIndex: acc.last });
+    acc.pairs.push([acc.last, r.index]); acc.last = r.index; return acc;
+  }, { last: -1, pairs: [] }).pairs`);
+  for (const [last, got] of indexes) assert.notStrictEqual(got, last);
 });
 
 test('the rotation actually varies', () => {
-  const seen = new Set(KEYS.map((k) => voice.firstComment(k, { platform: 'instagram', noEpisode: true }).text));
-  assert.ok(seen.size >= 4, `only ${seen.size} distinct comments across 20 posts`);
+  const file = richConfig(() => {});
+  const seen = inConfig(file, `(v) => [...new Set(${JSON.stringify(KEYS)}
+    .map((k) => v.firstComment(k, { platform: 'instagram', noEpisode: true }).text))].length`);
+  assert.ok(seen >= 4, `only ${seen} distinct comments across 20 posts`);
+});
+
+/*
+ * And the live config, which is the other half: one variant, no question, no
+ * ask. Asserted on the RENDERED comment rather than on the file, because what
+ * he objected to was what goes under the post.
+ */
+test('the comment is the link and nothing else', () => {
+  const text = voice.firstComment('instagram:1', { platform: 'facebook', noTags: true,
+    showUrl: 'https://mwkshow.com/xxxxx', linkLive: true }).text;
+  assert.strictEqual(text, 'https://mwkshow.com/xxxxx',
+    'the comment grew prose again — mate, 2026-09-22: just the link');
+  assert.strictEqual(voice.config().firstComment.plain.length, 1,
+    'a second variant is a content decision and needs his word');
+  assert.strictEqual((voice.config().firstComment.episode || []).length, 0,
+    'the episode variants quoted a wish and asked for yours; that is the pushing he stopped');
 });
 
 test('instagram never exceeds five hashtags', () => {
@@ -83,13 +159,14 @@ test('a config without the marker is refused', () => {
 });
 
 test('a pinned variant beats the rotation, on every platform and every key', () => {
-  const pinned = new Set(['a', 'b', 'c'].flatMap((k) => ['instagram', 'facebook', 'youtube']
-    .map((p) => voice.firstComment(k, { platform: p, variantIndex: 0 }).text)));
-  assert.strictEqual(pinned.size, 1, 'pinning still varied the comment');
-  // Against the config, not against a copy of the prose. Hard-coding variant 0's
-  // opening here meant every wording change broke a test about PINNING.
-  const first = voice.config().firstComment.plain[0].split('\n')[0];
-  assert.ok([...pinned][0].startsWith(first), `pinned variant 0 did not render "${first}"`);
+  const file = richConfig(() => {});
+  const out = inConfig(file, `(v) => {
+    const texts = ['a','b','c'].flatMap((k) => ['instagram','facebook','youtube']
+      .map((p) => v.firstComment(k, { platform: p, variantIndex: 0 }).text));
+    return { texts: [...new Set(texts)], first: v.config().firstComment.plain[0].split('\\n')[0] };
+  }`);
+  assert.strictEqual(out.texts.length, 1, 'pinning still varied the comment');
+  assert.ok(out.texts[0].startsWith(out.first), `pinned variant 0 did not render "${out.first}"`);
 });
 
 test('pinning a variant that does not exist is refused', () => {
@@ -534,22 +611,27 @@ test('a retired blurb swaps out without touching the video\'s own words', () => 
  * 2026-08-22. The test is now any url in any form.
  */
 test('the archive line renders its address, and only where a link works', () => {
+  const file = richConfig(() => {});
   const cfg = voice.config();
-  const idx = cfg.firstComment.plain.findIndex((v) => v.includes('{episodes}'));
-  assert.ok(idx >= 0, 'no variant asks for {episodes} — this would pass vacuously');
+  const idx = FIXTURE.plain.findIndex((v) => v.includes('{episodes}'));
+  assert.ok(idx >= 0, 'the fixture has no {episodes} variant — this would pass vacuously');
 
-  const live = voice.firstComment('k', { platform: 'facebook', variantIndex: idx }).text;
-  assert.ok(live.includes(cfg.links.episodes), 'the archive address did not render');
+  const rendered = inConfig(file,
+    `(v) => v.firstComment('k', { platform: 'facebook', variantIndex: ${idx} }).text`);
+  assert.ok(rendered.includes(cfg.links.episodes), 'the archive address did not render');
 
-  // Where urls are dead the whole variant leaves the pool, so no key can draw it.
-  for (const platform of ['instagram', 'tiktok']) {
-    for (const key of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']) {
-      const t = voice.firstComment(key, { platform, linkLive: false }).text;
-      assert.ok(!t.includes(cfg.links.episodes),
-        `${platform} drew a comment carrying a url nobody can click: ${t}`);
-      assert.ok(!/https?:\/\//.test(t.replace(voice.tagLine(platform, []), '')),
-        `${platform} drew a comment with a url in it: ${t}`);
-    }
+  // Where urls are dead the whole variant leaves the pool, so no key can draw
+  // it. This one holds for the LIVE config too and is the more important half:
+  // a code spent where nobody can click it reads as indifference.
+  const dead = inConfig(file, `(v) => ['instagram','tiktok'].flatMap((platform) =>
+    ['a','b','c','d','e','f','g','h','i','j'].map((key) =>
+      [platform, v.firstComment(key, { platform, linkLive: false }).text,
+       v.tagLine(platform, [])]))`);
+  for (const [platform, t, tags] of dead) {
+    assert.ok(!t.includes(cfg.links.episodes),
+      `${platform} drew a comment carrying a url nobody can click: ${t}`);
+    assert.ok(!/https?:\/\//.test(t.replace(tags, '')),
+      `${platform} drew a comment with a url in it: ${t}`);
   }
 });
 
@@ -557,10 +639,9 @@ test('a variant asking for {episodes} with no address configured is refused', ()
   const fs = require('node:fs');
   const os = require('node:os');
   const path = require('node:path');
-  const cfg = JSON.parse(JSON.stringify(voice.config()));
-  delete cfg.links.episodes;
-  const bad = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'voice-')), 'voice.json');
-  fs.writeFileSync(bad, JSON.stringify(cfg));
+  // The fixture, because the guard only fires when a variant ASKS for the
+  // address and the live config no longer has one.
+  const bad = richConfig((cfg) => { delete cfg.links.episodes; });
   const { execFileSync } = require('child_process');
   assert.throws(() => execFileSync(process.execPath, ['-e', 'require(process.env.V).config()'],
     { env: { ...process.env, MWK_VOICE_CONFIG: bad, V: require.resolve('../scripts/lib/voice') },
@@ -774,9 +855,12 @@ test('the publish path consults and records the last variant, like the watcher d
  * An explicitly pinned variant is a decision, and the nudge must not overrule
  * it — otherwise `--comment-variant 2` could silently publish variant 3.
  */
-test('a pinned variant ignores avoidIndex', async () => {
-  const voice = require('../scripts/lib/voice');
-  const pinned = await voice.firstComment('rotation:pin', { platform: 'facebook', variantIndex: 1, avoidIndex: 1 });
+test('a pinned variant ignores avoidIndex', () => {
+  // Against the fixture: pinning index 1 needs a second variant to exist, and
+  // the live config has one variant by decision.
+  const file = richConfig(() => {});
+  const pinned = inConfig(file,
+    "(v) => v.firstComment('rotation:pin', { platform: 'facebook', variantIndex: 1, avoidIndex: 1 })");
   assert.strictEqual(pinned.index, 1, 'the pinned index must survive a colliding avoidIndex');
 });
 
@@ -907,6 +991,9 @@ const capFixture = (wish, extra = {}) => {
     `</item></channel></rss>`);
   const cfg = JSON.parse(JSON.stringify(voice.config()));
   cfg.feed = `file://${feed}`;
+  // The fixture's variants, not the live ones: the live comment is a bare link
+  // since 2026-09-22 and there is no quote left to give up.
+  Object.assign(cfg.firstComment, JSON.parse(JSON.stringify(FIXTURE)));
   cfg.firstComment.episodeMixRatio = 1;          // force the quote path
   Object.assign(cfg.firstComment, extra);
   const file = path.join(dir, 'voice.json');

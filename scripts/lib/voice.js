@@ -184,7 +184,15 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   // Pinning names a line out of the plain list, so it also rules out an episode
   // variant: a human picked that exact wording and must get it, not a quote.
   const pinned = Number.isInteger(variantIndex);
-  const episodes = (noEpisode || pinned) ? [] : latestEpisodes();
+  /*
+   * DO NOT CURL THE FEED FOR A COMMENT NOBODY WILL QUOTE. Since 2026-09-22 the
+   * comment is the link and nothing else, so the episode pool is empty and the
+   * mix ratio is 0 — without this guard every comment still fetched the RSS to
+   * pick a wish it would then discard. The path stays; it is simply not
+   * reached until a variant wants it again.
+   */
+  const wantsAny = (fc.episodeMixRatio ?? 0) > 0 && (fc.episode || []).length > 0;
+  const episodes = (noEpisode || pinned || !wantsAny) ? [] : latestEpisodes();
   const wantEpisode = episodes.length > 0 &&
     (hash(key, 'mix') % 1000) / 1000 < (fc.episodeMixRatio ?? 0);
 

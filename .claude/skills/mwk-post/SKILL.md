@@ -46,6 +46,10 @@ never a paraphrase — read it off the live page rather than typing it from memo
   but *"come to the show"*, *"bring me yours"* and *"yours could be next"* are gone. A line
   states something true and then names the site. Applying is the site's own frame and is the
   opposite of begging: he picks every guest.
+- **THE FIRST COMMENT IS JUST THE LINK** (mate, 2026-09-22: *"we do not have to ask a question
+  just the link... if they do not want to come i do not care"*). The url and the topic tags,
+  one variant, no rotation to think about. Do not write him comment options — there is nothing
+  to choose. The CAPTION is where his voice goes, and it still ends on the line.
 - **"Invite" is not "teach", and the brand page bans the second one outright** (*"Never position
   him as the expert, the teacher"*). The post says the thing is doable and where to come; it does
   not run a lesson. The goal is *"to create curiosity, not to prove that somebody became a

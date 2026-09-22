@@ -177,6 +177,10 @@ test('the first comment is unchanged on a short', () => {
   const before = voice.firstComment('queue:test', args);
   const after = voice.firstComment('queue:test', args);
   assert.equal(after.text, before.text);
-  assert.ok(before.text.length > TITLE.length,
-    'the CTA still carries the full comment, which is where his words now live');
+  // Not a length comparison any more: since 2026-09-22 the comment is the link
+  // and the tags, so it is SHORTER than the title it sits under. What has to
+  // hold is that the caption rule did not reach it — the CTA is still there.
+  assert.ok(before.text.includes('link in my bio'),
+    'the CTA went missing from the comment the caption rule is not allowed to touch');
+  assert.ok(/#MWKShow/.test(before.text), 'and the tags with it');
 });

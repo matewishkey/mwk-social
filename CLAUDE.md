@@ -101,6 +101,26 @@ this file loads every session whether it is relevant or not.
     `showBlurbPast` (five entries now), so `findBlurb()` still recognises what is on the channel
     and the nightly sync takes the SWAP path: one line replaced on each video, his approved
     openings untouched.
+- **AND THEN: JUST THE LINK** (mate, 2026-09-22, an hour after the above: *"we do not have to
+  ask a question just the link... we do not overcomplicate it... if they do not want to come i
+  do not care, i do not want to push folks to come, only if they care"*). The first comment is
+  the url and the topic tags. Nothing else.
+  - **One variant on purpose.** `firstComment.plain` is `["{show}"]` and `episode` is empty.
+    The rotation, `avoidIndex`, the episode pool and the feed reader all still work and all
+    have nothing to choose between — a second variant is a content decision and needs his word.
+  - **Nothing curls the RSS for a comment any more.** `latestEpisodes()` was still fetched on
+    every composition to pick a wish that would then be discarded; it is skipped when the ratio
+    is 0 or the pool is empty.
+  - **The CAPTION is untouched.** It still ends on *Prompt it yourself!* — that is his own
+    writing and the brand's argument, not a plea. This is about the comment underneath.
+  - ⚠ **The YouTube tail keeps ONE line, and not for taste.** `findBlurb()` locates our tail by
+    the constant words either side of the slot, so a tail that is only `{show}` has no halves
+    to match — nothing on the channel would be recognised as ours again and all 23 videos would
+    take the REBUILD path. The line states what the show is and asks for nothing.
+  - **Ten tests went red and none was about the change.** They were rotation, pinning and the
+    give-up order, reading the LIVE config for their variants. They run against a fixture now:
+    content lives in `voice.json` and is asserted once for what it is, behaviour is exercised
+    against a config that cannot be edited out from under it.
 - **SHORT IS THE HOUSE STYLE** (mate, 2026-08-24: *"Keep the text simple short and concise, so we
   will not do AI issues"*). The description went 819 characters to 347. His reasoning: length is
   what reads as machine-written, so a long correct paragraph loses to a short one.
