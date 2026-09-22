@@ -242,9 +242,10 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   decided now or not at all. 2:3, 1:1 or 9:16 only. No comment, no watcher.
 - **Never say the watcher will pick up TikTok or X. It cannot.** `platforms.commentWatched()` is the
   one definition of what it covers: Instagram, Threads, Facebook, YouTube, LinkedIn.
-- Tags go in the caption **or** the comment, never both. **The 5-cap is Instagram's; "caption and
-  comments count together" is NOT** — that claim traces to marketing blogs and was retracted
-  2026-08-24. The behaviour stays because never spending the budget twice is free.
+- Tags go in the caption **or** the comment, never both — that is the behaviour, and it holds.
+  **The 5-cap is Instagram's; "caption and comments count together" is NOT** (retracted
+  2026-08-24). Why, and what else went with it, is argued once in `docs/playbook.md`
+  → *What each platform allows* → *The two worth getting right* — do not restate it here.
 - **Every code minted carries the queue item id**, so a click answers "which platform, which
   placement, which video" on `/links`. Nothing to do by hand; `run-queue.js` passes it down.
 - **A LinkedIn post is three surfaces and two codes** (since 2026-09-14): **his own profile

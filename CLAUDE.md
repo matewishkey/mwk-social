@@ -140,10 +140,11 @@ had already published were jargon the rule rejects.
   so the words in the caption matter more than the tag list.
 - **Tags go in the caption OR the comment, never both** (`noTags`). On Instagram both would spend
   the 5-cap twice — a defensive choice, not a rule Instagram states.
-- **Instagram's 5-cap is Instagram's; "caption AND comments together" is not** (corrected
-  2026-08-24 — that claim traces to marketing blogs). We keep the behaviour and drop the certainty.
-  IG's own search guidance says keywords must be in the CAPTION to be searchable, so tags in a
-  first comment may buy nothing there at all.
+- **Instagram's 5-cap is Instagram's; "caption AND comments together" is not** (retracted
+  2026-08-24). We keep the behaviour and drop the certainty. **The retraction is argued once, in
+  `docs/playbook.md` → *What each platform allows* → *The two worth getting right*** — including
+  what else went with it, and what a first comment may not buy on Instagram; it drifted once by
+  being written out three times. Read it there before re-opening the question.
 
 ## Transcripts and topic tags
 
@@ -242,6 +243,9 @@ had already published were jargon the rule rejects.
     backfill-before-deploy ordering, the post keys that are null by nature, and the Facebook
     post id whose `_` is a LIKE wildcard. **A comment asserting an impossibility is still a
     claim** — that is how sixteen Threads codes went unjoined.
+    - ⚠ **A FACEBOOK VIDEO POST RECORDS A DIFFERENT ID SHAPE FROM THE ONE EVERYTHING ELSE
+      SEES**, so its codes never join: 7 of our 20 Facebook posts, open as **#44**. Read the
+      issue rather than re-deriving it; the composite is not computable from the bare video id.
 - **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwkshow.com/s5`.** Nobody can click a url under a
   Short, so the only route is reading it off screen and typing it, and `mwkshow.com/8x2kq` is not
   a thing anyone types. `mint({ codePrefix: 's' })` allocates base 10 (base32 mixes confusable
@@ -362,9 +366,14 @@ had already published were jargon the rule rejects.
   been written yet.
 - **`--sync` proposes but cannot act on an UPCOMING stream** — yt-dlp refuses a scheduled live
   event, and its comments are closed. Both are expected; neither is a fault to chase.
-- **RESTREAM MIRRORS A LIVE STREAM AS TWO YOUTUBE VIDEOS**, one vertical and one landscape, same
-  title and duration, both public and both wanting the CTA — and as a Facebook Reel in the same
-  minute, which is why the Facebook sweep exists.
+- **RESTREAM MIRRORED A LIVE STREAM AS TWO YOUTUBE VIDEOS** — one vertical and one landscape,
+  same title and duration, both public and both wanting the CTA — **and as a Facebook Reel in
+  the same minute, which is why the Facebook sweep exists. He turned both off in Restream's own
+  settings and the sweeps stay.** Measured on `analytics:posts --source external`: the last
+  vertical+landscape pair is 2026-09-14T10:37Z and the last Facebook+YouTube pair is
+  2026-09-13T21:52Z; nothing of either shape since, against 7 pairs in the preceding month, so
+  the query still finds one. **The settings are his, so this can come back without a commit** —
+  re-run that query before treating a single upload as the rule. Related: `mwk-no-vertical-copies`.
 - **NOTHING HERE READS A TITLE OR A THUMBNAIL, SO A WRONG ONE SITS THERE UNTIL HE SEES IT.** A
   stream went out for 3h40m under the previous episode's guest card (`gUAo3DSGf-o`, 2026-09-18);
   five others carried the placeholder title *Watch Me Work* for three weeks. **That is our gap,
@@ -401,7 +410,7 @@ had already published were jargon the rule rejects.
     BEFORE bytes. Round-tripping a video's own current thumbnail is the safe positive control.
 - **THE CARD IS DRAWN IN THE WEBSITE REPO AND IS ALREADY ON THE SHARE — do not draw one here.**
   `mergodon/matewishkey-web`'s `npm run card -- <episode-slug>` writes it at the upload size,
-  inside Zernio's 2 MB cap; `scripts/episode-card.mjs`'s header carries every rule with the date
+  inside Zernio's 2 MB cap; that repo's `scripts/episode-card.mjs` header carries every rule with the date
   it was asked for — read it there, never edit that repo. **The episode's own `title` IS the
   card's headline**, so a YouTube title that disagrees with the card means one of the two was set
   by hand.

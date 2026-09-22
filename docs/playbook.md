@@ -20,9 +20,14 @@ a whole chapter on deciding whether a copy already existed somewhere. That chapt
 `lib/matcher.js` are all gone, and they are not coming back.
 
 **Two things still arrive from outside, and both are expected.** He goes live straight on YouTube,
-so a live stream never enters `posts:list` at all; and **Restream is posting again (2026-09-13)**,
-which lands a reel on Facebook and YouTube in the same minute. `first-comment.js` sweeps
-`analytics:posts` for exactly this — **two named sweeps, YouTube and Facebook, and Facebook
+so a live stream never enters `posts:list` at all; and **Restream mirrored a live stream onto
+Facebook and YouTube in the same minute until he turned reel publishing off** (his action, taken
+after 2026-09-14; the last same-minute Facebook+YouTube pair is 2026-09-13T21:52Z and the last
+vertical+landscape YouTube pair is 2026-09-14T10:37Z, both read off `analytics:posts --source
+external`). **Both sweeps stay** — the YouTube one because he still goes live there, the
+Facebook one because nothing tells us if he turns reel publishing back on, and an unused sweep
+costs a call while a missing one cost 9 of 19 streams their CTA. `first-comment.js` reads
+`analytics:posts` for them — **two named sweeps, YouTube and Facebook, and Facebook
 VIDEOS ONLY** (a hand-made post on the page is his, not a stream), with a test pinning both
 literals. Never a loop over every platform. Do not rebuild an "is a copy already over there?"
 check: that was the mirror's job and the mirror is why it hurt.
@@ -107,6 +112,7 @@ paragraph used to list beside it (losing Explore, hashtag pages and Reels recomm
 Both trace to marketing blogs rather than to Instagram, and both were retracted on 2026-08-24;
 the enforcement date that sat here went with them, being unverifiable and in the same breath.
 The behaviour stayed because it costs nothing if the stricter reading is wrong.
+**And a first comment may buy nothing on Instagram at all**: IG's own search guidance says keywords have to be in the CAPTION to be searchable, which is the opposite direction from where we put the tags. Kept because the cap is real and spending it twice cannot help.
 So an Instagram caption carries *zero* hashtags and the comment spends the budget — two
 always-on tags and three describing the clip.
 
