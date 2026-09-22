@@ -104,7 +104,12 @@ use it themselves?** If they would have to look it up, it is wrong.
 - A product name is fine when ordinary people know the product. `#Xero` yes, `#Cloudflare` no.
   That distinction is the rule, not an exception to it.
 - **Fewer good tags beat more weak ones, and none is an acceptable answer.**
-- `#MWKShow #PIY` lead every post automatically. Do not add them by hand.
+- `#piyshow #mwkshow #PromptItYourself` lead every post automatically (his spelling, his order,
+  2026-09-22). Do not add them by hand. They take three of Instagram's five, all of Pinterest's
+  three, and X's one — so a topic tag reaches Instagram twice over at most.
+- **No credit line unless he asks for one on THAT post.** The `@thechrisgoor #couchtocreator`
+  example above is the shape, not a default: he stopped it on 2026-09-22 (*"you can stop
+  posting to chris tag, so remove them"*).
 
 `config/voice.json`'s `blocked` list is the hard backstop — check a candidate against it before
 proposing it:

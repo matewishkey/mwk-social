@@ -272,8 +272,8 @@ ${card('Queue something', `
   <div class="field">
     <label for="qtopics">Hashtags describing the clip (optional, comma separated)</label>
     <input type="text" id="qtopics" name="topics" placeholder="Branding, SocialMedia, CreatingImages">
-    <p class="note">Everyday words only — what an ordinary person would call it. #MWKShow and #PIY
-      are always added. Instagram takes three more, X takes none.</p>
+    <p class="note">Everyday words only — what an ordinary person would call it. #piyshow #mwkshow
+      #PromptItYourself are always added. Instagram takes two more, Pinterest and X take none.</p>
   </div>
   <div class="field">
     <label for="qlink">Where this post points (optional)</label>

@@ -52,14 +52,16 @@ carries the marker — whoever put it there.
 hashtag caps, the blocklist, the YouTube blurb, the feed URL. Change it there or you'll change it
 in the wrong place.
 
-- **`#MWKShow` and `#PIY` go on every post, in that order** — the brand and the motto short form.
-  A cap tighter than the pair truncates it, so X's one tag is `#MWKShow`.
+- **`#piyshow #mwkshow #PromptItYourself` go on every post, in that order and spelled that way**
+  (mate, 2026-09-22 — he is buying the domains). A cap tighter than the three truncates from the
+  end, so X's one tag is `#piyshow`, Pinterest's three are these and no topic, and Instagram has
+  two topic slots left. Read `config/voice.json` → `tags._always` for what this reversed.
 - **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
   table decides: Facebook, YouTube, LinkedIn, TikTok, X and Pinterest take them in the caption;
   Instagram and Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive
   choice, not a rule Instagram states (see CLAUDE.md).
-  "Prompt it yourself!" is written out in the CAPTION where it reads as a sentence; as a tag it
-  is just `#PIY`. The comment carries no prose.
+  "Prompt it yourself!" is written out in the CAPTION where it reads as a sentence, and since
+  2026-09-22 it is also the tag `#PromptItYourself`. The comment carries no prose.
 - **On a SHORT the caption is the title line and the tags only** — Instagram, TikTok, Facebook
   and YouTube, because their players draw it over his own burned-in subtitles (`captionOverlaysShort`).
   The story still goes out in full on the text-first feeds, and the first comment is unchanged.

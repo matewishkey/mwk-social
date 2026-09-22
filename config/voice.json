@@ -22,10 +22,11 @@
   "feed": "https://matewishkey.com/rss.xml",
   "tags": {
     "always": [
-      "#MWKShow",
-      "#PIY"
+      "#piyshow",
+      "#mwkshow",
+      "#PromptItYourself"
     ],
-    "_always": "Every post, in this order. #MWKShow is the brand and #PIY is the motto short form. Two always-on tags rather than three leaves Instagram three topic slots instead of two — #MWK was dropped because it earned nothing the other two did not. \"Prompt it Yourself\" stays in the comment TEXT where it reads as a sentence — it is not a tag.",
+    "_always": "Every post, in this order, spelled exactly as he typed them (mate, 2026-09-22: \"our new tags always have to be #piyshow #mwkshow #PromptItYourself\" — he is buying the domains). This REVERSES the 2026-08 pair (#MWKShow #PIY) and the earlier call that Prompt it Yourself is a sentence rather than a tag. Three always-on tags leave Instagram two topic slots, Pinterest none, and X carries only #piyshow — his cost, his call. Nothing re-tags what is already published.",
     "maxTopic": 4,
     "caps": {
       "instagram": 5,

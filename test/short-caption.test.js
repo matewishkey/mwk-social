@@ -99,7 +99,7 @@ test('a short gets the title line and the tags, and nothing else of his', async 
   const opts = { text: BODY, topics: ['JobInterview'], probe: TALL };
 
   const tiktok = await captionForPlatform('tiktok', opts);
-  assert.equal(tiktok, `${TITLE}\n\n#MWKShow #PIY #JobInterview\n\n${CREDIT}`);
+  assert.equal(tiktok, `${TITLE}\n\n#piyshow #mwkshow #PromptItYourself #JobInterview\n\n${CREDIT}`);
   assert.ok(!tiktok.includes('They wanted a CTO'), 'the story stays off the picture');
 
   // Instagram keeps its five hashtags for the comment, so the caption is the
@@ -112,10 +112,10 @@ test('the same clip landscape, and the same platform, gets all of his words', as
   assert.ok(wide.startsWith(STORY), 'the feed post keeps every word of the story');
   assert.ok(wide.endsWith(CREDIT), 'and the credit is still on it');
   // Facebook takes hashtags in the caption, so its short one is the title and
-  // the two always-on tags — the same rule Instagram's hashtagsInCaption: 0
+  // the always-on tags — the same rule Instagram's hashtagsInCaption: 0
   // answers differently.
   const tall = await captionForPlatform('facebook', { text: BODY, topics: [], probe: TALL });
-  assert.equal(tall, `${TITLE}\n\n#MWKShow #PIY\n\n${CREDIT}`);
+  assert.equal(tall, `${TITLE}\n\n#piyshow #mwkshow #PromptItYourself\n\n${CREDIT}`);
 });
 
 test('a platform outside the set is untouched by the rule', async () => {
@@ -135,7 +135,7 @@ test('a platform outside the set is untouched by the rule', async () => {
 test('his tags come before the credit, short or not', async () => {
   for (const probe of [TALL, WIDE]) {
     const caption = await captionForPlatform('facebook', { text: BODY, topics: ['JobSearch'], probe });
-    assert.ok(caption.indexOf('#MWKShow') < caption.indexOf('@thechrisgoor'),
+    assert.ok(caption.indexOf('#mwkshow') < caption.indexOf('@thechrisgoor'),
       'the brand tags lead, whoever else is tagged');
     assert.ok(caption.endsWith(CREDIT), 'and the credit is the last thing on the post');
   }
@@ -182,5 +182,5 @@ test('the first comment is unchanged on a short', () => {
   // hold is that the caption rule did not reach it — the CTA is still there.
   assert.ok(before.text.includes('link in my bio'),
     'the CTA went missing from the comment the caption rule is not allowed to touch');
-  assert.ok(/#MWKShow/.test(before.text), 'and the tags with it');
+  assert.ok(/#mwkshow/.test(before.text), 'and the tags with it');
 });
