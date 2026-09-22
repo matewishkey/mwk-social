@@ -66,4 +66,38 @@ function suppress(posts, note = 'first comment switched off for this post') {
   return added;
 }
 
-module.exports = { statePath, load, save, suppress, key };
+/*
+ * WHERE A POST POINTS, FOR THE WATCHER'S BENEFIT.
+ *
+ * The publisher knows a queue item's destination; the watcher only ever sees a
+ * published post, so it cannot look one up. Without this it renders the SHOW
+ * under a post that is about a project — and on Threads, which has no native
+ * first comment, the watcher is the ONLY path, so that was every Threads
+ * comment on a `--link` post (found in review 2026-09-22, hours after the
+ * destination feature shipped).
+ *
+ * `__links` rather than the post's own entry, deliberately: an entry under the
+ * post key means "already dealt with", so writing the destination there would
+ * make the watcher skip the post entirely. The `__` prefix is the same
+ * namespace `__lastVariant` and `__failing` already use.
+ */
+function recordLinks(posts, url) {
+  if (!url) return 0;
+  const state = load();
+  const links = state.__links || {};
+  let added = 0;
+  for (const p of posts) {
+    if (!p || !p.platform || !p.postId) continue;
+    const k = key(p.platform, p.postId);
+    if (links[k]) continue;
+    links[k] = url;
+    added++;
+  }
+  if (added) { state.__links = links; save(state); }
+  return added;
+}
+
+/** The destination recorded for this post, or null for the show. */
+const linkFor = (state, k) => (state && state.__links && state.__links[k]) || null;
+
+module.exports = { statePath, load, save, suppress, recordLinks, linkFor, key };

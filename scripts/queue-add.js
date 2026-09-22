@@ -133,7 +133,9 @@ function toR2(file, dryRun) {
   if (!dryRun) {
     execFileSync('npx', ['wrangler', 'r2', 'object', 'put', `${BUCKET}/${key}`,
       `--file=${file}`, `--content-type=${type}`, '--remote'],
-    { cwd: WEB, stdio: 'inherit' });
+    // Ten minutes, like every other network subprocess here. It had none, and
+    // a wedged upload would have hung the command with nothing to stop it.
+    { cwd: WEB, stdio: 'inherit', timeout: 600000 });
   }
   return [key, type];
 }
@@ -415,7 +417,7 @@ function main() {
   fs.writeFileSync(file, sql);
   try {
     execFileSync('npx', ['wrangler', 'd1', 'execute', DB, '--remote', `--file=${file}`, '-y'],
-      { cwd: WEB, stdio: 'inherit' });
+      { cwd: WEB, stdio: 'inherit', timeout: 600000 });
   } finally {
     fs.rmSync(path.dirname(file), { recursive: true, force: true });
   }

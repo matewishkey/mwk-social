@@ -25,6 +25,7 @@ const path = require('node:path');
 const voice = require('../scripts/lib/voice');
 const shortlink = require('../scripts/lib/shortlink');
 const { parse, sqlFor } = require('../scripts/queue-add');
+const commentState = require('../scripts/lib/comment-state');
 
 const SHOW = voice.config().links.show;
 const PROJECT = 'https://matewishkey.com/projects/dial-countdown/';
@@ -142,4 +143,60 @@ test('the destination rides into the insert, and nothing there means the show', 
 
   const without = parse(['--body', 'x']);
   assert.match(sqlFor(without, '01ABC', [null, null], [null, null], 'now'), /NULL, NULL\);/);
+});
+
+/* ------------------------------------------- and the watcher has to know too */
+
+/*
+ * THE WATCHER NEVER LEARNED THE DESTINATION, AND ON THREADS IT IS THE ONLY
+ * PATH (found in review 2026-09-22, hours after the feature shipped).
+ *
+ * `first-comment.js` only ever sees a published post — it cannot look a queue
+ * item up — so it rendered the SHOW under a post that is about a project.
+ * Threads has no native first comment, so that was EVERY Threads comment on a
+ * `--link` post, and any comment backfilled after a native one failed.
+ *
+ * The publisher writes it down under the post's own key. Under `__links` and
+ * not the post's entry, because an entry under the post key means "already
+ * dealt with" and would make the watcher skip the post altogether.
+ */
+test('the publisher records the destination where the watcher looks', () => {
+  const dir = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'mwk-cs-'));
+  const was = process.env.MWK_COMMENT_STATE;
+  process.env.MWK_COMMENT_STATE = path.join(dir, 'first-comments.json');
+  try {
+    const state0 = commentState.load();
+    assert.equal(commentState.linkFor(state0, 'threads:1'), null, 'nothing recorded is the show');
+
+    const n = commentState.recordLinks([{ platform: 'threads', postId: '1' },
+      { platform: 'facebook', postId: '2' }], PROJECT);
+    assert.equal(n, 2);
+
+    const state = commentState.load();
+    assert.equal(commentState.linkFor(state, 'threads:1'), PROJECT);
+    assert.equal(commentState.linkFor(state, 'facebook:2'), PROJECT);
+
+    // The post's OWN entry must stay empty, or the watcher's pending filter
+    // (`!state[p.key]`) reads it as done and never comments at all.
+    assert.equal(state['threads:1'], undefined,
+      'recording a destination must not look like the comment already went out');
+
+    assert.equal(commentState.recordLinks([{ platform: 'threads', postId: '1' }],
+      'https://matewishkey.com/elsewhere/'), 0, 'never overwritten');
+    assert.equal(commentState.linkFor(commentState.load(), 'threads:1'), PROJECT);
+    assert.equal(commentState.recordLinks([{ platform: 'threads', postId: '9' }], null), 0,
+      'no destination means the show, and writes nothing');
+  } finally {
+    if (was === undefined) delete process.env.MWK_COMMENT_STATE; else process.env.MWK_COMMENT_STATE = was;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('both writer and reader are wired, not just declared', () => {
+  const rq = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'run-queue.js'), 'utf8');
+  assert.match(rq, /commentState\.recordLinks\(/, 'the publisher must write it down');
+  const fc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
+  assert.match(fc, /commentState\.linkFor\(state, target\.key\)/, 'the watcher must read it');
+  assert.match(fc, /itemLink \|\| await shortlink\.mint\(/,
+    'and it must take precedence over minting, or the show comes back');
 });

@@ -424,10 +424,18 @@ async function main() {
       // the same id, so the Worker resolves the clip itself (resolveClipId in
       // web/src/api.js). Nothing is passed from here on purpose: the lookup
       // belongs next to the dedupe key it feeds.
-      const linkUrl = (override || !live) ? null : await shortlink.mint({
-        platform: target.platform, postKey: target.key, label: target.url || null,
-        campaign: 'clip', medium: 'comment',
-      });
+      /*
+       * A post that names its own destination points THERE, and it goes out in
+       * full: mwkshow.com is the show's address (shortlink.isShowLink). The
+       * publisher wrote it down under this post's key, because nothing here can
+       * look a queue item up from a published post.
+       */
+      const itemLink = commentState.linkFor(state, target.key);
+      const linkUrl = (override || !live) ? null
+        : (itemLink || await shortlink.mint({
+          platform: target.platform, postKey: target.key, label: target.url || null,
+          campaign: 'clip', medium: 'comment',
+        }));
       // The platform's own cap on a comment, which is NOT its caption cap.
       // Composing past it is what a Threads 502 looks like from here.
       const commentMax = platformTable.get(target.platform).commentMax || null;

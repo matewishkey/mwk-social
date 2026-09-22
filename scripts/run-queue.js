@@ -166,7 +166,8 @@ function usage() {
  * 2026-08-27 `--help` claimed a queued item and posted it to Instagram, Threads
  * and X while somebody was looking up the flag list (#37). Instagram and TikTok
  * cannot be deleted through the API, so a wrong publish there is permanent.
- * Every sibling already refuses an unknown argument; this one now does too.
+ * queue-add.js and post.js refuse one too; yt-description, ship-events and
+ * ship-stats still read their flags with bare argv.includes().
  */
 const FLAGS = { '--dry-run': 'dryRun', '--scheduled': 'scheduled', '--now': 'ignorePace', '--help': 'help', '-h': 'help' };
 function parseArgs(argv) {
@@ -408,6 +409,20 @@ async function main() {
      * under the key it looks up is what makes the flag a decision rather than a
      * one-hour delay.
      */
+    /*
+     * Where this post points, for the watcher. It cannot look a queue item up
+     * from a published post, and on Threads it is the only path there is — so
+     * without this a `--link` post gets the show under it. Recorded for every
+     * platform, because a native first comment can fail and the watcher is
+     * what backfills it.
+     */
+    if (item.link) {
+      const noted = commentState.recordLinks(
+        outcome.filter((o) => o.postId).map((o) => ({ platform: o.platform, postId: o.postId })),
+        item.link);
+      if (noted) console.log(`destination recorded on ${noted} post(s) — ${item.link}`);
+    }
+
     if (item.firstComment === false) {
       const suppressed = commentState.suppress(
         outcome.filter((o) => o.postId).map((o) => ({ platform: o.platform, postId: o.postId, url: o.url })),

@@ -26,8 +26,8 @@ const { unlockAt, AT_JITTER_MINUTES, parse } = require('../scripts/queue-add.js'
 const posted = (iso) => ({ kind: 'queue.posted', ts: iso });
 
 // These cases are about the GAP. The live 07:00-11:00 window would refuse most
-// of the instants they walk over, and the live cap of ONE refuses a second
-// post outright before the gap is ever consulted — neither is what any of them
+// of the instants they walk over, and the live cap of TWO would end the day
+// before several of them reach the gap — neither is what any of them
 // is testing, so both are switched off here and pinned where they belong
 // (test/window.test.js and test/daily-cap.test.js).
 const GAP = { window: null, perDay: 6 };
