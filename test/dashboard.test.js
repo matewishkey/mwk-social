@@ -911,14 +911,14 @@ test('the headline quality number cannot mix denominators', async () => {
   const { statsPage } = await src('pages/stats.js');
   // Two channels: one reports reach, one reports nothing but views. Both earn
   // actions. Ten platform-posts, twenty actions => 2.0 per post, whatever each
-  // channel happens to expose. The actions are COMMENTS here on purpose: likes
-  // and shares carry the own-hands deduction (next test), and this test is
+  // channel happens to expose. The actions are SAVES here on purpose: likes, comments
+  // and shares all carry the own-hands deduction (next test), and this test is
   // about denominators, not about that.
   const rows = [
     { date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
-      views: 0, likes: 0, comments: 10, shares: 0, saves: 0, clicks: 0 },
+      views: 0, likes: 0, comments: 0, shares: 0, saves: 10, clicks: 0 },
     { date: isoDay(-3), platform: 'youtube', post_count: 5, reach: 0, impressions: 0,
-      views: 9999, likes: 0, comments: 10, shares: 0, saves: 0, clicks: 0 },
+      views: 9999, likes: 0, comments: 0, shares: 0, saves: 10, clicks: 0 },
   ];
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [],
     snapshots: {} });
@@ -942,8 +942,8 @@ test('the headline quality number cannot mix denominators', async () => {
 /*
  * HIS OWN LIKE AND REPOST COME OFF EVERY POST (mate, 2026-09-20). No platform
  * says who liked, so it is the flat deduction he named: 2 likes and 2 shares
- * per platform-post, clamped at zero, before anything is summed. Comments are
- * not touched. The control is the row with no posts, which must pass through
+ * per platform-post, clamped at zero, before anything is summed. One comment
+ * per post comes off where the watcher writes our first comment. The control is the row with no posts, which must pass through
  * untouched — a deduction on a day nothing was posted would invent a debt.
  */
 test('two likes and two shares per post are his own and come off, never below zero', async () => {
@@ -954,13 +954,27 @@ test('two likes and two shares per post are his own and come off, never below ze
     { date: '2026-09-03', platform: 'facebook', post_count: 0, likes: 5, shares: 5, comments: 0, saves: 0 },
   ]);
   assert.deepEqual(rows.map((r) => [r.likes, r.shares, r.comments, r.saves]),
-    [[4, 1, 4, 1], [0, 0, 2, 0], [5, 5, 0, 0]]);
+    [[4, 1, 1, 1], [0, 0, 0, 0], [5, 5, 0, 0]]);
 
   // And the page inherits it: 5 posts carrying 20 likes read 10, so 2.0 a post.
   const html = statsPage({ email: 'm@x.com', tz: TZ, followers: [], clicks: [], snapshots: {},
     daily: [{ date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
       views: 0, likes: 20, comments: 0, shares: 0, saves: 0, clicks: 0 }] });
   assert.match(tileFor(html, 'actions per post'), /<b>2\.0<\/b>/, '20 likes over 5 posts is 10 net, 2.0 a post');
+});
+
+test('our first comment comes off exactly where the watcher writes one', async () => {
+  const { withoutOwnActions, OWN_COMMENT_PLATFORMS } = await src('pages/stats.js');
+  const platforms = require('../scripts/lib/platforms');
+  const watched = Object.keys(platforms.PLATFORMS).filter((p) => platforms.commentWatched(p)).sort();
+  assert.deepEqual([...OWN_COMMENT_PLATFORMS].sort(), watched);
+  // TikTok gets no first comment from us, so its comments are all theirs: the control.
+  const [tt, yt] = withoutOwnActions([
+    { platform: 'tiktok', post_count: 2, comments: 3 },
+    { platform: 'youtube', post_count: 2, comments: 3 },
+  ]);
+  assert.equal(tt.comments, 3);
+  assert.equal(yt.comments, 1);
 });
 
 /*

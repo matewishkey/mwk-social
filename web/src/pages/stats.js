@@ -63,11 +63,17 @@ const TREND_DAYS = 7;
  * applied per platform-post to every row before anything on this page adds
  * them up — the tiles, the channel table, the age-matched trend and the
  * revision trail all inherit it. Clamped at zero: a post nobody but him
- * touched reads 0, never negative. Comments are NOT deducted here — the first
- * comment is ours too, but he did not ask for that one and the number is
- * already explained as "including our own first comment" where it is shown.
+ * touched reads 0, never negative.
+ *
+ * OUR FIRST COMMENT COMES OFF TOO (2026-09-23). This header used to say the
+ * comments number was "explained as including our own first comment where it
+ * is shown" — nothing on the page said so, and on almost every platform
+ * comments equalled posts, so the tile was our own CTA counted back as
+ * engagement. One per post, on the platforms the watcher comments on; a test
+ * pins this list to platforms.commentWatched().
  */
 export const OWN_ACTIONS = { likes: 2, shares: 2 };
+export const OWN_COMMENT_PLATFORMS = ['facebook', 'instagram', 'linkedin', 'threads', 'youtube'];
 export function withoutOwnActions(rows) {
   return rows.map((r) => {
     const posts = r.post_count || 0;
@@ -76,6 +82,9 @@ export function withoutOwnActions(rows) {
     for (const k of Object.keys(OWN_ACTIONS)) {
       if (out[k] == null) continue;
       out[k] = Math.max(0, out[k] - OWN_ACTIONS[k] * posts);
+    }
+    if (out.comments != null && OWN_COMMENT_PLATFORMS.includes(r.platform)) {
+      out.comments = Math.max(0, out.comments - posts);
     }
     return out;
   });

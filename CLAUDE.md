@@ -754,7 +754,9 @@ comparable, the age-matching rule and its three failure modes, the three trend g
 funnel's unmeasurable last stage. What is NOT there, and is why the header is trusted:
 
 - **HIS OWN LIKE AND REPOST COME OFF EVERY POST** (mate, 2026-09-20) — 2 likes and 2 shares per
-  platform-post, because no platform says who liked. **The deduction is on the PAGE, not in the
+  platform-post, because no platform says who liked. **Our first comment comes off too**, one
+  per post on the platforms the watcher comments on (2026-09-23) — the comments tile was our own CTA
+  counted back as engagement. **The deduction is on the PAGE, not in the
   table**: `daily_metric` still holds what the platforms said, so the raw number is recoverable.
 - **A VIEW IS NOT A VIEW: YouTube changed the unit on 24 August 2026.** A YouTube views trend
   crossing that date is refused with a reason rather than drawn (`viewsUnitBlocked`). ⚠ It
