@@ -180,7 +180,7 @@ const isShort = (id) => platforms.linkDeadFor('youtube', youtubeProbe(id));
  */
 async function tailFor(id, title = null) {
   /*
-   * A Short gets a SHORT code — mwkshow.com/s3 — not the channel phrasing it
+   * A Short gets a SHORT code — mwk.show/s3 — not the channel phrasing it
    * used to get (mate's call, 2026-08-25: "for shorts we can create some unique
    * super short links which is easy to type").
    *
@@ -190,7 +190,7 @@ async function tailFor(id, title = null) {
    * address at all, while the blurb printed two other urls underneath it. He
    * found that on the dashboard and it was indefensible.
    *
-   * So: still no click, but a person can read `mwkshow.com/s3` off their screen
+   * So: still no click, but a person can read `mwk.show/s3` off their screen
    * and type it, which is the whole reason the short domain was bought. A low
    * number on one of these is not indifference and not unreachability — it is
    * how many people cared enough to type, which is a real thing to measure.

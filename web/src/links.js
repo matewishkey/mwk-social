@@ -60,7 +60,7 @@ export function platformFromReferer(host) {
 /*
  * Who he sent it to, taken off the end of the url.
  *
- * mwkshow.com/<code>/<tag>. The tag is a word HE types as he sends the link —
+ * mwk.show/<code>/<tag>. The tag is a word HE types as he sends the link —
  * "natalie", "tom", "book-club" — so one code serves everybody and there is
  * nothing to mint per person. Nothing about the visitor is read to produce it.
  *

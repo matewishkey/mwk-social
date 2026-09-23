@@ -358,7 +358,7 @@ const tagsInCaption = (platform) => {
  * show... this rule has to be generic").
  *
  * `opts.link` is the queue item's own destination. It goes out as its full
- * url and is deliberately not minted — mwkshow.com is the show's address and
+ * url and is deliberately not minted — mwk.show is the show's address and
  * shortlink.isShowLink() is where that rule lives.
  */
 async function linkFor(platform, opts, medium) {

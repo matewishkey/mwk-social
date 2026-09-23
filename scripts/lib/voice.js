@@ -39,8 +39,12 @@ function config() {
     const short = cached.shortLink;
     if (short && short.enabled) {
       if (!short.host) throw new Error(`${CONFIG_PATH}: shortLink.enabled needs shortLink.host`);
-      if (!cached.markers.some((m) => short.host.includes(m.split('/')[0]))) {
-        throw new Error(`${CONFIG_PATH}: no marker would match a ${short.host} link — the guard would re-comment on every post`);
+      // Every host a code has ever been printed under, not just today's: a
+      // comment written under the old host is still ours.
+      for (const h of [short.host, ...(short.aliases || [])]) {
+        if (!cached.markers.includes(`${h}/`)) {
+          throw new Error(`${CONFIG_PATH}: markers[] lacks "${h}/" — the guard would not recognise a ${h} link and would re-comment on every post`);
+        }
       }
     }
     for (const v of [...cached.firstComment.plain, ...cached.firstComment.episode]) {
@@ -99,6 +103,10 @@ const profileCta = (platform = null) => {
 };
 
 const shortLink = () => config().shortLink || { enabled: false };
+// Every host our codes resolve on — the printed one and the retired ones. A url
+// on any of them is already one of ours and is never minted again.
+const linkHosts = () => { const s = shortLink(); return s.host ? [s.host, ...(s.aliases || [])].map((h) => h.toLowerCase()) : []; };
+const isOurLinkHost = (hostname) => linkHosts().includes(String(hostname || '').toLowerCase());
 const alwaysTags = () => config().tags.always.slice();
 const blockedTags = () => new Set(config().tags.blocked);
 const maxTopicTags = () => config().tags.maxTopic;
@@ -272,7 +280,7 @@ function firstComment(key, { platform, topicTags = [], avoidIndex = -1, noEpisod
   }
 
   const text = attempt.text;
-  // Any known marker will do: with a short link the text carries mwkshow.com/…
+  // Any known marker will do: with a short link the text carries mwk.show/…
   // rather than the long URL, and both must count as "this is ours".
   if (!carriesCta(text)) {
     throw new Error(`composed comment carries none of the markers ${cfg.markers.join(', ')} — refusing to post`);
@@ -322,7 +330,7 @@ function tagLine(platform, topicTags = []) {
  * does render every url as plain text, so the address cannot be CLICKED — but
  * naming the channel instead left the video with no address at all, and mate
  * found exactly that on the dashboard on 2026-08-25. A Short now gets a short,
- * typeable code (mwkshow.com/s3) which a person can read off the screen and
+ * typeable code (mwk.show/s3) which a person can read off the screen and
  * type; yt-description.js asks for the `s` sequence, and that is the only
  * difference between a Short's tail and any other.
  *
@@ -407,6 +415,6 @@ function findBlurb(text) {
 }
 
 module.exports = {
-  config, marker, markers, carriesCta, shortLink, alwaysTags, blockedTags, maxTopicTags, capFor,
+  config, marker, markers, carriesCta, shortLink, linkHosts, isOurLinkHost, alwaysTags, blockedTags, maxTopicTags, capFor,
   firstComment, tagLine, latestEpisodes, showBlurb, findBlurb, profileCta, hash, CONFIG_PATH,
 };

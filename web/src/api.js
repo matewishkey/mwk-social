@@ -281,8 +281,8 @@ async function result(body, env) {
 /*
  * A code he chose himself, rather than five random characters.
  *
- * `mwkshow.com/mmm/natalie` is a link he can type into a message from memory;
- * `mwkshow.com/6kc0k/natalie` is one he has to copy from somewhere. That is the
+ * `mwk.show/mmm/natalie` is a link he can type into a message from memory;
+ * `mwk.show/6kc0k/natalie` is one he has to copy from somewhere. That is the
  * whole difference and it decides whether the personal-share habit survives
  * contact with a phone.
  *
@@ -306,7 +306,7 @@ export function normaliseCode(raw) {
  * Five characters of base32 is fine for a link someone CLICKS. Under a YouTube
  * Short nobody can click it — YouTube renders every url there as plain text —
  * so the only way anyone follows it is by typing it off their own screen, and
- * `mwkshow.com/8x2kq` is not a thing a person types. `mwkshow.com/s3` is.
+ * `mwk.show/8x2kq` is not a thing a person types. `mwk.show/s3` is.
  * (Same reasoning that got him `mmm` for his personal share, one audience out.)
  *
  * Base 10, not base 32: the point is a string that survives being read off a

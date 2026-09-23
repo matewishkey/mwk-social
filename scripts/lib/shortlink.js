@@ -139,7 +139,7 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
     // anything that is not the show, which mint() would refuse anyway. The
     // second test is the 2026-09-22 rule and it is what leaves a project page,
     // a marketplace listing or a repo in a custom comment written out in full.
-    if (host(url) === (voice.shortLink().host || '').toLowerCase()) continue;
+    if (voice.isOurLinkHost(host(url))) continue;
     if (!isShowLink(url)) continue;
     const short = await mint({ platform, postKey, clipId, campaign, medium,
       target: url, label: url.slice(0, 120) });

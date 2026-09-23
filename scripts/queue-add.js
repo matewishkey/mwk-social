@@ -53,7 +53,7 @@
  *                                    the pin's destination, X's caption link
  *                                    and the link in the first comment. It
  *                                    goes out as the FULL url and is never
- *                                    shortened: mwkshow.com is the show's
+ *                                    shortened: mwk.show is the show's
  *                                    address (mate, 2026-09-22)
  *   --at YYYY-MM-DD                  hold it until that day. Stored as a full
                                    timestamp: a random instant inside the
@@ -187,7 +187,7 @@ function parse(argv) {
    * A LINK SLOT WANTS A URL, and the one time it was handed prose the pin
    * died at Pinterest with `Invalid URL or request data` (2026-09-22). Caught
    * here, where it is one edit, rather than nine hours later at publish.
-   * A mwkshow.com code is refused for the same reason the minter refuses to
+   * A mwk.show code (or an old mwkshow.com one) is refused for the same reason the minter refuses to
    * make one: that host means the show, so a project pointed at it would say
    * the wrong thing however well it resolved.
    */
@@ -195,7 +195,7 @@ function parse(argv) {
     let u;
     try { u = new URL(opt.link); } catch { throw new Error(`--link wants a url, got ${JSON.stringify(opt.link)}`); }
     if (!/^https?:$/.test(u.protocol)) throw new Error(`--link wants an http(s) url, got ${opt.link}`);
-    if (u.hostname.toLowerCase().endsWith(voice.shortLink().host)) {
+    if (voice.isOurLinkHost(u.hostname)) {
       throw new Error(`--link wants the page's own full url, not a ${voice.shortLink().host} code — that host is the show's`);
     }
   }

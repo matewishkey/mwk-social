@@ -17,9 +17,9 @@ which is the US evening. Queue five things at once and they go out **two a day**
 minute — and something queued at noon waits until the next morning.
 
 **Every post carries a route back** — the show by default, or the page the post is about when
-it names one (`--link`, since 2026-09-22). The show's route is a tracked `mwkshow.com/<code>`,
+it names one (`--link`, since 2026-09-22). The show's route is a tracked `mwk.show/<code>`,
 minted per platform and placement, so a click says which channel and which clip earned it; a
-project's own page goes out whole and is not counted, because `mwkshow.com` means the show. Where a url is not clickable at all — Instagram, a YouTube Short — the
+project's own page goes out whole and is not counted, because `mwk.show` means the show. Where a url is not clickable at all — Instagram, a YouTube Short — the
 comment names where the link *is* instead of spending a code on a click that cannot happen. On
 TikTok not even the bio is clickable, so a post there carries no link and claims none.
 

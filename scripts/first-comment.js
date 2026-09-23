@@ -398,7 +398,7 @@ async function main() {
        * This watcher was the fourth place a link gets minted and the only one
        * that never learned the rule. Instagram is on its list precisely to
        * catch a native first comment that silently failed — and it would then
-       * write a tracked mwkshow.com code into an Instagram comment, where no
+       * write a tracked mwk.show code into an Instagram comment, where no
        * url is clickable at all. That is the exact mistake fixed in post.js on
        * 2026-08-22 and left standing here.
        *
@@ -428,7 +428,7 @@ async function main() {
       // the analytics sweep, and the url is the only thing the two agree on.
       /*
        * A post that names its own destination points THERE, and it goes out in
-       * full: mwkshow.com is the show's address (shortlink.isShowLink). The
+       * full: mwk.show is the show's address (shortlink.isShowLink). The
        * publisher wrote it down under this post's key, because nothing here can
        * look a queue item up from a published post.
        */

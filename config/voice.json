@@ -6,6 +6,7 @@
     "matewishkey.com/show",
     "matewishkey.com/",
     "mwkshow.com/",
+    "mwk.show/",
     "link in my bio",
     "the link is on my channel page"
   ],
@@ -16,7 +17,9 @@
   },
   "shortLink": {
     "enabled": true,
-    "host": "mwkshow.com",
+    "host": "mwk.show",
+    "aliases": ["mwkshow.com"],
+    "_host": "host is what every NEW link is printed as; aliases are the hosts that still RESOLVE the same codes (the worker serves one table on all of them). mwkshow.com became an alias on 2026-09-23, when mate bought mwk.show and said he will not renew the old one (it lapses 2027-08-20). Every host here must also be in markers[] as '<host>/', or the guard stops recognising comments printed under it; voice.js refuses the config otherwise. web/wrangler.toml carries the same pair as LINK_HOST / LINK_ALIASES and a test pins them equal.",
     "_": "One code per (platform, clip), minted through the dashboard's ingest API and idempotent — a re-run must render the identical comment or the guard above breaks. If minting fails the plain links.show is used instead: a link we cannot measure is far better than a comment that never goes out."
   },
   "feed": "https://matewishkey.com/rss.xml",

@@ -281,14 +281,14 @@ ${card('Queue something', `
     <p class="note">Leave it empty and everything points at the show. Fill it in when the post is
       <em>about</em> something with a page of its own, and that page becomes the Pinterest pin's
       destination, the link in the X post and the link in the first comment. It goes out in full —
-      <code>mwkshow.com</code> is the show's address and stands for nothing else.</p>
+      <code>mwk.show</code> is the show's address and stands for nothing else.</p>
   </div>
   <div class="field">
     <label for="qcomment">First comment — override the standard one (optional)</label>
     <textarea id="qcomment" name="commentText" style="min-height:5rem"
       placeholder="Left empty, the standard comment is used — the link, and nothing else."></textarea>
     <p class="note">Use this to say something specific under the post. A link to the show is
-      replaced with a tracked <code>mwkshow.com</code> code; any other URL goes out as you wrote
+      replaced with a tracked <code>mwk.show</code> code; any other URL goes out as you wrote
       it, in full.</p>
   </div>
   <div class="field">

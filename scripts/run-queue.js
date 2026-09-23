@@ -318,7 +318,7 @@ async function main() {
           firstComment: item.firstComment,
           comment: item.commentText || null,
           // Where this post points. Null means the show, which is the default
-          // and the only thing mwkshow.com ever stands for.
+          // and the only thing mwk.show ever stands for.
           link: item.link || null,
           topics: item.topics || [],
           commentVariant: null,

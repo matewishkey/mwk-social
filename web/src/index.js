@@ -39,13 +39,21 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.hostname === env.INGEST_HOST) return await ingestHost(request, env, url);
-      if (env.LINK_HOST && url.hostname === env.LINK_HOST) return await redirect(request, env, url, ctx);
+      if (isLinkHost(env, url.hostname)) return await redirect(request, env, url, ctx);
       return await dashboard(request, env, url);
     } catch (err) {
       return new Response(`error: ${err.message}`, { status: 500 });
     }
   },
 };
+
+// LINK_HOST is what new codes are printed as; LINK_ALIASES are the retired
+// hosts, still served because a code printed under one lives on in a comment.
+export function isLinkHost(env, hostname) {
+  const hosts = [env.LINK_HOST, ...String(env.LINK_ALIASES || '').split(',')]
+    .map((h) => (h || '').trim().toLowerCase()).filter(Boolean);
+  return hosts.includes(String(hostname || '').toLowerCase());
+}
 
 async function ingestHost(request, env, url) {
   // The box fetches back media it queued, with the same bearer token the rest
@@ -382,7 +390,7 @@ async function links(env, tz, email, url) {
       `SELECT COUNT(DISTINCT l.code) AS links, ${counts} FROM link l ${clicks}`).first(),
     /*
      * Who he sent a link to, by hand. The tag is his own word off the end of
-     * the url (mwkshow.com/<code>/natalie), so this is the whole answer to
+     * the url (mwk.show/<code>/natalie), so this is the whole answer to
      * "did the people I messaged actually open it".
      *
      * Counted clicks only, and this is the place it matters most. A messenger

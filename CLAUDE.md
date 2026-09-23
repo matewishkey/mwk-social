@@ -1,7 +1,7 @@
 # mwk-social — Zernio social-media integration
 
 Agent notes for working in this repo. (This repo is public — keep this file free of account
-IDs, billing details and secrets; that state lives outside the repo. **The three custom
+IDs, billing details and secrets; that state lives outside the repo. **The custom
 hostnames are not covered by that**: they are in `web/wrangler.toml`, which is committed here,
 so naming them costs nothing and pretending otherwise just makes the doc unusable.)
 
@@ -172,8 +172,8 @@ had already published were jargon the rule rejects.
 
 ## Links, and where a url actually works
 
-- **A POST POINTS AT WHAT IT IS ABOUT, AND `mwkshow.com` IS THE SHOW'S ADDRESS AND NOTHING
-  ELSE'S** (mate, 2026-09-22: *"the mwkshow.com is really just the show otherwise use full link.
+- **A POST POINTS AT WHAT IT IS ABOUT, AND `mwk.show` IS THE SHOW'S ADDRESS AND NOTHING
+  ELSE'S** (it was `mwkshow.com` when he said it) (mate, 2026-09-22: *"the mwkshow.com is really just the show otherwise use full link.
   this rule has to be generic"*). `queue_item.link` is the post's own destination (`--link`, and
   a field on the dashboard form); null means the show. The reasoning is in
   `shortlink.js`'s header, at `isShowLink()`. What is not there:
@@ -189,7 +189,7 @@ had already published were jargon the rule rejects.
     the CTA *is* a mention of his site. The cost runs the safe way: a viewer who links his site
     makes us skip that post, which is a comment added by hand rather than one Instagram cannot
     delete.
-  - **A live code is never broken.** `mwkshow.com/dial` still resolves; it is simply not used
+  - **A live code is never broken.** `mwk.show/dial` still resolves; it is simply not used
     again.
   - **A PUBLISHED POST WHOSE DESTINATION IS ONE OF OUR CODES IS STILL OURS TO REPOINT, AND THIS
     FILE SAID THE OPPOSITE** (2026-09-22). It read *"nothing reaches what is already
@@ -260,13 +260,13 @@ had already published were jargon the rule rejects.
         reads the post before writing. **Left alone on purpose** — collapsing the keys would
         route `inbox:reply` through the bare video id, which has never been exercised, while
         the composite has.
-- **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwkshow.com/s5`.** Nobody can click a url under a
-  Short, so the only route is reading it off screen and typing it, and `mwkshow.com/8x2kq` is not
+- **A SHORT GETS A CODE SOMEBODY CAN TYPE — `mwk.show/s5`.** Nobody can click a url under a
+  Short, so the only route is reading it off screen and typing it, and `mwk.show/8x2kq` is not
   a thing anyone types. `mint({ codePrefix: 's' })` allocates base 10 (base32 mixes confusable
   characters). **A low number on one of these is neither indifference nor unreachability — it is
   how many people cared enough to type it.** How `codePrefix` narrows the dedupe, and why the
   lookup is ordered, are at `mint()` in `web/src/api.js`.
-- **A PERSONAL SHARE IS A NAME ON THE END OF ANY LINK — `mwkshow.com/mmm/natalie`.** One code
+- **A PERSONAL SHARE IS A NAME ON THE END OF ANY LINK — `mwk.show/mmm/natalie`.** One code
   serves everybody; the name is a word HE types, stored on the CLICK as `tag`. **A code he has to
   copy from somewhere is a code he will not use from a phone**, which is why `mint()` takes a
   chosen code — and a chosen code SKIPS the attribute dedupe.
@@ -715,10 +715,18 @@ table, on no page, and read by nothing without anything looking wrong.
 
 ## The dashboard
 
-- **The deployment, the three hostnames and the Access reasoning live in `docs/playbook.md` →
+- **The deployment, the hostnames and the Access reasoning live in `docs/playbook.md` →
   *The dashboard*** — read it there. **`web/deploy.sh` ships it from this box, never on push** —
   that one is here because it governs what you do, not what the system is.
-- **Short links: `mwkshow.com/<code>`.** A click stores the code, the time and the referring
+- **Short links: `mwk.show/<code>`, and EVERY HOST SERVES EVERY CODE** (mate bought `mwk.show`
+  2026-09-23 and will not renew `mwkshow.com`, which lapses **2027-08-20**). One table, so the
+  move was only which host is PRINTED: `shortLink.host` / `aliases` in `config/voice.json` and
+  `LINK_HOST` / `LINK_ALIASES` in `web/wrangler.toml`, pinned equal by
+  `test/link-hosts.test.js`. **A retired host stays in `markers[]` for ever** — a comment
+  printed under it is still ours, and forgetting it re-comments under every old post. The day
+  `mwkshow.com` lapses, everything printed with it (Instagram and TikTok comments, pins) dies
+  and whoever buys it gets the traffic; the YouTube descriptions were moved the same day.
+- **Short links, the rest:** A click stores the code, the time and the referring
   host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
   miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must
   never dead-end. **Why it exists:** `clicks` comes back from Facebook and once from LinkedIn;

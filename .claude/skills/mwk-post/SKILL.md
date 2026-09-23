@@ -206,7 +206,7 @@ the clip, `MWK_COVER_MS` to change it. Nothing to pass.
 
 **`--link` when the post is ABOUT something with a page of its own.** A project, an episode, a
 tool. That page becomes the pin's destination and X's caption link, and it goes out as the
-**full url** — `mwkshow.com` is the show's address and stands for nothing else (mate,
+**full url** — `mwk.show` is the show's address and stands for nothing else (mate,
 2026-09-22). Leave it off and everything points at the show, which is right for a clip off the
 show. The cost, which is his call: a project link is not counted.
 
@@ -244,7 +244,7 @@ deleted through the API**, so a repeat inside a fortnight is permanent.
   the pin's title (100 max), the words plus up to three tags are the description, and the pin's
   own destination field carries the link — the show by default, or **whatever `--link` names**.
   The PIN cannot be edited afterwards (and no delete has been exercised) — but its destination
-  is a `mwkshow.com/<code>` we own, and the code's `target` is a row in D1 read fresh on every
+  is a `mwk.show/<code>` we own (older ones say `mwkshow.com`; same table), and the code's `target` is a row in D1 read fresh on every
   hit, so a show-code pin is repointed with one `UPDATE link` and the pin is never touched
   (done for the 2026-09-22 Dial pin; CLAUDE.md → *Links* has the rule and its limits). A full
   `--link` url is baked in and is decided now. 2:3, 1:1 or 9:16 only. No comment, no watcher.

@@ -308,10 +308,10 @@ overview, stats, the queue, the links database and the workflow map. `web/` hold
 
 | | |
 |---|---|
-| Worker | `mwk-social-log`, one script, three hostnames |
+| Worker | `mwk-social-log`, one script, four hostnames (read them out of `web/wrangler.toml`) |
 | Dashboard | `social.matewishkey.com`, Access (OTP), 720h session |
 | Ingest | `ingest.matewishkey.com`, bearer token |
-| Short links | `mwkshow.com` — **public, no Access application, ever** |
+| Short links | `mwk.show`, and the retired `mwkshow.com` (lapses 2027-08-20) — **public, no Access application, ever** |
 | Storage | D1 `mwk-social` (11 tables) + R2 `mwk-social-media` for queued uploads |
 | Uploader | `scripts/ship-events.js` every two minutes, `scripts/ship-stats.js` hourly |
 
@@ -326,7 +326,7 @@ different application in the same Access org.
 application covers a HOSTNAME and runs in front of the Worker, so putting ingest behind the same
 one would 302 the uploader into a login page. Measured the same way for short links: a request to
 `/l/<code>` on the dashboard host 302s to the Access login page before any Worker code runs. That
-is why `mwkshow.com` is its own hostname with no Access application on it.
+is why `mwk.show` is its own hostname with no Access application on it.
 
 **Snapshots where the box already knows the answer.** `platforms`, `voice` and `pace` are computed
 on the box and shipped whole, because the code that uses them is the code that computes them —

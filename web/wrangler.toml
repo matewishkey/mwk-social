@@ -40,6 +40,12 @@ custom_domain = true
 # The short-link domain. No Access application on this one, ever — it is the
 # public half, and every CTA we post points at it.
 [[routes]]
+pattern = "mwk.show"
+custom_domain = true
+
+# Retired 2026-09-23 for mwk.show and not renewed (lapses 2027-08-20). Still
+# served, because every code printed before the move carries it.
+[[routes]]
 pattern = "mwkshow.com"
 custom_domain = true
 
@@ -47,7 +53,10 @@ custom_domain = true
 INGEST_HOST = "ingest.matewishkey.com"
 DASHBOARD_HOST = "social.matewishkey.com"
 # The hostname short links are served from; matches the route above.
-LINK_HOST = "mwkshow.com"
+LINK_HOST = "mwk.show"
+# Hosts that resolve the same codes but are never printed. Comma-separated.
+# config/voice.json -> shortLink.aliases is the same list; a test pins the pair.
+LINK_ALIASES = "mwkshow.com"
 LINK_FALLBACK = "https://matewishkey.com/show"
 TZ_DISPLAY = "Australia/Brisbane"
 ACCESS_TEAM = "mergodon.cloudflareaccess.com"
