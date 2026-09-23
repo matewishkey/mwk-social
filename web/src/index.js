@@ -23,7 +23,7 @@ import { accessIdentity, tokenOk } from './lib/access.js';
 import { pageOf } from './lib/html.js';
 import { counted, automated } from './lib/clicks.js';
 import { api } from './api.js';
-import { redirect, platformFromReferer } from './links.js';
+import { redirect, platformFromReferer, courseSql, hostFor } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
 import { statsPage } from './pages/stats.js';
 import { configPage } from './pages/config.js';
@@ -173,7 +173,13 @@ async function stats(env, tz, snapshots, email) {
    * clicks (people)" with the social number underneath at zero. Every social
    * figure below excludes platform = 'website'; the website gets its own card.
    */
-  const SOCIAL = "l.platform IS NOT 'website'";
+  /*
+   * And the COURSE is a third thing (2026-09-23): piy.show/otd has no platform,
+   * so without this every course click would have been added to the social
+   * number and to the show's guest funnel. It gets its own card, by profile.
+   */
+  const COURSE = courseSql(env);
+  const SOCIAL = `l.platform IS NOT 'website' AND NOT ${COURSE}`;
   /*
    * The revision trail, for the two trend windows only. It is what lets seen
    * and actions be compared at a matched age instead of young-against-settled
@@ -183,7 +189,7 @@ async function stats(env, tz, snapshots, email) {
    */
   const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
   const [daily, followers, clicks, targets, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince, website, revisions, funnel] = await Promise.all([
+    followerHistory, clicksByDay, platformSince, accountSince, website, revisions, funnel, course] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -273,7 +279,7 @@ async function stats(env, tz, snapshots, email) {
      * printing two identical numbers and letting them look like a finding.
      */
     env.DB.prepare(
-      `SELECT CASE WHEN l.platform = 'website' THEN l.code ELSE 'social' END stage,
+      `SELECT CASE WHEN l.platform = 'website' THEN l.code WHEN ${COURSE} THEN 'course' ELSE 'social' END stage,
               COUNT(*) all_time,
               SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent,
               MIN(substr(c.at, 1, 10)) first_seen, MAX(substr(c.at, 1, 10)) last_seen,
@@ -281,6 +287,14 @@ async function stats(env, tz, snapshots, email) {
          FROM click c JOIN link l ON l.code = c.code
         WHERE ${counted('c')}
         GROUP BY stage`).bind(from).all(),
+    // The course, by the ending on the url: piy.show/otd/instagram says the
+    // Instagram profile sent them. No ending is the generic link.
+    env.DB.prepare(
+      `SELECT l.code, COALESCE(c.tag, '') tag, COUNT(*) all_time,
+              SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
+         FROM click c JOIN link l ON l.code = c.code
+        WHERE ${COURSE} AND ${counted('c')}
+        GROUP BY l.code, tag ORDER BY all_time DESC`).bind(from).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -296,7 +310,7 @@ async function stats(env, tz, snapshots, email) {
     daily: daily.results || [], followers: followers.results || [], clicks: folded,
     targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0,
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
-    website: website.results || [],
+    website: website.results || [], course: course.results || [], courseHost: env.COURSE_HOST,
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
     revisions: revisions.results || [], funnel: funnel.results || [] });
@@ -405,7 +419,7 @@ async function links(env, tz, email, url) {
   ]);
 
   return linksPage({
-    email, tz, host: env.LINK_HOST,
+    email, tz, host: env.LINK_HOST, hostFor: (target) => hostFor(env, target),
     rows: rows.results || [],
     campaigns: campaigns.results || [],
     totals: totals || { links: 0, human: 0, crawler: 0 },

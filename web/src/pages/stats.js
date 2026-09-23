@@ -303,7 +303,7 @@ function totals(rows) {
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   targets = [], split = [], links = 0, days = WINDOW_DAYS,
   followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [],
-  revisions = [], funnel = [] }) {
+  revisions = [], funnel = [], course = [], courseHost = null }) {
   // Before anything is summed: see OWN_ACTIONS.
   daily = withoutOwnActions(daily);
   revisions = withoutOwnActions(revisions);
@@ -672,6 +672,21 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       crawler pressing both buttons at once. Bookings actually made are not measured anywhere.</p>`
     : '<p class="empty">No button presses on the site in this window.</p>';
 
+  /*
+   * The course's own card (2026-09-23). Its clicks are excluded from every
+   * social number and from the guest funnel above; here they are by profile,
+   * off the ending he put on each bio link.
+   */
+  const courseRows = course.length ? `<table>
+    <thead><tr><th>link</th><th class="num">all time</th><th class="num">last ${days} days</th></tr></thead>
+    <tbody>${course.map((c) => `<tr>
+      <td>${esc(c.tag || 'no ending, the generic link')}<div class="faint" style="font-size:.72rem">${esc(`${courseHost || ''}/${c.code}${c.tag ? `/${c.tag}` : ''}`)}</div></td>
+      <td class="num">${esc(num(c.all_time || 0))}</td><td class="num faint">${esc(num(c.recent || 0))}</td></tr>`).join('')}</tbody></table>
+    <p class="note">People, counted the same way as everything else. The ending names the profile
+      it was put on, not the person: a link can be copied anywhere. Not included in the social
+      clicks or the guest funnel.</p>`
+    : '<p class="empty">Nobody has opened a course link yet.</p>';
+
   const splitCard = (crawler || unknown || human) ? `
     <table>
       <thead><tr><th>traffic</th><th class="num">hits</th></tr></thead>
@@ -878,7 +893,10 @@ ${card('Channels, side by side', channelTable)}
   ${card('What they clicked', targetRows)}
 </div>
 
-${card('On the website', websiteRows)}
+<div class="two">
+  ${card('On the website', websiteRows)}
+  ${card('The course', courseRows)}
+</div>
 
 <div class="two">
   ${card('What counted, and what did not', splitCard)}

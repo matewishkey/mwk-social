@@ -108,12 +108,34 @@ test('the comment renders the post\'s own page, and still reads as ours', () => 
  * thing that can silently regress: the item's destination is returned WHOLE,
  * before any minting, so it cannot come back as a mwkshow.com code.
  */
-test('the link slot hands back the item\'s own destination, unminted', () => {
+test('the link slot hands back the item\'s own destination, through destination()', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
-  assert.match(src, /async function linkFor\(platform, opts, medium\) \{\n\s*if \(opts\.link\) return opts\.link;/,
-    'the early return is the rule — anything below it mints');
-  assert.match(src, /commentLink\(opts\.link\) \|\| await shortlink\.mint\(/,
+  assert.match(src, /if \(opts\.link\) return shortlink\.destination\(opts\.link, where\);/,
+    'the early return is the rule — only destination() decides whether it is minted');
+  assert.match(src, /commentLink\(opts\.link\) \? await shortlink\.destination\(opts\.link, where\)/,
     'the comment uses the same destination, filtered to links that are his');
+});
+
+/*
+ * TWO THINGS ARE TRACKED NOW (2026-09-23): the show and the course. A course
+ * page is minted (the worker prints it on piy.show); a project or vendor page
+ * still goes out whole.
+ */
+test('destination() mints a course page and leaves everything else alone', async () => {
+  const realFetch = global.fetch;
+  const sent = [];
+  process.env.MWK_LOG_URL = 'https://example.test/events';
+  process.env.MWK_LOG_TOKEN = 'x';
+  global.fetch = async (_u, o) => { sent.push(JSON.parse(o.body)); return { ok: true, json: async () => ({ ok: true, url: 'https://piy.show/c0de' }) }; };
+  try {
+    const COURSE = 'https://promptityourself.com/courses/open-the-door';
+    assert.strictEqual(await shortlink.destination(COURSE, { platform: 'facebook' }), 'https://piy.show/c0de');
+    assert.strictEqual(sent[0].target, COURSE);
+    assert.strictEqual(await shortlink.destination(PROJECT, {}), PROJECT, 'a project page is not minted');
+    assert.strictEqual(await shortlink.destination(ELGATO, {}), ELGATO);
+    assert.strictEqual(sent.length, 1);
+    assert.ok(voice.carriesCta(COURSE), 'a plain course url in a comment must still read as ours');
+  } finally { global.fetch = realFetch; }
 });
 
 test('run-queue carries the destination from the row to the publish', () => {
@@ -197,7 +219,7 @@ test('both writer and reader are wired, not just declared', () => {
   assert.match(rq, /commentState\.recordLinks\(/, 'the publisher must write it down');
   const fc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
   assert.match(fc, /commentState\.linkFor\(state, target\.key\)/, 'the watcher must read it');
-  assert.match(fc, /ourLink \|\| await shortlink\.mint\(/,
+  assert.match(fc, /\(ourLink\n\s*\? await shortlink\.destination\(ourLink,/,
     'and it must take precedence over minting, or the show comes back');
 });
 
@@ -219,14 +241,14 @@ test('a vendor page is refused as a comment, which is why it must not reach one'
 test('the comment keeps the show when the destination is not his', () => {
   const src = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
   assert.match(src, /const commentLink = \(link\) => \(link && voice\.carriesCta\(link\) \? link : null\);/);
-  assert.match(src, /commentLink\(opts\.link\) \|\| await shortlink\.mint\(/);
+  assert.match(src, /commentLink\(opts\.link\) \? await shortlink\.destination\(opts\.link, where\)/);
 
   const fc = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'first-comment.js'), 'utf8');
   assert.match(fc, /itemLink && voice\.carriesCta\(itemLink\) \? itemLink : null/,
     'the watcher needs the same guard — it composes through the same function');
 
   // The slots do NOT have this guard, on purpose: a pin may point anywhere.
-  assert.match(src, /async function linkFor\(platform, opts, medium\) \{\n\s*if \(opts\.link\) return opts\.link;/);
+  assert.match(src, /if \(opts\.link\) return shortlink\.destination\(opts\.link, where\);/);
 });
 
 test('queue-add says so, rather than leaving it to be noticed at publish time', () => {

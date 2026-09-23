@@ -732,8 +732,16 @@ table, on no page, and read by nothing without anything looking wrong.
   land on `COURSE_FALLBACK` and none is counted (`isCourseHost` in `web/src/links.js`, three
   tests). `piy.show/otd` is the Open the Door course; each profile carries
   `piy.show/otd/<profile>`, so the TAG names the profile and one code serves all of them. The
-  dashboard prints any code as `mwk.show/…`; for a course code that is cosmetic, and `piy.show`
-  is the form to hand out.
+  dashboard prints a course code on `piy.show` (`hostFor()`).
+  - **TWO DESTINATIONS, TWO SCOREBOARDS** (mate, 2026-09-23: *"we have two different pages to
+    track"*). A course code is told apart by its TARGET being on `links.course`, never by
+    campaign or platform — `otd` carries no platform, so before this every course click was a
+    social click and counted toward the show's guest funnel. `courseSql()` is the one SQL
+    definition; the stats page gives the course its own card, by profile ending.
+  - **The publisher mints a course page too** (`shortlink.destination()`): a `--link` on the
+    course site goes out as a `piy.show` code in the slots and the comment; a project or vendor
+    page still goes out whole. `promptityourself.com/` is in `markers[]` so a comment carrying
+    the plain url after a failed mint is still recognised as ours.
 - **Short links, the rest:** A click stores the code, the time and the referring
   host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
   miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must

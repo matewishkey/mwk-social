@@ -207,7 +207,8 @@ async function commentFor(platform, text, opts) {
   // phrase still stands in — an unclickable project page is no better than an
   // unclickable show page.
   const linkUrl = live
-    ? (commentLink(opts.link) || await shortlink.mint({ ...where, label: opts.title || null }))
+    ? (commentLink(opts.link) ? await shortlink.destination(opts.link, where)
+      : await shortlink.mint({ ...where, label: opts.title || null }))
     : null;
 
   /*
@@ -362,10 +363,10 @@ const tagsInCaption = (platform) => {
  * shortlink.isShowLink() is where that rule lives.
  */
 async function linkFor(platform, opts, medium) {
-  if (opts.link) return opts.link;
   const postKey = opts.postKey || `new:${voice.hash(opts.text)}`;
   const where = { platform, postKey, clipId: opts.clipId || null,
     campaign: opts.campaign || 'clip', medium };
+  if (opts.link) return shortlink.destination(opts.link, where);
   return (await shortlink.mint({ ...where, label: opts.title || null }))
     || voice.config().links.show;
 }

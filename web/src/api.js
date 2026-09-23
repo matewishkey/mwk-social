@@ -17,6 +17,7 @@
  */
 
 import { tokenOk, ulid, shortCode } from './lib/access.js';
+import { hostFor } from './links.js';
 
 const json = (o, status = 200) => Response.json(o, { status });
 
@@ -413,7 +414,7 @@ export async function mint(env, {
     if (!code) throw new Error(`"${wanted}" will not do as a code — letters, numbers and dashes, 2 to 24 of them`);
     const already = await env.DB.prepare('SELECT code, target FROM link WHERE code = ?').bind(code).first();
     if (already) {
-      if (already.target === target) return { code, url: linkUrl(env, code), reused: true };
+      if (already.target === target) return { code, url: linkUrl(env, code, target), reused: true };
       throw new Error(`${code} is already taken, and it points somewhere else`);
     }
     await env.DB.prepare(
@@ -422,7 +423,7 @@ export async function mint(env, {
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
     ).bind(code, target, platform, clipId, postKey, label, new Date().toISOString(),
       campaign, medium, createdBy, note).run();
-    return { code, url: linkUrl(env, code), reused: false };
+    return { code, url: linkUrl(env, code, target), reused: false };
   }
 
   const seq = /^[a-z]{1,4}$/.test(String(codePrefix || '')) ? codePrefix : null;
@@ -457,7 +458,7 @@ export async function mint(env, {
       ORDER BY created_at`,
   ).bind(target, platform, clipId, postKey, campaign, medium).all();
   const existing = (owned.results || []).find((r) => !seqOnly || seqOnly.test(r.code));
-  if (existing) return { code: existing.code, url: linkUrl(env, existing.code), reused: true };
+  if (existing) return { code: existing.code, url: linkUrl(env, existing.code, target), reused: true };
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = seq ? `${seq}${await nextInSequence(env, seq)}` : shortCode(5);
@@ -468,7 +469,7 @@ export async function mint(env, {
          VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       ).bind(code, target, platform, clipId, postKey, label, new Date().toISOString(),
         campaign, medium, createdBy, note).run();
-      return { code, url: linkUrl(env, code), reused: false };
+      return { code, url: linkUrl(env, code, target), reused: false };
     } catch { /* collision on the primary key — try another */ }
   }
   throw new Error('could not mint a code');
@@ -483,7 +484,7 @@ async function mintLink(body, env) {
   }
 }
 
-export const linkUrl = (env, code) => `https://${env.LINK_HOST}/${code}`;
+export const linkUrl = (env, code, target = null) => `https://${hostFor(env, target)}/${code}`;
 
 /* ---------------------------------------------------------------- actions -- */
 

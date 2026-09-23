@@ -111,3 +111,43 @@ test('a miss on piy.show falls back to the course, and on mwk.show to the show',
   assert.strictEqual((await hit('piy.show', '', ROWS)).to, 'https://promptityourself.com/');
   assert.strictEqual((await hit('mwk.show', 'nope', ROWS)).to, 'https://matewishkey.com/show');
 });
+
+/*
+ * TWO DESTINATIONS, TWO SCOREBOARDS (2026-09-23). A course code is told apart
+ * by its TARGET: piy.show/otd has no platform, so without this every course
+ * click was a "social" click and counted toward the show's guest funnel.
+ */
+const COURSE_ENV = { LINK_HOST: 'mwk.show', COURSE_HOST: 'piy.show', COURSE_FALLBACK: 'https://promptityourself.com/' };
+
+test('a course code prints on piy.show, a show code on mwk.show', async () => {
+  const { hostFor } = await import(path.join(__dirname, '..', 'web', 'src', 'links.js'));
+  assert.strictEqual(hostFor(COURSE_ENV, 'https://promptityourself.com/courses/open-the-door'), 'piy.show');
+  assert.strictEqual(hostFor(COURSE_ENV, 'https://matewishkey.com/show'), 'mwk.show');
+  assert.strictEqual(hostFor(COURSE_ENV, 'https://evilpromptityourself.com/x'), 'mwk.show', 'suffix is not the site');
+  assert.strictEqual(hostFor(COURSE_ENV, null), 'mwk.show');
+});
+
+test('the course SQL matches the course site and nothing else', async () => {
+  const { courseSql } = await import(path.join(__dirname, '..', 'web', 'src', 'links.js'));
+  const sql = courseSql(COURSE_ENV);
+  assert.match(sql, /l\.target = 'https:\/\/promptityourself\.com'/);
+  assert.match(sql, /l\.target LIKE 'https:\/\/promptityourself\.com\/%'/);
+  assert.strictEqual(courseSql({}), '0', 'no course configured must match nothing, not everything');
+});
+
+test('the social numbers exclude the course, and the funnel gives it its own stage', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
+  assert.match(src, /const SOCIAL = `l\.platform IS NOT 'website' AND NOT \$\{COURSE\}`/);
+  assert.match(src, /WHEN \$\{COURSE\} THEN 'course' ELSE 'social'/);
+});
+
+test('the stats page shows course clicks by profile ending', async () => {
+  const { statsPage } = await import(path.join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'));
+  const html = statsPage({ email: 'm@x.com', tz: 'Australia/Brisbane', daily: [], followers: [], clicks: [],
+    snapshots: {}, courseHost: 'piy.show',
+    course: [{ code: 'otd', tag: 'instagram', all_time: 3, recent: 2 }, { code: 'otd', tag: '', all_time: 1, recent: 1 }] });
+  const card = html.split('The course')[1] || '';
+  assert.match(card, /instagram/);
+  assert.match(card, /piy\.show\/otd\/instagram/);
+  assert.match(card, /generic link/);
+});

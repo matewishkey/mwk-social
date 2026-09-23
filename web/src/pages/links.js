@@ -100,8 +100,11 @@ export async function linksAction(request, env, email) {
 }
 
 export function linksPage({ email, tz, host, rows, campaigns, totals, minted, err,
-  shares = [], campaign = '', page = 1, size = 50, total = 0, params = '' }) {
-  const short = (code) => `https://${host}/${code}`;
+  shares = [], campaign = '', page = 1, size = 50, total = 0, params = '', hostFor = null }) {
+  // A course code prints on the course host (links.js hostFor); every host
+  // serves every code, so this is only which spelling to hand out.
+  const hostOf = (target) => (hostFor && target ? hostFor(target) : host);
+  const short = (code, target = null) => `https://${hostOf(target)}/${code}`;
   // queue/2026-08-21-dont-call-your-brother.mp4 -> dont-call-your-brother
   const clipName = (key) => (key || '').replace(/^.*\//, '').replace(/\.[a-z0-9]+$/i, '')
     .replace(/^\d{4}-\d{2}-\d{2}-/, '') || null;
@@ -115,8 +118,8 @@ export function linksPage({ email, tz, host, rows, campaigns, totals, minted, er
 
   const row = (l) => `<tr>
     <td class="code">
-      <a href="${esc(short(l.code))}" target="_blank" rel="noopener">${esc(l.code)}</a>
-      <button type="button" class="cp" data-t="${esc(short(l.code))}" title="Copy the whole link">copy</button>
+      <a href="${esc(short(l.code, l.target))}" target="_blank" rel="noopener">${esc(l.code)}</a>
+      <button type="button" class="cp" data-t="${esc(short(l.code, l.target))}" title="Copy the whole link">copy</button>
     </td>
     <td>${l.campaign
       ? `<a href="/links?campaign=${encodeURIComponent(l.campaign)}">${esc((meta(l.campaign) || {}).title || l.campaign)}</a>`

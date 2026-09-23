@@ -196,7 +196,7 @@ function parse(argv) {
     try { u = new URL(opt.link); } catch { throw new Error(`--link wants a url, got ${JSON.stringify(opt.link)}`); }
     if (!/^https?:$/.test(u.protocol)) throw new Error(`--link wants an http(s) url, got ${opt.link}`);
     if (voice.isOurLinkHost(u.hostname)) {
-      throw new Error(`--link wants the page's own full url, not a ${voice.shortLink().host} code — that host is the show's`);
+      throw new Error(`--link wants the page's own full url, not a ${u.hostname} code — we mint the code ourselves (the show on mwk.show, the course on piy.show)`);
     }
   }
 

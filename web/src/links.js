@@ -65,6 +65,26 @@ export function onCourseSite(env, target) {
     return h === want || h.endsWith(`.${want}`);
   } catch { return false; }
 }
+/*
+ * THE TWO DESTINATIONS, AND THE ONE PLACE THAT TELLS THEM APART (2026-09-23).
+ * A code is a COURSE code when its target is on the course site — by target,
+ * not by campaign or platform, because piy.show/otd carries no platform and a
+ * forgotten campaign must not quietly count a course click as a show click.
+ */
+export function courseOrigin(env) {
+  try { return new URL(env.COURSE_FALLBACK).origin; } catch { return null; }
+}
+export function courseSql(env, alias = 'l') {
+  const o = courseOrigin(env);
+  // From wrangler.toml, never from a request; the quote check is belt and braces.
+  if (!o || o.includes("'")) return '0';
+  return `(${alias}.target = '${o}' OR ${alias}.target LIKE '${o}/%')`;
+}
+// How a code is PRINTED: a course code on the course host, everything else on
+// the show's. Served on every host either way; this is only the spelling.
+export const hostFor = (env, target) =>
+  (env.COURSE_HOST && target && onCourseSite(env, target)) ? env.COURSE_HOST : env.LINK_HOST;
+
 export const fallbackFor = (env, hostname) =>
   (isCourseHost(env, hostname) && env.COURSE_FALLBACK) || env.LINK_FALLBACK;
 

@@ -51,6 +51,28 @@ function isShowLink(url) {
     || u.startsWith(`${show}/`) || u.startsWith(`${show}?`) || u.startsWith(`${show}#`);
 }
 
+/*
+ * THE COURSE IS THE SECOND THING WE TRACK (mate, 2026-09-23: "we have two
+ * different pages to track"). A url on the course site is minted too, and the
+ * worker prints it on piy.show (web/src/links.js hostFor). Everything that is
+ * neither the show nor the course still goes out whole.
+ */
+function isCourseLink(url) {
+  const course = voice.config().links.course;
+  if (!course) return false;
+  try { return new URL(url).origin === new URL(course).origin; } catch { return false; }
+}
+
+/**
+ * A post's own destination as it should be published: a course page becomes a
+ * piy.show code, anything else stays exactly as he wrote it. Never fatal — a
+ * failed mint publishes the full url.
+ */
+async function destination(link, where = {}) {
+  if (!link || !isCourseLink(link)) return link;
+  return (await mint({ ...where, target: link })) || link;
+}
+
 /**
  * @param {string} [opts.clipId] the QUEUE ITEM id. It is what makes a click
  *   answerable back to a video: queue_item carries the media_key, so
@@ -87,7 +109,7 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
   // The show, or no code at all — see isShowLink() above. Returning null is
   // the same answer an unreachable dashboard gives, and every caller already
   // handles it by publishing the plain url, which is exactly what is wanted.
-  if (!isShowLink(target)) return null;
+  if (!isShowLink(target) && !isCourseLink(target)) return null;
   try {
     const res = await fetch(`${new URL(base).origin}/links`, {
       method: 'POST',
@@ -140,7 +162,7 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
     // second test is the 2026-09-22 rule and it is what leaves a project page,
     // a marketplace listing or a repo in a custom comment written out in full.
     if (voice.isOurLinkHost(host(url))) continue;
-    if (!isShowLink(url)) continue;
+    if (!isShowLink(url) && !isCourseLink(url)) continue;
     const short = await mint({ platform, postKey, clipId, campaign, medium,
       target: url, label: url.slice(0, 120) });
     if (short) out = out.split(url).join(short);
@@ -148,4 +170,4 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
   return out;
 }
 
-module.exports = { mint, trackLinks, isShowLink, URL_RE };
+module.exports = { mint, trackLinks, isShowLink, isCourseLink, destination, URL_RE };

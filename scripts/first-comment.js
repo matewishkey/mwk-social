@@ -438,10 +438,13 @@ async function main() {
       const itemLink = commentState.linkFor(state, target.key);
       const ourLink = itemLink && voice.carriesCta(itemLink) ? itemLink : null;
       const linkUrl = (override || !live) ? null
-        : (ourLink || await shortlink.mint({
-          platform: target.platform, postKey: target.key, label: target.url || null,
-          postUrl: target.url || null, campaign: 'clip', medium: 'comment',
-        }));
+        : (ourLink
+          ? await shortlink.destination(ourLink, { platform: target.platform, postKey: target.key,
+            postUrl: target.url || null, campaign: 'clip', medium: 'comment' })
+          : await shortlink.mint({
+            platform: target.platform, postKey: target.key, label: target.url || null,
+            postUrl: target.url || null, campaign: 'clip', medium: 'comment',
+          }));
       // The platform's own cap on a comment, which is NOT its caption cap.
       // Composing past it is what a Threads 502 looks like from here.
       const commentMax = platformTable.get(target.platform).commentMax || null;
