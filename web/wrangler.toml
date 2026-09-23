@@ -49,6 +49,12 @@ custom_domain = true
 pattern = "mwkshow.com"
 custom_domain = true
 
+# The course's host. Same table, but every miss and every non-course code lands
+# on the course (web/src/links.js, isCourseHost).
+[[routes]]
+pattern = "piy.show"
+custom_domain = true
+
 [vars]
 INGEST_HOST = "ingest.matewishkey.com"
 DASHBOARD_HOST = "social.matewishkey.com"
@@ -56,7 +62,9 @@ DASHBOARD_HOST = "social.matewishkey.com"
 LINK_HOST = "mwk.show"
 # Hosts that resolve the same codes but are never printed. Comma-separated.
 # config/voice.json -> shortLink.aliases is the same list; a test pins the pair.
-LINK_ALIASES = "mwkshow.com"
+LINK_ALIASES = "mwkshow.com,piy.show"
+COURSE_HOST = "piy.show"
+COURSE_FALLBACK = "https://promptityourself.com/"
 LINK_FALLBACK = "https://matewishkey.com/show"
 TZ_DISPLAY = "Australia/Brisbane"
 ACCESS_TEAM = "mergodon.cloudflareaccess.com"

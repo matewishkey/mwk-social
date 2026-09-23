@@ -50,6 +50,24 @@ const REFERER_PLATFORM = [
   [/(^|\.)(twitter|x)\.com$|^t\.co$/, 'twitter'],
 ];
 
+/*
+ * piy.show is the COURSE's host (mate, 2026-09-23: "if it is a piy.show it has
+ * to [go to a] promptityourself.com page, that is the course"). So its miss goes
+ * to the course, never to the show, and so does any code in the shared table
+ * whose target is not on the course site.
+ */
+export const isCourseHost = (env, hostname) =>
+  !!env.COURSE_HOST && String(hostname || '').toLowerCase() === env.COURSE_HOST.toLowerCase();
+export function onCourseSite(env, target) {
+  try {
+    const want = new URL(env.COURSE_FALLBACK).hostname;
+    const h = new URL(target).hostname;
+    return h === want || h.endsWith(`.${want}`);
+  } catch { return false; }
+}
+export const fallbackFor = (env, hostname) =>
+  (isCourseHost(env, hostname) && env.COURSE_FALLBACK) || env.LINK_FALLBACK;
+
 export function platformFromReferer(host) {
   if (!host) return null;
   const h = String(host).toLowerCase();
@@ -94,14 +112,19 @@ export async function redirect(request, env, url, ctx) {
   // %C3%96d%C3%B6n and normalising that straight gave "c3-96d-c3-b6n". Caught by
   // testing the live redirect with a real accented name rather than an ASCII one.
   const tag = second ? normaliseTag(decodeSafe(second)) : null;
-  if (!code || code === 'favicon.ico') return Response.redirect(env.LINK_FALLBACK, 302);
+  const fallback = fallbackFor(env, url.hostname);
+  if (!code || code === 'favicon.ico') return Response.redirect(fallback, 302);
 
-  const row = await env.DB.prepare('SELECT target FROM link WHERE code = ?').bind(code).first();
+  let row = await env.DB.prepare('SELECT target FROM link WHERE code = ?').bind(code).first();
+  // A course link leads to the course, always (mate, 2026-09-23). The table is
+  // shared across hosts, so piy.show/<a show code> exists — and is sent to the
+  // course rather than to the show, and not counted as a click on that code.
+  if (row && isCourseHost(env, url.hostname) && !onCourseSite(env, row.target)) row = null;
   // Straight through, byte for byte. The code already says which platform,
   // placement and campaign it belongs to — appending utm_ parameters would be
   // counting the same click twice, in somebody else's system, and would look
   // like more tracking than we actually do. Mate's call, 2026-08-22: keep it slim.
-  const target = (row && row.target) || env.LINK_FALLBACK;
+  const target = (row && row.target) || fallback;
 
   if (row) {
     let refererHost = null;

@@ -726,6 +726,14 @@ table, on no page, and read by nothing without anything looking wrong.
   printed under it is still ours, and forgetting it re-comments under every old post. The day
   `mwkshow.com` lapses, everything printed with it (Instagram and TikTok comments, pins) dies
   and whoever buys it gets the traffic; the YouTube descriptions were moved the same day.
+- **`piy.show` IS THE COURSE'S HOST, AND IT NEVER LEADS ANYWHERE ELSE** (mate, 2026-09-23: a
+  piy.show link *"has to [go to a] promptityourself.com page, that is the course"*). Same table,
+  but on that host a miss, a bare `/`, and any code whose target is not on the course site all
+  land on `COURSE_FALLBACK` and none is counted (`isCourseHost` in `web/src/links.js`, three
+  tests). `piy.show/otd` is the Open the Door course; each profile carries
+  `piy.show/otd/<profile>`, so the TAG names the profile and one code serves all of them. The
+  dashboard prints any code as `mwk.show/…`; for a course code that is cosmetic, and `piy.show`
+  is the form to hand out.
 - **Short links, the rest:** A click stores the code, the time and the referring
   host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
   miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must
