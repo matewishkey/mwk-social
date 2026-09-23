@@ -1025,6 +1025,12 @@ file** (*The platform table*, above). What is recorded here is only what has no 
   delete or edit via API. **A single video IS a Reel**, and the cap was 900 in the table until a
   measurement put it at 90 — nothing over 90 s has ever been sent, so raise it only after a
   longer clip has actually published.
+- **Pinterest's PROFILE website takes the full page, never a short code** (mate, 2026-09-23:
+  *"they are tricky, we can not use jump page"*) — Pinterest's policy bans shorteners and
+  redirects, so its bio is `matewishkey.com/show` untracked. **Pins are different, and so far
+  fine**: the 2026-09-22 pins still carried `mwkshow.com/<code>` a day later, read off the pin
+  page, and one counted click came through one. The same policy could strip them; re-read a
+  pin's `"link"` before assuming either way.
 - **Pinterest**: every pin needs a board, and **`zernio connect:get-pinterest-boards <id>`
   answers 405** while `GET /accounts/{id}/pinterest-boards` returns the list — `post.js` uses the
   REST route and **only READS**; it throws if the account has none, and the board we use was
