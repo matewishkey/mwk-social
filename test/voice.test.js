@@ -128,8 +128,17 @@ test('a cap tighter than the always-on set truncates the set', () => {
   assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#piyshow');
 });
 
+/*
+ * Threads makes the FIRST hashtag of a post its one topic tag and leaves every
+ * other one as plain text. Measured 2026-09-23 off our own comments: each read
+ * back as "piyshow #mwkshow #PromptItYourself ..." with the first # consumed.
+ */
+test('threads gets one tag, because it only ever links one', () => {
+  assert.strictEqual(voice.tagLine('threads', ['A', 'B']), '#piyshow');
+});
+
 test('the brand tag is on every post that has room for it', () => {
-  for (const p of ['instagram', 'threads', 'tiktok', 'facebook']) {
+  for (const p of ['instagram', 'tiktok', 'facebook']) {
     assert.ok(voice.tagLine(p, ['Trading']).includes('#mwkshow'), `${p} lost the brand tag`);
   }
 });
@@ -140,11 +149,11 @@ test('the brand tag is on every post that has room for it', () => {
  * of the three always-on tags outright. The spelling is his, CamelCase.
  */
 test('PromptItYourself is a tag again, spelled his way', () => {
-  assert.ok(voice.tagLine('threads', ['Trading']).includes('#PromptItYourself'));
+  assert.ok(voice.tagLine('facebook', ['Trading']).includes('#PromptItYourself'));
 });
 
 test('blocked tags never get through', () => {
-  const line = voice.tagLine('threads', ['ai', 'viral', 'Trading', 'fyp']);
+  const line = voice.tagLine('facebook', ['ai', 'viral', 'Trading', 'fyp']);
   assert.ok(!/#ai\b|#viral|#fyp/i.test(line));
   assert.ok(line.includes('#Trading'));
 });
@@ -180,7 +189,7 @@ test('pinning a variant that does not exist is refused', () => {
 });
 
 test('the motto tag rides along wherever there is room', () => {
-  for (const p of ['instagram', 'threads', 'tiktok', 'facebook', 'youtube', 'linkedin']) {
+  for (const p of ['instagram', 'tiktok', 'facebook', 'youtube', 'linkedin']) {
     assert.ok(voice.tagLine(p, ['VPN']).includes('#PromptItYourself'), `${p} lost the motto tag`);
   }
   // Instagram's budget is the binding one: three always-on leaves two topic

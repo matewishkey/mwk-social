@@ -122,7 +122,7 @@ node -e 'const v=require("./config/voice.json");
 ```
 
 **ALWAYS pass `--topics`.** The watcher only reaches a post with NO comment yet, and a pipeline
-post already has one — so omitting them means no topic tags anywhere but Threads, permanently.
+post already has one — so omitting them means no topic tags anywhere, permanently.
 That went out to five platforms on 2026-09-13 and none of them can be edited.
 
 ## 3. The media has to survive every platform it is aimed at
