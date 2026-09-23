@@ -1025,7 +1025,9 @@ file** (*The platform table*, above). What is recorded here is only what has no 
   daily cap; consent flags are required per post; no comments, DMs or FYP analytics via API.
 - **YouTube**: vertical <3min auto-classifies as a Short; impressions and CTR exist only in
   Studio's UI, not in any API. **Shorts DO take a custom 16:9 thumbnail** — see *Thumbnails*,
-  above; what cannot be set is the vertical cover in the Shorts feed.
+  above; what cannot be set is the vertical cover in the Shorts feed. Custom vertical Shorts
+  thumbnails exist since 2026-07-24 but for **Partner Program channels only**, with no API; ours is
+  set by hand in the YouTube app (any frame) or Studio desktop (three suggested frames).
 - **PLAYLISTS CAN BE LISTED AND ASSIGNED; CREATING ONE IS DOCUMENTED AND UNEXERCISED.**
   `posts:update-metadata --playlistId` assigns and `zernio connect:get-youtube-playlists
   <accountId>` lists. The addressing is the same trick descriptions use: `{platform, videoId,

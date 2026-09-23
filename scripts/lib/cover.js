@@ -24,6 +24,13 @@
  *     documents a way to set it. That one is the mobile app's "Edit cover".
  * Do not let a summary flatten those two into "we can set the thumbnail".
  *
+ * Re-measured 2026-09-23 on u9hHftjwJJg: maxresdefault is our 2,000 ms frame,
+ * oar2.jpg (1080x1920) is YouTube's own pick from mid-clip. And the one route
+ * that WOULD set the vertical cover is not open to us: YouTube's blog,
+ * 2026-07-24, gives custom Shorts thumbnails to Partner Program channels only,
+ * names no API for it, and otherwise offers three suggested frames in Studio
+ * on desktop or any frame in the mobile app. Both are by hand.
+ *
  * Every failure here is non-fatal by construction. The post is already live
  * when this runs; a cover that did not land is worth a line in the journal and
  * nothing more.
