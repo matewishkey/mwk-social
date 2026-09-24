@@ -218,6 +218,8 @@
   },
   "youtubeDescription": {
     "showBlurb": "Mate Wish Key is an unscripted vibe-coding show. A guest brings wishes. We try them live on their computer and see how far we get.\n\n{show}",
+    "piyLine": "The prompt: piy.show/{code}",
+    "_piyLine": "A PIY Short's description carries its prompt number directly above the show blurb (mate, 2026-09-25: \"we can do both\"). This is NOT the second address the note on showBlurb bans: that rule was about pointing at another PLATFORM (Twitch) and at the one the viewer is already on. Both of these are his, both are typed rather than tapped on a Short, and they answer two different questions: which prompt this video used, and where the show is. Which Shorts are PIY is promptityourself.com/prompts.json's answer (the shorts[] on each page), never ours. The host is written out because it is printed; piy.show is the course host in web/wrangler.toml.",
     "showBlurbPast": [
       "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is an unscripted vibe-coding show. A guest brings wishes. We try them live on their computer and see how far we get.\n\nApply to be a guest: {show}",
       "Why let others solve your problems with AI?\nPrompt it yourself!\nMate Wish Key is a show about curious people taking their first steps solving problems with AI, with a little guidance along the way.\n\nBring me something you wish your computer did: {show}",

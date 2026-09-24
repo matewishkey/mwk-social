@@ -43,6 +43,7 @@ const shortlink = require('./lib/shortlink');
 const platforms = require('./lib/platforms');
 const { youtubeProbe } = require('./lib/media');
 const showNotes = require('./lib/show-notes');
+const prompts = require('./lib/prompts');
 
 /*
  * The YouTube account id, resolved from the connection list rather than baked in
@@ -211,6 +212,21 @@ async function tailFor(id, title = null) {
   return voice.showBlurb(link);
 }
 
+/*
+ * The PIY number line for this video, or null (not a PIY Short, or the course
+ * site's list could not be read). A failed read is a NOTE, not a failure: the
+ * line is only ever added, never removed, so a missed run costs one sync cycle
+ * and nothing is taken off a description because the site was slow.
+ */
+function piyFor(id) {
+  try {
+    return prompts.line(prompts.forShort(id));
+  } catch (err) {
+    console.log(`note  ${id} — could not read ${prompts.indexUrl()} (${String(err.message).split('\n')[0]}); no PIY line this run`);
+    return null;
+  }
+}
+
 async function build(id) {
   const title = currentTitle(id);
   const tail = await tailFor(id, title);
@@ -242,7 +258,7 @@ async function build(id) {
 
   const opening = await summarise(topics.transcript, title);
   const tags = voice.tagLine('youtube', topics.tags);
-  return { title, description: `${opening}\n\n${tail}\n\n${tags}` };
+  return { title, description: `${opening}\n\n${prompts.place(tail, tail, piyFor(id))}\n\n${tags}` };
 }
 
 /** Has the show blurb been chosen, or is it still my paraphrase? */
@@ -341,7 +357,6 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
          */
         const tail = await tailFor(id);
         const ours = voice.findBlurb(existing);
-        if (ours === tail) continue;                             // current, nothing to do
 
         if (ours) {
           /*
@@ -357,8 +372,16 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
            * rebuild path — which is what the twelve Shorts would have done the
            * moment their dead tracked code had to come out.
            */
+          /*
+           * A PIY Short also carries its prompt number above the tail, and it
+           * rides the same one-line swap. `place()` returns the text unchanged
+           * when the line is already there, so "current" is still a plain
+           * compare and a re-run adds nothing.
+           */
+          const proposed = prompts.place(existing.replace(ours, () => tail), tail, piyFor(id));
+          if (proposed === existing) continue;                   // current, nothing to do
           proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
-            proposed: existing.replace(ours, tail), kind: 'swap' });
+            proposed, kind: 'swap' });
           continue;
         }
 
@@ -394,7 +417,7 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
            * thing to do quietly, however small the addition.
            */
           proposals.push({ videoId: id, title: currentTitle(id), currentText: existing,
-            proposed: `${existing.trim()}\n\n${tail}`, kind: 'append' });
+            proposed: `${existing.trim()}\n\n${prompts.place(tail, tail, piyFor(id))}`, kind: 'append' });
           console.log(`append ${id} — no captions after ${Math.round(hours)}h; proposing the show blurb alone`);
           continue;
         }
@@ -421,7 +444,8 @@ async function sync({ dryRun = false, limit = 50 } = {}) {
           console.log(`defer ${id} — empty and not captioned yet${hours == null ? '' : ` (${Math.round(hours)}h old)`}`);
           continue;
         }
-        empty = { title: currentTitle(id), description: await tailFor(id) };
+        const tail = await tailFor(id);
+        empty = { title: currentTitle(id), description: prompts.place(tail, tail, piyFor(id)) };
         console.log(`note  ${id} — no captions after ${Math.round(hours)}h; filling with the show blurb alone`);
       }
       const { title, description } = empty;

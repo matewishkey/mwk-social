@@ -356,8 +356,7 @@ function pageNumber(link, { index = null } = {}) {
   const slug = (u.pathname.match(/\/prompts\/([a-z0-9-]+)\/?$/) || [])[1];
   if (!slug) throw new Error(`${link} is not a prompt page (/prompts/<slug>)`);
   const src = index || `${u.origin}/prompts.json`;
-  const json = JSON.parse(execFileSync('curl', ['-4', '-sL', '--fail', '--max-time', '20', '--', src], { encoding: 'utf8', maxBuffer: 1 << 24 }));
-  const hit = (json.prompts || []).find((p) => p.slug === slug);
+  const hit = require('./lib/prompts').read(src).find((p) => p.slug === slug);
   if (!hit || !/^\d{3,4}$/.test(String(hit.code || ''))) {
     throw new Error(`${slug} is not in ${src} — the prompt page is not live yet, so it has no number`);
   }

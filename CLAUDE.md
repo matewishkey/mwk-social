@@ -757,8 +757,12 @@ table, on no page, and read by nothing without anything looking wrong.
     with no sync; only codes in our table are counted. 001-005 are in the table (2026-09-24).
   - ⚠ Two random codes are all digits (`43361`, `77235`); only `campaign = 'piy'` is a PIY number.
   - **The course (`/courses/…`) is not a prompt page**: it keeps its word code (`otd`).
-  - **Not built: a PIY number in the YouTube DESCRIPTION.** The tail's `{show}` slot is the
-    show's; a Short marked PIY still gets `mwk.show/sNN` there until that is decided.
+  - **A PIY Short's YouTube description carries BOTH** (mate, 2026-09-25: *"we can do both"*):
+    `The prompt: piy.show/NNN` directly above the show tail, whose `{show}` slot stays the
+    show's `mwk.show/sNN`. **Which Shorts are PIY is `prompts.json`'s `shorts[]`**, read by
+    `scripts/lib/prompts.js` (queue-add's number lookup uses the same read). The line rides the
+    one-line swap and `place()` adds it once, so a re-run changes nothing; why it is not the
+    banned second address is in `config/voice.json` → `_piyLine`.
 - **ONE LINK EACH WAY BETWEEN HIS TWO SITES** (mate, 2026-09-24: *"one generic links, we do not
   have to overcomplicate"*): `mwk.show/piy` on promptityourself.com → matewishkey.com, and
   `piy.show/mwk` on matewishkey.com → promptityourself.com. `campaign = 'site-link'`, platform
@@ -914,10 +918,11 @@ get its trial** — so compare the FIRST HOURS, not the lifetime number.
 
 ## Alerting and the box's state
 
-- ⚠ **NOTHING ALERTS ANYBODY TODAY.** `scripts/lib/health.js` is wired — three Healthchecks
-  dead-man checks, unset = no-op so a job never fails because the alerting did — but no
-  `MWK_HC_*_URL` is set (checked 2026-09-21), so every `health.ping` is a no-op. The code is
-  ready; the Healthchecks project is mate's account to create.
+- ⚠ **NOTHING ALERTS ANYBODY, AND THAT IS HIS CALL** (mate, 2026-09-25: *"skip it, you will
+  tell me here"*). `scripts/lib/health.js` is wired — three Healthchecks dead-man checks,
+  unset = no-op — but no `MWK_HC_*_URL` is set, and he declined creating the account. **The
+  `mwk-status` sweep IS the alert**: a failed unit or a stuck post is reported in the session.
+  Do not re-propose Healthchecks.
 - **A RED UNIT MEANT NOTHING WHILE ONE TRANSIENT ERROR COULD PAINT IT** (#36). A post carries its
   own consecutive-run count (`__failing` in the comment state) and only `MWK_COMMENT_STUCK_RUNS`
   failures in a row go red. **A SOURCE failure is deliberately still loud on the first run**: a
