@@ -187,28 +187,41 @@ export function weekBlocks(today, n = SITE_WEEKS) {
   return out;
 }
 
-export function websitesCard({ sites = null, clickDays = [], today = new Date().toISOString().slice(0, 10) }) {
+export function websitesCard({ sites = null, search = null, clickDays = [], today = new Date().toISOString().slice(0, 10) }) {
   const list = (sites && sites.sites) || [];
   if (!list.length) return '<p class="empty">No website visits shipped yet.</p>';
   const weeks = weekBlocks(today);
   const sum = (rows, key, w) => rows.filter((r) => r.date >= w.from && r.date <= w.to).reduce((a, r) => a + (r[key] || 0), 0);
   const clicks = clickDays.map((r) => ({ date: r.day, show: r.show, course: r.course }));
+  /*
+   * Google Search Console beside the visits: how often the site was SHOWN in
+   * Google and how often somebody clicked through. A site the robot cannot see
+   * reads "—", never 0, and the note says which (lib/search-console.js).
+   */
+  const gsc = Object.fromEntries(((search && search.sites) || []).map((x) => [x.host, x.days]));
+  const searchCells = (x, w) => (gsc[x.host]
+    ? `<td class="num">${esc(num(sum(gsc[x.host], 'impressions', w)))}</td><td class="num">${esc(num(sum(gsc[x.host], 'clicks', w)))}</td>`
+    : '<td class="num faint">—</td><td class="num faint">—</td>');
   const rows = weeks.map((w) => `<tr>
     <td class="nowrap">${esc(short(w.from))}–${esc(short(w.to))}</td>
-    ${list.map((x) => (x.since && w.to < x.since)
+    ${list.map((x) => ((x.since && w.to < x.since)
       ? '<td class="num faint">not tracked</td>'
-      : `<td class="num"><b>${esc(num(sum(x.days, 'visits', w)))}</b></td>`).join('')}
+      : `<td class="num"><b>${esc(num(sum(x.days, 'visits', w)))}</b></td>`) + searchCells(x, w)).join('')}
     <td class="num">${sum(clicks, 'show', w)}</td>
     <td class="num">${sum(clicks, 'course', w)}</td>
   </tr>`).join('');
   const interval = list.map((x) => x.sampleInterval).find(Boolean);
   return `<div class="wrap"><table>
-    <thead><tr><th>week</th>${list.map((x) => `<th class="num">${esc(x.host)} visits</th>`).join('')}
+    <thead><tr><th>week</th>${list.map((x) => `<th class="num">${esc(x.host)}<em class="sub">visits</em></th>
+      <th class="num">in Google<em class="sub">shown</em></th><th class="num">from Google<em class="sub">clicked</em></th>`).join('')}
       <th class="num">show link clicks</th><th class="num">course link clicks</th></tr></thead>
     <tbody>${rows}</tbody></table></div>
   <p class="note">Visits are Cloudflare's estimate: it keeps ${interval ? `1 page load in ${esc(String(interval))}` : 'a sample'}
     and multiplies, so a small week moves in tens. Your own visits are in them. Clicks are exact, people only,
-    and they are not a share of the visits: most apps send no referrer, so nobody can join the two.</p>`;
+    and they are not a share of the visits: most apps send no referrer, so nobody can join the two.
+    Google's columns come from Search Console, which runs two or three days behind, so the newest week is short.${
+  search && search.missing && search.missing.length ? ` Not connected yet: ${esc(search.missing.join(', '))}.` : ''}${
+  search ? '' : ' Search Console is not connected yet.'}</p>`;
 }
 
 const SEARCH_ENGINE = /(^|\.)(google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yandex\.[a-z]+|ecosia\.org|search\.brave\.com)$/;
@@ -795,7 +808,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
     <tbody>${clicks.map((c) => `<tr><td>${esc(c.platform || 'unattributed')}</td>
       <td class="num">${c.n}</td></tr>`).join('')}</tbody></table>`
     : `<p class="empty">${crawler || unknown
-      ? 'Nothing here is a person yet — see the breakdown opposite.'
+      ? 'No person has clicked one yet.'
       : `No short links have been clicked yet${links ? '' : ', and none have been minted'}.`}
        Only Facebook reports clicks natively, so away from it these links are the whole scoreboard.</p>`;
 
@@ -957,7 +970,10 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   ${trendTile(num(recent.views || 0), 'video views, last 7 days', 'plain', 'still growing for weeks', null)}
   ${trendTile(perPostNow.toFixed(1), 'actions per post, last 7 days', 'plain', 'our own taken off', null)}
   ${trendTile(human, 'show link clicks', human ? 'ok' : 'plain',
-    crawler || unknown ? `${crawler + unknown} crawler hits not counted` : 'people, not crawlers',
+    // Robots are filtered out and not mentioned (mate, 2026-09-25: "i do not
+    // care about robot visits"). The filter stays; only the count of what it
+    // threw away left the page.
+    'people only',
     change(clicksNow, clicksBefore))}
   ${trendTile(courseAll, 'course link clicks', courseAll ? 'ok' : 'plain', 'piy.show', null)}
   ${trendTile(num(followersNow), 'followers', 'plain',
@@ -981,7 +997,7 @@ ${funnelCard}
   ${card('The course', courseRows)}
 </div>
 
-${card('The websites, week by week', websitesCard({ sites: (snapshots.sites || {}).body || null, clickDays: siteClickDays }))}
+${card('The websites, week by week', websitesCard({ sites: (snapshots.sites || {}).body || null, search: (snapshots.search || {}).body || null, clickDays: siteClickDays }))}
 
 <div class="two">
   ${card('Where website visitors came from', sourcesCard({ sites: (snapshots.sites || {}).body || null }))}

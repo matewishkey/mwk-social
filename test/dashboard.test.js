@@ -733,14 +733,16 @@ test('the vertical surfaces are exactly the ones that reject a landscape cut', a
 
 // The click card must never present crawler traffic as people. It said "18
 // clicks" on the first live post when every one of them was a preview fetch.
-test('the stats page separates people from crawlers and says so', async () => {
+test('the stats page counts people only, and does not talk about the robots', async () => {
   const { statsPage } = await src('pages/stats.js');
   const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
     targets: [{ target: 'https://github.com/matewishkey/mwk-og-image-generator', n: 0, codes: 3 }],
     split: [{ bot: 1, n: 1 }, { bot: 2, n: 37 }], links: 9, snapshots: {} });
 
   assert.match(html, /<b>0<\/b>\s*<span>show link clicks<\/span>/, 'zero people is what to show');
-  assert.match(html, /38 crawler hits not counted/, 'and the ignored traffic is named, not hidden');
+  // mate, 2026-09-25: "i do not care about robot visits, can we remove it" --
+  // filtered, and no longer named.
+  assert.ok(!/crawler/.test(html), 'robot traffic is not mentioned');
   assert.ok(!/<b>38<\/b>\s*<span>link clicks/.test(html), 'the total must never be shown as clicks');
 });
 

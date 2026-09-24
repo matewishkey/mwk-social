@@ -34,6 +34,7 @@ const pace = require('./lib/pace');
 const voice = require('./lib/voice');
 const events = require('./lib/events');
 const { siteVisits } = require('./lib/site-visits');
+const { searchStats } = require('./lib/search-console');
 
 const DEFAULT_DAYS = 45;
 
@@ -263,6 +264,13 @@ async function main() {
   } catch (err) {
     console.error(`note: site visits not refreshed — ${String(err.message).split('\n')[0]}`);
   }
+  // Google Search Console, the same way (lib/search-console.js).
+  try {
+    snapshots.search = searchStats();
+    if (snapshots.search.missing.length) console.log(`note: Search Console cannot see ${snapshots.search.missing.join(', ')} yet`);
+  } catch (err) {
+    console.error(`note: search stats not refreshed — ${String(err.message).split('\n')[0]}`);
+  }
 
   if (dryRun) {
     console.log(`would ship ${rows.length} daily row(s) and ${folk.length} follower count(s) to ${origin}`);
@@ -273,6 +281,9 @@ async function main() {
     }
     for (const x of (snapshots.sites || {}).sites || []) {
       console.log(`  site ${x.host}: ${x.days.reduce((a, d) => a + d.visits, 0)} visits over ${x.days.length} day(s), sampled 1 in ${x.sampleInterval}`);
+    }
+    for (const x of (snapshots.search || {}).sites || []) {
+      console.log(`  search ${x.host}: ${x.days.reduce((a, d) => a + d.impressions, 0)} impressions, ${x.days.reduce((a, d) => a + d.clicks, 0)} clicks`);
     }
     for (const p of snapshots.posts) {
       console.log(`  post ${p.publishedAt.slice(0, 16)} ${p.title.slice(0, 50)} — ${p.platforms.map((x) => `${x.platform} ${x.views || x.impressions}`).join(', ')}`);

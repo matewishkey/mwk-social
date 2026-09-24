@@ -101,9 +101,23 @@ test('the websites card sets visits beside the week\'s clicks, show and course a
   const show = [600].filter(inWeek).length;
   const course = [1200, 1800, 2400].filter(inWeek).length;
   assert.ok(course > 0, 'the fixture must put at least one click in the block, or this proves nothing');
-  assert.deepStrictEqual(cells(thisWeek), ['50', '10', String(show), String(course)]);
-  assert.deepStrictEqual(cells(lastWeek), ['70', 'not tracked', '0', '0'],
+  // Per site: visits, shown in Google, clicked from Google. No Search Console
+  // snapshot, so Google reads "—", never 0.
+  assert.deepStrictEqual(cells(thisWeek), ['50', '—', '—', '10', '—', '—', String(show), String(course)]);
+  assert.deepStrictEqual(cells(lastWeek), ['70', '—', '—', 'not tracked', '—', '—', '0', '0'],
     'a week before the course site was tracked says so, rather than 0');
+  assert.match(card, /Search Console is not connected yet/);
+
+  // With Search Console: the site it can see gets numbers, the one it cannot says so.
+  const search = { body: { sites: [{ host: 'matewishkey.com', property: 'sc-domain:matewishkey.com',
+    days: [{ date: day(3), impressions: 120, clicks: 4 }, { date: day(10), impressions: 80, clicks: 1 }] }],
+  missing: ['promptityourself.com'] } };
+  const html2 = await stats({ ...ENV, DB: d1(seed()) }, 'Australia/Brisbane', { sites, search }, 'm@x.com');
+  const card2 = html2.split('The websites, week by week')[1].split('</section>')[0];
+  const [w1, w2] = card2.split('<tbody>')[1].split('</tr>');
+  assert.deepStrictEqual(cells(w1).slice(0, 6), ['50', '120', '4', '10', '—', '—']);
+  assert.deepStrictEqual(cells(w2).slice(0, 3), ['70', '80', '1']);
+  assert.match(card2, /Not connected yet: promptityourself\.com/);
   assert.match(card, /1 page load in 10/);
 
   const sources = html.split('Where website visitors came from')[1].split('</section>')[0];
