@@ -334,11 +334,28 @@ const AT_JITTER_MINUTES = pace.DEFAULTS.window
  * item is already queued, and the publisher will take the number itself.
  */
 async function piyLine(link, id) {
-  const url = await shortlink.mint({ target: link, numbered: true, postKey: `queue:${id}`,
+  const number = pageNumber(link);
+  const url = await shortlink.mint({ target: link, numbered: true, number, postKey: `queue:${id}`,
     clipId: id, campaign: 'piy', label: link });
   return url
-    ? `PIY number: ${url.replace(/^https?:\/\//, '')} -> ${link} (put it on the video)`
-    : `PIY number: NOT TAKEN (dashboard unreachable?) — the publisher takes it at publish time; ${link}`;
+    ? `PIY number: ${url.replace(/^https?:\/\//, '')} -> ${link}`
+    : `PIY number: NOT CONNECTED — piy.show/${number} will land on the course home until it is; ${link}`;
+}
+
+/*
+ * THE NUMBER IS THE ONE THE PAGE PRINTS (2026-09-24). He numbers the prompts
+ * on the course site (#005) and each page prints its own piy.show/NNN, so that
+ * is read, not chosen here. A page printing none, or two different ones, stops
+ * the queue: a short with a number that leads nowhere is the thing to avoid.
+ * `curl -4`: no IPv6 route on this box (CLAUDE.md, the Meta CDN trap).
+ */
+function pageNumber(link) {
+  const html = execFileSync('curl', ['-4', '-sL', '--max-time', '20', '--', link], { encoding: 'utf8', maxBuffer: 1 << 24 });
+  const found = [...new Set([...html.matchAll(/piy\.show\/(\d{3,4})\b/g)].map((m) => m[1]))];
+  if (found.length !== 1) {
+    throw new Error(`${link} prints ${found.length ? `several PIY numbers (${found.join(', ')})` : 'no piy.show number'} — put exactly one on the page first`);
+  }
+  return found[0];
 }
 
 /** The INSERT, as text. Separated out so a test can read it without a network. */
@@ -449,7 +466,7 @@ async function main() {
     console.log(sql);
     // A dry run is exactly when he wants to hear this, so it is not only on
     // the success path.
-    if (opt.piy) console.log('-- gets the next PIY number when it is really queued (a dry run does not take one)');
+    if (opt.piy) console.log(`-- PIY number on the page: piy.show/${pageNumber(opt.link)} (connected when it is really queued)`);
     console.log(`-- ${gateLine(opt)}`);
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
@@ -494,4 +511,4 @@ if (require.main === module) {
   main().catch((e) => { console.error(e.message); process.exit(1); });
 }
 
-module.exports = { lit, sqlFor, parse, unlockAt, gateLine, AT_JITTER_MINUTES };
+module.exports = { lit, sqlFor, parse, unlockAt, gateLine, pageNumber, AT_JITTER_MINUTES };

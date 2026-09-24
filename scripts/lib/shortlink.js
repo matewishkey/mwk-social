@@ -108,7 +108,7 @@ async function destination(link, where = {}) {
  */
 async function mint({ platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, target: wanted = null, codePrefix = null,
-  postUrl = null, numbered = false } = {}) {
+  postUrl = null, numbered = false, number = null } = {}) {
   const cfg = voice.shortLink();
   if (!cfg.enabled) return null;
 
@@ -126,7 +126,7 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, platform, clipId, postKey, label, campaign, medium,
-        codePrefix, postUrl, numbered, createdBy: 'pipeline' }),
+        codePrefix, postUrl, numbered, number, createdBy: 'pipeline' }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;

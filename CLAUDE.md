@@ -745,12 +745,14 @@ table, on no page, and read by nothing without anything looking wrong.
 - **A PIY SHORT GETS A NUMBER: `piy.show/007` → `promptityourself.com/prompts/<slug>`** (mate,
   2026-09-24). Two kinds of short, the show's and PIY; **which is which is his to say**, and
   `queue-add.js --piy <slug>` is how it is said. One number per PROMPT PAGE (not per placement:
-  it is burned into the video), taken at queue time and printed on the `queued` block, and
+  it is burned into the video), connected at queue time and printed on the `queued` block, and
   printed in the comment even on Instagram, TikTok and Shorts because it is typed, not tapped.
   Plain numbers are reserved (`normaliseCode` refuses them, the random mint skips them).
-  - ⚠ **The sequence counts `campaign = 'piy'` only.** Two random codes minted before the
-    numbers existed are all digits (`43361`, `77235`); counting every all-digit code would have
-    made the first PIY short `piy.show/77236`. Caught live, before a number was taken.
+  - **THE NUMBER IS HIS, AND THE PAGE PRINTS IT.** The course site numbers its prompts (#001 …)
+    and each page prints its own `piy.show/NNN`; `queue-add.js` reads it off the page
+    (`pageNumber`) and nothing here allocates one. A counter was the first version and would
+    have called his fifth prompt 001. 001-005 were connected on 2026-09-24, each read off its page.
+  - ⚠ Two random codes are all digits (`43361`, `77235`); only `campaign = 'piy'` is a PIY number.
   - **The course (`/courses/…`) is not a prompt page**: it keeps its word code (`otd`).
   - **Not built: a PIY number in the YouTube DESCRIPTION.** The tail's `{show}` slot is the
     show's; a Short marked PIY still gets `mwk.show/sNN` there until that is decided.

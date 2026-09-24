@@ -24,6 +24,9 @@ function fakeDb(rows = []) {
           if (/SELECT code FROM link WHERE target = \?/.test(sql)) {
             return rows.find((r) => r.target === a[0] && /^\d+$/.test(r.code) && piy(r)) || null;
           }
+          if (/SELECT target FROM link WHERE code = \?/.test(sql)) {
+            return rows.find((r) => r.code === a[0]) || null;
+          }
           if (/SELECT MAX\(CAST\(code AS INTEGER\)\)/.test(sql)) {
             const nums = rows.filter((r) => /^\d+$/.test(r.code) && piy(r)).map((r) => Number(r.code));
             return { n: nums.length ? Math.max(...nums) : null };
@@ -38,20 +41,22 @@ function fakeDb(rows = []) {
   };
 }
 
-test('the first prompt page gets 001, the next 002, and a page keeps its number', async () => {
+test('the number is the one he gives, a page keeps it, and a clash is refused', async () => {
   const { mint } = await import(path.join(__dirname, '..', 'web', 'src', 'api.js'));
-  // 77235 is real: a random code minted before the numbers existed that happens
-  // to be all digits. Counting from it made the first PIY number 77236.
-  const env = { ...ENV, DB: fakeDb([{ code: 'otd', target: 'https://promptityourself.com/courses/open-the-door' },
-    { code: '77235', target: 'https://matewishkey.com/show', campaign: null }]) };
-  const a = await mint(env, { target: REFUND, numbered: true, clipId: 'x' });
-  assert.strictEqual(a.code, '001');
-  assert.strictEqual(a.url, 'https://piy.show/001', 'printed on the course host');
-  const b = await mint(env, { target: 'https://promptityourself.com/prompts/dial', numbered: true, clipId: 'y' });
-  assert.strictEqual(b.code, '002');
+  // 77235 is real: a random all-digit code from before the numbers existed.
+  const env = { ...ENV, DB: fakeDb([{ code: '77235', target: 'https://matewishkey.com/show', campaign: null }]) };
+  const a = await mint(env, { target: REFUND, numbered: true, number: '005', clipId: 'x' });
+  assert.strictEqual(a.code, '005', 'his fifth prompt is 005, whatever came before it here');
+  assert.strictEqual(a.url, 'https://piy.show/005', 'printed on the course host');
   const again = await mint(env, { target: REFUND, numbered: true, clipId: 'z', platform: 'instagram', medium: 'comment' });
-  assert.strictEqual(again.code, '001', 'every placement of one post prints the same number');
+  assert.strictEqual(again.code, '005', 'every placement of one post prints the same number');
   assert.strictEqual(again.reused, true);
+  await assert.rejects(mint(env, { target: 'https://promptityourself.com/prompts/other', numbered: true, number: '005', clipId: 'y' }),
+    /already/, 'one number, one page');
+  await assert.rejects(mint(env, { target: REFUND, numbered: true, number: '006', clipId: 'y' }),
+    /already piy\.show\/005/, 'a page does not change its number by accident');
+  await assert.rejects(mint(env, { target: 'https://promptityourself.com/prompts/new', numbered: true, clipId: 'y' }),
+    /no PIY number yet/, 'nothing is allocated here: the number is his');
 });
 
 test('only a page on the course site may have a number', async () => {
@@ -116,4 +121,15 @@ test('the number is printed even where nothing is clickable', async () => {
     if (was === undefined) delete process.env.MWK_COMMENT_STATE; else process.env.MWK_COMMENT_STATE = was;
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('queue-add reads the number the page prints, and refuses a page with none or two', () => {
+  const { pageNumber } = require('../scripts/queue-add');
+  const fs = require('fs'); const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pn-'));
+  const page = (html) => { const f = path.join(dir, `${Math.random()}.html`); fs.writeFileSync(f, html); return `file://${f}`; };
+  assert.strictEqual(pageNumber(page('<p>Type <b>piy.show/005</b></p><a href="https://piy.show/005">x</a>')), '005');
+  assert.throws(() => pageNumber(page('<p>nothing</p>')), /no piy\.show number/);
+  assert.throws(() => pageNumber(page('piy.show/004 and piy.show/005')), /several/);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

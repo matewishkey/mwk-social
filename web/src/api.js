@@ -399,7 +399,7 @@ export async function resolveClipId(env, postKey, postUrl = null) {
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
-  codePrefix = null, postUrl = null, numbered = false,
+  codePrefix = null, postUrl = null, numbered = false, number = null,
 }) {
   clipId = clipId || await resolveClipId(env, postKey, postUrl);
 
@@ -414,30 +414,34 @@ export async function mint(env, {
    * a page on the course site may have one.
    */
   if (numbered) {
+    /*
+     * THE NUMBER IS HIS, AND THE PAGE SAYS IT (2026-09-24). A counter here was
+     * the first version, and it would have called his fifth prompt 001: the
+     * course site numbers its prompts itself (#001 … #005) and prints
+     * piy.show/NNN on each page. So the number is passed in — queue-add reads
+     * it off the page — and a page that already has one keeps it. Nothing is
+     * ever allocated here: two sources of numbers is how they drift apart.
+     */
     if (!onCourseSite(env, target)) throw new Error(`a numbered code is for a prompt page on the course site, not ${target}`);
     const own = await env.DB.prepare(
       "SELECT code FROM link WHERE target = ? AND campaign = 'piy' AND code NOT GLOB '*[^0-9]*' ORDER BY created_at",
     ).bind(target).first();
-    if (own) return { code: own.code, url: linkUrl(env, own.code, target), reused: true };
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const top = await env.DB.prepare(
-        // campaign = 'piy', not "every all-digit code": two random codes minted
-        // before the numbers existed are all digits (77235 is a Reddit bio), and
-        // counting from them would have made the first PIY short piy.show/77236.
-        "SELECT MAX(CAST(code AS INTEGER)) n FROM link WHERE campaign = 'piy' AND code NOT GLOB '*[^0-9]*'",
-      ).first();
-      const code = String(((top && top.n) || 0) + 1).padStart(3, '0');
-      try {
-        await env.DB.prepare(
-          `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,
-             campaign, medium, created_by, note)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
-        ).bind(code, target, null, clipId, postKey, label, new Date().toISOString(),
-          'piy', null, createdBy, note).run();
-        return { code, url: linkUrl(env, code, target), reused: false };
-      } catch { /* two callers raced for the same number — take the next */ }
+    const wantedNumber = number == null ? null : String(number).trim();
+    if (wantedNumber !== null && !/^\d{3,4}$/.test(wantedNumber)) throw new Error(`a PIY number is three digits, got ${JSON.stringify(number)}`);
+    if (own) {
+      if (wantedNumber && wantedNumber !== own.code) throw new Error(`${target} is already piy.show/${own.code}, not ${wantedNumber}`);
+      return { code: own.code, url: linkUrl(env, own.code, target), reused: true };
     }
-    throw new Error('could not allocate a PIY number');
+    if (!wantedNumber) throw new Error(`${target} has no PIY number yet, and the number is his: pass the one on the page`);
+    const taken = await env.DB.prepare('SELECT target FROM link WHERE code = ?').bind(wantedNumber).first();
+    if (taken) throw new Error(`piy.show/${wantedNumber} is already ${taken.target}`);
+    await env.DB.prepare(
+      `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,
+         campaign, medium, created_by, note)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+    ).bind(wantedNumber, target, null, clipId, postKey, label, new Date().toISOString(),
+      'piy', null, createdBy, note).run();
+    return { code: wantedNumber, url: linkUrl(env, wantedNumber, target), reused: false };
   }
 
   /*

@@ -109,7 +109,7 @@ use it themselves?** If they would have to look it up, it is wrong.
   Instagram's five, all of Pinterest's three, and the one tag X and Threads get — so a topic tag
   reaches Instagram twice over at most.
 - **A PIY short is queued with `--piy <slug>`** (2026-09-24): it points at
-  `promptityourself.com/prompts/<slug>` and takes the next number, `piy.show/007`, printed on the
+  `promptityourself.com/prompts/<slug>` and connects the number THE PAGE prints (`piy.show/005`), shown on the
   `queued` block so it can go on the video. One number per prompt page, printed in every comment
   even where nothing is clickable, because it is typed. **Which shorts are PIY is his to say.**
 - **No credit line unless he asks for one on THAT post.** The `@thechrisgoor #couchtocreator`
