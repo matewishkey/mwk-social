@@ -35,6 +35,8 @@ function seed() {
   link.run('show1', 'https://matewishkey.com/show', 'facebook', at(9000), 'clip');
   link.run('otd', 'https://promptityourself.com/courses/open-the-door', null, at(9000), 'course');
   link.run('30zc4', 'https://calendar.app.google/x', 'website', at(9000), 'book');
+  link.run('mwk', 'https://promptityourself.com/', 'website', at(9000), 'site-link');
+  link.run('piy', 'https://matewishkey.com/', 'website', at(9000), 'site-link');
   const click = db.prepare('INSERT INTO click (code, at, referer_host, bot, tag) VALUES (?,?,?,?,?)');
   // Each hit alone in time, so every one counts as a person (lib/clicks.js).
   click.run('show1', at(600), null, 0, null);
@@ -42,6 +44,9 @@ function seed() {
   click.run('otd', at(1800), null, 0, 'instagram');
   click.run('otd', at(2400), null, 0, null);
   click.run('30zc4', at(3000), null, 0, null);
+  click.run('mwk', at(3600), null, 0, null);
+  click.run('piy', at(4200), null, 0, null);
+  click.run('piy', at(4800), null, 0, null);
   return db;
 }
 
@@ -59,11 +64,16 @@ test('a course click is never a show click, and the course card has it by profil
   const funnel = html.split('Does any of it produce a guest')[1] || '';
   assert.match(funnel, /clicked a show link in a post[\s\S]*?<td class="num">1<\/td>/,
     'the guest funnel counts the show click only');
+  // The links between his two sites: their own card, and in nothing else.
+  const between = html.split('Between the two sites')[1].split('</section>')[0];
+  assert.match(between, /show site → course site[\s\S]*?piy\.show\/mwk[\s\S]*?<td class="num">1<\/td>/);
+  assert.match(between, /course site → show site[\s\S]*?mwk\.show\/piy[\s\S]*?<td class="num">2<\/td>/);
+  assert.ok(!/<b>mwk<\/b>|piy\.show\/mwk/.test(course.split('</section>')[0]), 'the site link is not a course click');
 });
 
 test('with no course configured, every click is the show again (the control)', async () => {
   const { stats } = await import(path.join(__dirname, '..', 'web', 'src', 'index.js'));
   const html = await stats({ LINK_HOST: 'mwk.show', DB: d1(seed()) }, 'Australia/Brisbane', {}, 'm@x.com');
   const tile = html.split('<div class="tile').find((t) => t.includes('<span>show link clicks</span>')) || '';
-  assert.match(tile, /<b>4<\/b>/, 'if this read 1 the split above would be proving nothing');
+  assert.match(tile, /<b>4<\/b>/, 'if this read 1 the split above would be proving nothing (site links are website, so out either way)');
 });

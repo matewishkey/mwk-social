@@ -406,7 +406,8 @@ function totals(rows) {
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   split = [], links = 0, days = WINDOW_DAYS,
   followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {},
-  revisions = [], funnel = [], course = [], courseHost = null, postClicks = [] }) {
+  revisions = [], funnel = [], course = [], courseHost = null, postClicks = [], siteLinks = [],
+  linkHost = null }) {
   // Before anything is summed: see OWN_ACTIONS.
   daily = withoutOwnActions(daily);
   revisions = withoutOwnActions(revisions);
@@ -718,6 +719,17 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
    * off the ending he put on each bio link.
    */
   const courseAll = course.reduce((a, c) => a + (c.recent || 0), 0);
+  // One row each way; the host is the one the code is printed on.
+  const siteRows = siteLinks.length ? `<table>
+    <thead><tr><th>link</th><th class="num">all time</th><th class="num">last ${days} days</th></tr></thead>
+    <tbody>${siteLinks.map((l) => {
+      const toCourse = /promptityourself\.com/.test(l.target || '');
+      return `<tr><td>${toCourse ? 'show site → course site' : 'course site → show site'}
+        <div class="faint" style="font-size:.72rem">${esc(`${toCourse ? courseHost || '' : linkHost || ''}/${l.code}`)}</div></td>
+        <td class="num">${esc(num(l.all_time || 0))}</td><td class="num faint">${esc(num(l.recent || 0))}</td></tr>`;
+    }).join('')}</tbody></table>
+    <p class="note">People moving from one of his sites to the other. Not in the social or course numbers.</p>`
+    : '<p class="empty">No links between the sites yet.</p>';
   const courseRows = course.length ? `<table>
     <thead><tr><th>link</th><th class="num">all time</th><th class="num">last ${days} days</th></tr></thead>
     <tbody>${course.map((c) => `<tr>
@@ -881,7 +893,10 @@ ${funnelCard}
   ${card('The course', courseRows)}
 </div>
 
-${card('Followers', followerRows)}
+<div class="two">
+  ${card('Between the two sites', siteRows)}
+  ${card('Followers', followerRows)}
+</div>
 
 <style>
 .sec { font-size:.82rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:1.6rem 0 .8rem; }

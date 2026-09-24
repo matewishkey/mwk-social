@@ -754,6 +754,12 @@ table, on no page, and read by nothing without anything looking wrong.
   - **The course (`/courses/…`) is not a prompt page**: it keeps its word code (`otd`).
   - **Not built: a PIY number in the YouTube DESCRIPTION.** The tail's `{show}` slot is the
     show's; a Short marked PIY still gets `mwk.show/sNN` there until that is decided.
+- **ONE LINK EACH WAY BETWEEN HIS TWO SITES** (mate, 2026-09-24: *"one generic links, we do not
+  have to overcomplicate"*): `mwk.show/piy` on promptityourself.com → matewishkey.com, and
+  `piy.show/mwk` on matewishkey.com → promptityourself.com. `campaign = 'site-link'`, platform
+  `website`: out of the social numbers AND the course card, in their own *Between the two sites*
+  card. Deep links between the sites stay plain, and machine-read urls (JSON-LD, canonical) stay
+  full. The swaps are filed as issues on both site repos, never edited here.
 - **Short links, the rest:** A click stores the code, the time and the referring
   host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
   miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must

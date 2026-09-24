@@ -192,7 +192,7 @@ export async function stats(env, tz, snapshots, email) {
   const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
   const [daily, followers, clicks, split, links,
     followerHistory, clicksByDay, platformSince, accountSince, revisions, funnel, course,
-    postClicks] = await Promise.all([
+    postClicks, siteLinks] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -290,7 +290,7 @@ export async function stats(env, tz, snapshots, email) {
       `SELECT l.code, COALESCE(c.tag, '') tag, COUNT(*) all_time,
               SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
          FROM click c JOIN link l ON l.code = c.code
-        WHERE ${COURSE} AND ${counted('c')}
+        WHERE ${COURSE} AND l.campaign IS NOT 'site-link' AND ${counted('c')}
         GROUP BY l.code, tag ORDER BY all_time DESC`).bind(from).all(),
     // Clicks per POST, for the latest-posts card: a code minted for a queue
     // item carries its id as clip_id, and the item's body opens on the title
@@ -301,6 +301,18 @@ export async function stats(env, tz, snapshots, email) {
          FROM click c JOIN link l ON l.code = c.code JOIN queue_item q ON q.id = l.clip_id
         WHERE ${counted('c')} AND q.status = 'posted' AND q.created_at >= ?
         GROUP BY q.id`).bind(from).all(),
+    /*
+     * BETWEEN THE TWO SITES (mate, 2026-09-24: "we can have one generic
+     * links, we do not have to overcomplicate"). One code each way — mwk.show/piy
+     * on the course site, piy.show/mwk on the show's — `campaign = 'site-link'`,
+     * and out of the course card and the social numbers: a visitor already on
+     * one of his sites is not somebody a post brought.
+     */
+    env.DB.prepare(
+      `SELECT l.code, l.target, l.note, COUNT(c.id) all_time,
+              SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
+         FROM link l LEFT JOIN click c ON c.code = l.code AND ${counted('c')}
+        WHERE l.campaign = 'site-link' GROUP BY l.code ORDER BY l.code`).bind(from).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -317,7 +329,8 @@ export async function stats(env, tz, snapshots, email) {
     split: split.results || [], links: (links && links.n) || 0,
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
     course: course.results || [], courseHost: env.COURSE_HOST,
-    postClicks: postClicks.results || [],
+    postClicks: postClicks.results || [], siteLinks: siteLinks.results || [],
+    linkHost: env.LINK_HOST,
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
     revisions: revisions.results || [], funnel: funnel.results || [] });
