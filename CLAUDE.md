@@ -854,6 +854,13 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   `requestHost`. Visits and clicks are never divided: most apps send no referrer. Detail in
   `scripts/lib/site-visits.js`'s header.
 
+- **SEARCH CONSOLE: THE TWO WEBSITES YES, THE CREATOR PROFILES NO** (measured 2026-09-25).
+  `gsc-reader@mwk-social-stats` is a Restricted user on all five, but `sites.list` returns
+  only the two domains, and a query on `sc-creator-profile:tiktok.com/user/matewishkey` (the
+  resource id from Search Console's own url) answers **400 invalid argument**. The control: a
+  property it cannot see answers **403 insufficient permission**, so this is the API not
+  knowing the resource type, not access. Re-test before telling him it has changed.
+
 ## "Are we being suppressed?" — the seed test
 
 **A SHORT THAT UNDERPERFORMS IS ALMOST NEVER A PENALTY, AND `daily_metric_revision` CAN PROVE IT
