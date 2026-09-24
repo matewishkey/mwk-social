@@ -5,13 +5,19 @@
  * this: at our follower counts, followers are not the scoreboard. Five things
  * are worth watching, in this order —
  *
- *   1. reach / views      did anyone see it
- *   2. actions per post   did anyone care (per post, so it compares across
+ *   1. the latest posts   how each one is doing, per platform, with its age
+ *   2. views              did anyone see it
+ *   3. actions per post   did anyone care (per post, so it compares across
  *                         channels — see the channel table for why a RATE
  *                         cannot)
- *   3. link clicks        the only number tied to the actual goal, guest sign-ups
- *   4. cadence            posts per week — the biggest lever we fully control
- *   5. follower growth    last, and only where there is a base to grow
+ *   4. link clicks        the show (mwk.show) and the course (piy.show), never
+ *                         added together
+ *   5. follower growth    last: on the video platforms views do not come from
+ *                         followers (TikTok says so outright), so it is the
+ *                         result of good posts, not their cause
+ *
+ * Cadence left the page on 2026-09-24: the queue's pace sets it now, so it is
+ * not a lever anybody pulls by looking here.
  *
  * Each channel card shows ONLY the metrics that channel genuinely returns,
  * read from the platform table. A grid of structural zeros looks like failure
@@ -47,7 +53,7 @@
  * The rule under all three: when the data cannot answer the question, the page
  * says so. It never draws an arrow it has not earned.
  */
-import { esc, card, layout, num } from '../lib/html.js';
+import { esc, card, layout, num, when } from '../lib/html.js';
 
 const WINDOW_DAYS = 30;
 const TREND_DAYS = 7;
@@ -110,6 +116,63 @@ export function withoutOwnActions(rows) {
 export const YT_VIEW_UNIT_CHANGED = '2026-08-24';
 
 /*
+ * THE LATEST POSTS, ONE ROW EACH (2026-09-24) — the question asked most ("how
+ * is the last post doing") and the one no per-day table could answer.
+ *
+ * Per platform, what it was SEEN by (views where the platform reports them,
+ * impressions otherwise) and what people DID, with our own hands taken off the
+ * same way as everywhere else on this page (withoutOwnActions). The age is on
+ * every row because a 6-hour-old post and a 3-day-old one are not comparable,
+ * and nothing here pretends they are. Clicks are counted people, show and
+ * course apart. The snapshot is built on the box (ship-stats.js latestPosts).
+ */
+export const POST_COLUMNS = ['facebook', 'tiktok', 'youtube', 'instagram', 'linkedin', 'threads', 'twitter', 'pinterest'];
+const postKey = (t) => String(t || '').split('\n')[0].split(/\s[#@]/)[0].trim().toLowerCase().slice(0, 40);
+const ageOf = (iso, now) => {
+  const h = (now - new Date(iso).getTime()) / 3600_000;
+  return h < 48 ? `${Math.max(0, Math.round(h))}h old` : `${Math.round(h / 24)} days old`;
+};
+export function latestPostsCard({ posts = [], postClicks = [], tz, now = Date.now() }) {
+  if (!posts.length) return '<p class="empty">No posts shipped yet.</p>';
+  const clicksBy = new Map();
+  for (const r of postClicks) {
+    const k = postKey(r.body);
+    const c = clicksBy.get(k) || { show: 0, course: 0 };
+    clicksBy.set(k, { show: c.show + (r.show || 0), course: c.course + (r.course || 0) });
+  }
+  const cols = POST_COLUMNS.filter((pl) => posts.some((p) => p.platforms.some((x) => x.platform === pl)));
+  const rows = posts.map((p) => {
+    const by = {};
+    for (const x of p.platforms) {
+      const [net] = withoutOwnActions([{ ...x, post_count: 1 }]);
+      const cur = by[x.platform] || { seen: 0, did: 0 };
+      by[x.platform] = { seen: cur.seen + (x.views || x.impressions || 0),
+        did: cur.did + (net.likes || 0) + (net.comments || 0) + (net.shares || 0) + (net.saves || 0) };
+    }
+    const total = Object.values(by).reduce((a, v) => a + v.seen, 0);
+    const k = clicksBy.get(postKey(p.title)) || { show: 0, course: 0 };
+    const best = Math.max(...Object.values(by).map((v) => v.seen), 0);
+    return `<tr>
+      <td class="post"><b>${esc(p.title)}</b><div class="faint den">${esc(when(p.publishedAt, tz))} · ${esc(ageOf(p.publishedAt, now))}</div></td>
+      ${cols.map((pl) => {
+        const v = by[pl];
+        if (!v) return '<td class="num faint">—</td>';
+        return `<td class="num${v.seen && v.seen === best ? ' top' : ''}">${esc(num(v.seen))}${v.did ? `<div class="faint den">${v.did} did</div>` : ''}</td>`;
+      }).join('')}
+      <td class="num"><b>${esc(num(total))}</b></td>
+      <td class="num">${k.show || k.course ? `${k.show}${k.course ? ` <span class="faint">+ ${k.course} course</span>` : ''}` : '<span class="faint">0</span>'}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="wrap"><table class="posts">
+    <thead><tr><th>post</th>${cols.map((pl) => `<th class="num">${esc(pl === 'twitter' ? 'x' : pl)}</th>`).join('')}
+      <th class="num">seen</th><th class="num">clicks</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+  <p class="note">Seen = views, or impressions where a platform has no views. "did" = likes, comments,
+    shares and saves, with our own like, share and first comment taken off. Numbers keep growing
+    for days, so compare posts of the same age. Clicks are people on our links.</p>`;
+}
+
+/*
  * Exported so it can be tested against fixed dates. Testing it through the
  * rendered page cannot work: the windows are computed from today's clock, so
  * an assertion that the trend is refused would start failing on its own the
@@ -129,34 +192,6 @@ const short = (iso) => {
       .format(new Date(`${iso}T00:00:00Z`));
   } catch { return iso; }
 };
-
-/** A bar chart, inline SVG, no library — the CSP forbids one anyway. */
-function bars(series, { height = 54, label = '', markFrom = null } = {}) {
-  if (!series.length) return '<p class="empty">Nothing yet.</p>';
-  const max = Math.max(...series.map((d) => d.value), 1);
-  const w = 100 / series.length;
-  return `<svg class="bars" viewBox="0 0 100 ${height}" preserveAspectRatio="none" role="img" aria-label="${esc(label)}">
-    ${series.map((d, i) => {
-      const h = Math.max((d.value / max) * (height - 2), d.value > 0 ? 1 : 0);
-      // The most recent complete week is drawn solid, the history behind it
-      // faded — so the half of the chart the percentage is about is visible.
-      const recent = markFrom && d.label >= markFrom;
-      return `<rect class="${recent ? 'now' : ''}" x="${(i * w).toFixed(2)}" y="${(height - h).toFixed(2)}"
-        width="${(w * 0.72).toFixed(2)}" height="${h.toFixed(2)}" rx="0.6"><title>${esc(d.label)}: ${d.value}</title></rect>`;
-    }).join('')}
-  </svg>`;
-}
-
-/** A sparkline for a channel card — shape only, no axis, no numbers. */
-function spark(series, label = '') {
-  if (series.length < 2) return '';
-  const max = Math.max(...series.map((d) => d.value), 1);
-  const step = 100 / (series.length - 1);
-  const pts = series.map((d, i) =>
-    `${(i * step).toFixed(2)},${(20 - (d.value / max) * 18).toFixed(2)}`).join(' ');
-  return `<svg class="spark" viewBox="0 0 100 20" preserveAspectRatio="none" role="img"
-    aria-label="${esc(label)}"><polyline points="${pts}" fill="none" vector-effect="non-scaling-stroke"/></svg>`;
-}
 
 /*
  * now against before, as something that can be rendered.
@@ -262,6 +297,36 @@ export function ageMatchedTotal(days, byKey, metric, ageDays) {
   return { total, usedDays: used.length, droppedDays: dropped.length };
 }
 
+/*
+ * THE PAIRING THE HEADER PROMISED AND THE CODE NEVER DID (found 2026-09-24).
+ * "A day missing from one window must be missing from the other" was written
+ * above and ageMatchedTotal() was called on each window separately — so the
+ * older week lost four days the revision trail had not started recording yet
+ * while the newer week kept all seven, and the page printed video views up
+ * +6,891% (3.1k against 44). Day i of the newer week is now paired with day i
+ * of the older one, per platform, and a pair is used only when BOTH can be read
+ * at the same age. A platform-day with no row at all is a day nothing went out
+ * there: a real zero, not an unknown.
+ */
+export function pairedTotals({ daily, byKey, metrics, recentFrom, priorFrom, days, ageDays }) {
+  const platforms = [...new Set(daily.map((r) => r.platform))];
+  let now = 0; let before = 0; let dropped = 0;
+  const read = (date, platform, metric) => {
+    const e = byKey[`${date}|${platform}`];
+    if (!e) return 0;
+    return valueAtAge(e.revisions || [], e.current, cutFor(date, ageDays), metric);
+  };
+  for (const platform of platforms) {
+    for (let i = 0; i < days; i++) {
+      const dn = shift(recentFrom, i); const db = shift(priorFrom, i);
+      const vals = metrics.map((m) => [read(dn, platform, m), read(db, platform, m)]);
+      if (vals.some(([a, b]) => a === null || b === null)) { dropped += 1; continue; }
+      for (const [a, b] of vals) { now += a; before += b; }
+    }
+  }
+  return { now, before, dropped };
+}
+
 const SETTLING = 'still settling';
 
 function change(now, before, blocked = null) {
@@ -301,9 +366,9 @@ function totals(rows) {
 }
 
 export function statsPage({ email, tz, daily, followers, clicks, snapshots,
-  targets = [], split = [], links = 0, days = WINDOW_DAYS,
-  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {}, website = [],
-  revisions = [], funnel = [], course = [], courseHost = null }) {
+  split = [], links = 0, days = WINDOW_DAYS,
+  followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {},
+  revisions = [], funnel = [], course = [], courseHost = null, postClicks = [] }) {
   // Before anything is summed: see OWN_ACTIONS.
   daily = withoutOwnActions(daily);
   revisions = withoutOwnActions(revisions);
@@ -379,8 +444,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   const spanDays = dates.length
     ? Math.max(Math.round((Date.parse(dates[dates.length - 1]) - Date.parse(dates[0])) / 86400_000) + 1, 1)
     : 0;
-  const postedOn = dates.filter((d) => byDate[d].posts > 0).length;
-  const cadence = spanDays ? postedOn / (spanDays / 7) : 0;
   // Per window the divisor is known — seven days — so this one is a plain count.
   const daysPosted = (a, b) => dates.filter((d) => within(d, a, b) && byDate[d].posts > 0).length;
   const cadenceNow = daysPosted(recentFrom, recentTo);
@@ -419,34 +482,9 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
    */
   const actionsOf = (t) => (t.likes || 0) + (t.comments || 0) + (t.shares || 0) + (t.saves || 0);
   const perPostOf = (t) => (t.posts ? actionsOf(t) / t.posts : 0);
-  const perPostAll = perPostOf(tot);
   const perPostNow = perPostOf(recent);
   const perPostBefore = perPostOf(prior);
 
-  // A short, readable name for a destination — the whole url is noise in a table.
-  const label = (url) => {
-    try {
-      const u = new URL(url);
-      if (u.hostname.includes('matewishkey.com') && u.pathname.startsWith('/show')) return 'the sign-up page';
-      if (u.hostname.includes('github.com')) return `the repo${u.pathname.split('/')[2] ? ` · ${u.pathname.split('/')[2]}` : ''}`;
-      if (u.hostname.includes('youtube') || u.hostname.includes('youtu.be')) return 'a video on YouTube';
-      return u.hostname.replace(/^www\./, '') + (u.pathname === '/' ? '' : u.pathname);
-    } catch { return url; }
-  };
-
-  /*
-   * Every day in the span, not only the days carrying rows.
-   *
-   * A bar chart that skips its empty days draws them as if they never happened:
-   * two posts a week apart sit side by side and the gap — which is the thing
-   * worth seeing, because cadence is the lever we control — disappears.
-   */
-  const allDays = [];
-  if (dates.length) {
-    for (let d = dates[0]; d <= dates[dates.length - 1]; d = shift(d, 1)) allDays.push(d);
-  }
-  const reachSeries = allDays.map((d) => ({ label: d, value: (byDate[d] || {}).reach || 0 }));
-  const clickSeries = allDays.map((d) => ({ label: d, value: clickOn[d] || 0 }));
 
   /* ---- one row per channel, and only the columns that mean the same thing --
    *
@@ -529,10 +567,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
           || SETTLING,
         now: mine(recentRows),
         before: mine(priorRows),
-        series: allDays.map((d) => ({
-          label: d,
-          value: (daily.find((r) => r.date === d && r.platform === p.platform) || {})[seenKey] || 0,
-        })),
       };
     });
 
@@ -567,16 +601,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
         <div class="faint den">of ${esc(c.seenKey)}</div></td>
       <td class="num">${pill(change(c.now[c.seenKey], c.before[c.seenKey], c.blocked))}</td>
     </tr>`).join('')}</tbody></table></div>
-  <p class="note"><b>The two shaded columns are the only ones that compare across channels.</b>
-    A post is a post everywhere, and a click is one hit on our own short link with preview crawlers
-    filtered out — both measured identically on all seven.</p>
-  <p class="note"><b>Seen and rate cannot be ranked against each other, and each names its own
-    denominator for that reason.</b> Reach counts unique accounts, impressions count every time
-    something was on a screen, and a play is neither — so the same post reads as a win on one scale
-    and a dud on another. Two of these changed meaning this year: YouTube began counting a view the
-    moment playback starts on <b>24 August 2026</b>, where long-form used to need real watch time,
-    and TikTok counts one on autoplay. On Instagram and Threads views and impressions are literally
-    the same number here — 990 against 990, and 53 against 53.</p>`
+  <p class="note"><b>Posts, per post and clicks compare across channels.</b> Seen does not: each
+    platform counts it differently (reach, impressions or plays), so it is shown with its own unit.</p>`
     : '<p class="empty">No metrics shipped yet.</p>';
 
   // ---- followers: per account, because a connection is not growth ---------
@@ -646,37 +672,14 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       : `No short links have been clicked yet${links ? '' : ', and none have been minted'}.`}
        Only Facebook reports clicks natively, so away from it these links are the whole scoreboard.</p>`;
 
-  const targetRows = targets.length ? `<table>
-    <thead><tr><th>they clicked</th><th class="num">clicks</th></tr></thead>
-    <tbody>${targets.map((t) => `<tr>
-      <td>${esc(label(t.target))}<div class="faint" style="font-size:.72rem">${esc(t.target.slice(0, 62))}</div></td>
-      <td class="num">${t.n}</td></tr>`).join('')}</tbody></table>`
-    : '<p class="empty">Nothing clicked yet.</p>';
 
-  /*
-   * The website's own codes — the booking buttons — in their own card, and
-   * called what they are. A hit here is a button press by somebody already on
-   * the site; nothing joins it to the post that brought them (no cookie, no
-   * parameter, by his rule), most arrive with no referer, and the two buttons
-   * on two different pages have been pressed within three seconds of each
-   * other three times, which is a crawler or him, not a prospect. Not a social
-   * result, and never added to the social numbers above.
-   */
-  const websiteRows = website.length ? `<table>
-    <thead><tr><th>button</th><th class="num">presses</th></tr></thead>
-    <tbody>${website.map((w) => `<tr>
-      <td>${esc(w.note || w.code)}<div class="faint" style="font-size:.72rem">${esc(w.code)}</div></td>
-      <td class="num">${w.n}</td></tr>`).join('')}</tbody></table>
-    <p class="note">Calendar-button presses on matewishkey.com itself, in the same window. Not clicks
-      from social — nothing links a press to the post that brought the person, and some pairs are a
-      crawler pressing both buttons at once. Bookings actually made are not measured anywhere.</p>`
-    : '<p class="empty">No button presses on the site in this window.</p>';
 
   /*
    * The course's own card (2026-09-23). Its clicks are excluded from every
    * social number and from the guest funnel above; here they are by profile,
    * off the ending he put on each bio link.
    */
+  const courseAll = course.reduce((a, c) => a + (c.recent || 0), 0);
   const courseRows = course.length ? `<table>
     <thead><tr><th>link</th><th class="num">all time</th><th class="num">last ${days} days</th></tr></thead>
     <tbody>${course.map((c) => `<tr>
@@ -687,21 +690,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       clicks or the guest funnel.</p>`
     : '<p class="empty">Nobody has opened a course link yet.</p>';
 
-  const splitCard = (crawler || unknown || human) ? `
-    <table>
-      <thead><tr><th>traffic</th><th class="num">hits</th></tr></thead>
-      <tbody>
-        <tr><td><span class="pill p-ok">counted</span> looked like a person</td><td class="num">${human}</td></tr>
-        <tr><td><span class="pill p-plain">ignored</span> link-preview crawler</td><td class="num">${crawler}</td></tr>
-        ${unknown ? `<tr><td><span class="pill p-warn">ignored</span> logged before this was measured</td>
-          <td class="num">${unknown}</td></tr>` : ''}
-      </tbody>
-    </table>
-    <p class="note">A platform fetches a link to build its preview card, and every fetch hits the
-      redirect. The User-Agent is read to decide and then discarded — nothing about a visitor is
-      stored, only whether the hit counted.${unknown ? ` The ${unknown} unknown were recorded before
-      that existed; calling them people would be a guess.` : ''}</p>`
-    : '<p class="empty">No traffic yet.</p>';
 
   /*
    * ---- age-matched seen and actions --------------------------------------
@@ -718,10 +706,6 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
     if (!byKey[k]) byKey[k] = { current: null, revisions: [] };
     byKey[k].revisions.push(r);
   }
-  const daysIn = (a, b) => daily.filter((r) => within(r.date, a, b))
-    .map((r) => ({ date: r.date, platform: r.platform }));
-  const recentDays = daysIn(recentFrom, recentTo);
-  const priorDays = daysIn(priorFrom, priorTo);
 
   /*
    * `dropped` is counted ONCE, not once per metric. Whether a platform-day can
@@ -730,16 +714,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
    * days where there were 11. A number four times too big in a caveat is still
    * a wrong number, and this one would have made the page look unusable.
    */
-  const matchedPair = (metrics) => {
-    let now = 0; let before = 0; let dropped = null;
-    for (const m of metrics) {
-      const a = ageMatchedTotal(recentDays, byKey, m, TREND_AGE_DAYS);
-      const b = ageMatchedTotal(priorDays, byKey, m, TREND_AGE_DAYS);
-      now += a.total; before += b.total;
-      if (dropped === null) dropped = a.droppedDays + b.droppedDays;
-    }
-    return { now, before, dropped: dropped || 0 };
-  };
+  const matchedPair = (metrics) => pairedTotals({ daily, byKey, metrics,
+    recentFrom, priorFrom, days: TREND_DAYS, ageDays: TREND_AGE_DAYS });
   const seenM = matchedPair(['reach']);
   const impM = matchedPair(['impressions']);
   const viewsM = matchedPair(['views']);
@@ -750,6 +726,14 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   const seenBefore = seenM.before || impM.before;
   // Same days for every metric, so the largest single count is the answer.
   const matchedDropped = Math.max(seenM.dropped, viewsM.dropped, actM.dropped);
+  /*
+   * TOO LITTLE HISTORY IS A REASON, NOT A PERCENTAGE (2026-09-24). With the
+   * revision trail starting mid-week, the pairs that survived were three quiet
+   * days against three busy ones and the page printed views +4,774%. Past a
+   * quarter of the pairs dropped, the matched rows say why instead of a number.
+   */
+  const pairsAll = new Set(daily.map((r) => r.platform)).size * TREND_DAYS;
+  const thinHistory = pairsAll && matchedDropped / pairsAll > 0.25 ? 'not enough history yet' : null;
 
   /*
    * ---- the funnel ---------------------------------------------------------
@@ -791,7 +775,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <thead><tr><th></th><th class="num">all time</th><th class="num">last ${days} days</th>
         <th class="num">spread over</th></tr></thead>
       <tbody>
-        ${funnelRow('clicked a link in a post', social, 'people leaving a post, counted')}
+        ${funnelRow('clicked a show link in a post', social, 'people leaving a post, counted')}
         ${funnelRow('opened the show booking calendar', bookPublic, 'the button on /show')}
         ${funnelRow('opened the private session calendar', bookPrivate, 'the one-to-one button')}
         <tr><td>booked a slot<em class="sub">Google\u2019s calendar, nothing reports back</em></td>
@@ -800,19 +784,12 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       </tbody>
     </table></div>
     <p class="note">${pressesAll
-      ? `<b>${esc(num(pressesAll))} presses on a booking button, across ${esc(String(Math.max(bookPublic.days || 0, bookPrivate.days || 0)))} separate days.</b>
-         People are reaching the calendar. Whether any of them finished is the one step here that is
-         not instrumented, and it is not going to be: it is a Google page and it tells us nothing.
-         If the answer is still no guests, the leak is between opening that calendar and confirming
-         a time, which is a thing to look at in a browser rather than in this table.`
-      : 'Nobody has opened a booking calendar yet.'}
-      The booking buttons live on matewishkey.com, so a press is somebody already on the page.
-      Most of them did not arrive through one of our links, which is why these rows are counts
-      rather than a funnel with percentages between them: the path is not traceable and a
-      percentage would claim it was.${windowsOverlap
-        ? ` <b>The two columns are nearly the same window right now</b> \u2014 the first click ever recorded
-          is ${esc(firstClickEver)}, so almost everything is inside the last ${days} days. They will
-          separate as the record gets longer.` : ''}</p>`);
+      ? `<b>${esc(num(pressesAll))} presses on a booking button, over ${esc(String(Math.max(bookPublic.days || 0, bookPrivate.days || 0)))} days.</b>
+         People reach the calendar; whether they finish is Google's page and is not measured. `
+      : 'Nobody has opened a booking calendar yet. '}The buttons are on matewishkey.com, so these are
+      counts, not a funnel: most presses did not come through one of our links.${windowsOverlap
+        ? ` <b>The two columns are nearly the same window right now</b> — the first click ever recorded
+          is ${esc(firstClickEver)}.` : ''}</p>`);
 
   // ---- week on week, as a table ------------------------------------------
   const wowRow = (name, now, before, fmt = num, blocked = null) => `<tr>
@@ -827,85 +804,55 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
       <th class="num">${esc(short(priorFrom))}–${esc(short(priorTo))}</th>
       <th class="num">change</th></tr></thead>
     <tbody>
-      ${wowRow('reach, summed', seenNow, seenBefore, num)}
-      ${wowRow('video views', viewsM.now, viewsM.before, num, ytViewsBlocked)}
-      ${wowRow('likes, comments, shares, saves', actM.now, actM.before, num)}
+      ${wowRow('video views', viewsM.now, viewsM.before, num, ytViewsBlocked || thinHistory)}
+      ${wowRow('likes, comments, shares, saves', actM.now, actM.before, num, thinHistory)}
       ${wowRow('actions per post', cadenceNow ? actM.now / Math.max(recent.posts, 1) : 0,
-        cadenceBefore ? actM.before / Math.max(prior.posts, 1) : 0, (v) => v.toFixed(1))}
-      ${wowRow('link clicks from social (people)', clicksNow, clicksBefore, (v) => String(v))}
-      ${wowRow('days we posted', cadenceNow, cadenceBefore, (v) => `${v}/7`)}
+        cadenceBefore ? actM.before / Math.max(prior.posts, 1) : 0, (v) => v.toFixed(1), thinHistory)}
+      ${wowRow('clicks on show links (people)', clicksNow, clicksBefore, (v) => String(v))}
     </tbody></table></div>
-  <p class="note">Both columns are seven whole days and today is in neither, because putting a
-    morning against a full week draws a fall that is only the clock.
-    <b>Reach, views and actions are read at ${TREND_AGE_DAYS} day old on both sides.</b> Those numbers
-    keep climbing for weeks after a post goes out, so comparing last week as it stands against the
-    week before as it ended made a flat channel read ten to twenty per cent down every time. Reading
-    every day at the same age cancels that instead of subtracting it, which is what the revision
-    trail has been recorded for. It also means these four rows are lower than the totals above:
-    they are the same days caught younger, on purpose.${matchedDropped
-      ? ` ${matchedDropped} platform-day${matchedDropped === 1 ? '' : 's'} could not be read at that age and
-        ${matchedDropped === 1 ? 'was' : 'were'} left out of both columns rather than counted as nothing.` : ''}
-    Clicks and days posted are final by midnight and need none of this.</p>`;
+  <p class="note">Seven whole days each, today in neither. Views and actions are read at
+    ${TREND_AGE_DAYS} day old on both sides, so a young week is not compared with a settled one.${matchedDropped
+      ? ` ${matchedDropped} platform-day${matchedDropped === 1 ? '' : 's'} could not be read at that age and ${matchedDropped === 1 ? 'is' : 'are'} left out of both.` : ''}</p>`;
 
   const body = `
 <h1>Stats</h1>
-<p class="lede">Last ${spanDays || days} days${dates.length ? `, ${esc(dates[0])} to ${esc(dates[dates.length - 1])}` : ''}.
-  Trend compares ${esc(short(recentFrom))}–${esc(short(recentTo))} against ${esc(short(priorFrom))}–${esc(short(priorTo))}.</p>
+<p class="lede">Last ${spanDays || days} days. Trends compare ${esc(short(recentFrom))}–${esc(short(recentTo))}
+  with ${esc(short(priorFrom))}–${esc(short(priorTo))}. The show is mwk.show, the course is piy.show; their clicks are never added together.</p>
 
 <div class="tiles">
-  ${trendTile(num(tot.reach || tot.impressions || 0), 'reach, summed', 'plain',
-    'FB + IG + LI added up — not a count of people', null)}
-  ${trendTile(num(tot.views || 0), 'video views', 'plain', '', null)}
-  ${trendTile(perPostAll.toFixed(1), 'actions per post',
-    perPostAll >= 4 ? 'ok' : perPostAll >= 2 ? 'warn' : 'bad', 'did anyone care', null)}
-  ${trendTile(human, 'link clicks from social', human ? 'ok' : 'plain',
-    crawler || unknown ? `${crawler + unknown} not counted` : 'people, not crawlers',
+  ${trendTile(num(recent.views || 0), 'video views, last 7 days', 'plain', 'still growing for weeks', null)}
+  ${trendTile(perPostNow.toFixed(1), 'actions per post, last 7 days', 'plain', 'our own taken off', null)}
+  ${trendTile(human, 'show link clicks', human ? 'ok' : 'plain',
+    crawler || unknown ? `${crawler + unknown} crawler hits not counted` : 'people, not crawlers',
     change(clicksNow, clicksBefore))}
-  ${trendTile(cadence.toFixed(1), 'days a week we post',
-    cadence >= 5 ? 'ok' : cadence >= 3 ? 'warn' : 'bad', 'the lever we control',
-    change(cadenceNow, cadenceBefore))}
+  ${trendTile(courseAll, 'course link clicks', courseAll ? 'ok' : 'plain', 'piy.show', null)}
   ${trendTile(num(followersNow), 'followers', 'plain',
-    bothEnds.length ? `${bothEnds.length} account${bothEnds.length === 1 ? '' : 's'} held throughout` : '',
+    bothEnds.length ? `${bothEnds.length} account${bothEnds.length === 1 ? '' : 's'}` : '',
     fFirst === fLast ? { text: 'one reading so far', tone: 'plain', dir: '', note: true }
       : change(followersNow, followersThen))}
 </div>
 
-${funnelCard}
-
-${card('Week on week', wow)}
-
-${card('Reach by day', bars(reachSeries, { label: 'reach by day', markFrom: recentFrom })
-  + `<div class="axis"><span>${esc(allDays[0] || '')}</span>
-      <span class="faint">solid = the week the percentages are about</span>
-      <span>${esc(allDays[allDays.length - 1] || '')}</span></div>`)}
-
-${card('Link clicks by day', clickSeries.some((d) => d.value)
-  ? bars(clickSeries, { label: 'clicks by day', markFrom: recentFrom })
-    + `<div class="axis"><span>${esc(allDays[0] || '')}</span>
-        <span class="faint">people only — preview crawlers are excluded</span>
-        <span>${esc(allDays[allDays.length - 1] || '')}</span></div>`
-  : '<p class="empty">No clicks from a person yet, so there is no shape to draw.</p>')}
+${card('Latest posts', latestPostsCard({ posts: ((snapshots.posts || {}).body) || [], postClicks, tz }))}
 
 ${card('Channels, side by side', channelTable)}
 
-<div class="two">
-  ${card('Clicks by channel', clickRows)}
-  ${card('What they clicked', targetRows)}
-</div>
+${card('Week on week', wow)}
+
+${funnelCard}
 
 <div class="two">
-  ${card('On the website', websiteRows)}
+  ${card('Show link clicks, by channel', clickRows)}
   ${card('The course', courseRows)}
 </div>
 
-<div class="two">
-  ${card('What counted, and what did not', splitCard)}
-  ${card('Followers', followerRows)}
-</div>
+${card('Followers', followerRows)}
 
 <style>
 .sec { font-size:.82rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:1.6rem 0 .8rem; }
 table.chan td { vertical-align:middle; }
+em.sub { display:block; font-style:normal; font-size:.75rem; color:var(--faint); }
+table.posts td.post { min-width:16rem; }
+table.posts td.top { color:var(--ok); font-weight:650; }
 table.chan th.cmp, table.chan td.bar { background:var(--accent-soft); }
 th.cmp { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); }
 td.bar { min-width:9rem; }
@@ -917,11 +864,6 @@ td.bar span { font-variant-numeric:tabular-nums; font-weight:650; font-size:.85r
 .den { font-size:.68rem; font-weight:400; line-height:1.2; }
 .two { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:1.1rem; margin-top:1.1rem; }
 .two .card { margin:0; }
-.bars { width:100%; height:74px; display:block; }
-.bars rect { fill:var(--accent); opacity:.28; }
-.bars rect.now { opacity:.85; }
-.spark { width:100%; height:34px; display:block; margin:0 0 .5rem; }
-.spark polyline { stroke:var(--accent); stroke-width:1.5px; stroke-linejoin:round; stroke-linecap:round; }
 .trend { font-size:.78rem; color:var(--muted); margin:0 0 .6rem; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
 .axis { display:flex; justify-content:space-between; gap:.6rem; font-size:.72rem; color:var(--faint); margin-top:.3rem; }
 .kv { display:grid; grid-template-columns:1fr auto; gap:0; margin:0; font-size:.86rem; }

@@ -59,6 +59,45 @@ async function daily(days) {
   return rows;
 }
 
+/*
+ * THE LATEST POSTS, ONE ROW PER POST (2026-09-24). "How is the last post
+ * doing" was the question asked most and the page could not answer it: every
+ * table here is per DAY, and a day can hold two posts and a live stream.
+ *
+ * One post goes out as several Zernio posts (one per caption group), so they
+ * are joined back on the first line — the title line, which every platform
+ * carries whichever way its caption was composed — within one Brisbane day.
+ * A LinkedIn repost has no content of its own and is left out: it is the same
+ * post seen again, and folding it in would count it twice.
+ * Shipped as a snapshot, not a table: Zernio holds the lifetime number, so
+ * the newest read is the whole truth and there is nothing to bank.
+ */
+const POSTS_SHOWN = 10;
+function latestPosts(res) {
+  const day = (t) => new Date(new Date(t).getTime() + 10 * 3600_000).toISOString().slice(0, 10);
+  const groups = new Map();
+  for (const p of res.posts || []) {
+    // TikTok hands its caption back as ONE line, tags and credit attached, so
+    // the title is cut at the first tag or mention and matched on its start.
+    const title = String(p.content || '').split('\n')[0].split(/\s[#@]/)[0].trim();
+    if (!title || !p.publishedAt) continue;
+    const key = `${day(p.publishedAt)}|${title.toLowerCase().slice(0, 40)}`;
+    if (!groups.has(key)) groups.set(key, { title, publishedAt: p.publishedAt, platforms: [] });
+    const g = groups.get(key);
+    if (p.publishedAt < g.publishedAt) g.publishedAt = p.publishedAt;
+    if (title.length < g.title.length) g.title = title;
+    for (const pf of (p.platforms && p.platforms.length ? p.platforms : [p])) {
+      const a = pf.analytics || p.analytics || {};
+      g.platforms.push({
+        platform: pf.platform || p.platform, url: pf.platformPostUrl || p.platformPostUrl || null,
+        views: a.views || 0, impressions: a.impressions || 0,
+        likes: a.likes || 0, comments: a.comments || 0, shares: a.shares || 0, saves: a.saves || 0,
+      });
+    }
+  }
+  return [...groups.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, POSTS_SHOWN);
+}
+
 async function followers() {
   const res = cli(['accounts:follower-stats']);
   const day = iso(new Date());
@@ -109,6 +148,7 @@ async function main() {
 
   const [rows, folk] = await Promise.all([daily(days), followers()]);
   const snapshots = {
+    posts: latestPosts(cli(['analytics:posts', '--limit', '40'])),
     platforms: platformSnapshot(),
     voice: voiceSnapshot(),
     pace: pace.status(events.read()),
@@ -118,6 +158,9 @@ async function main() {
     console.log(`would ship ${rows.length} daily row(s) and ${folk.length} follower count(s) to ${origin}`);
     console.log(`  pace: ${snapshots.pace.today}/${snapshots.pace.perDay} today, next ${snapshots.pace.nextAt || '—'}`);
     console.log(`  blurb chosen: ${snapshots.voice && snapshots.voice.blurbChosen}`);
+    for (const p of snapshots.posts) {
+      console.log(`  post ${p.publishedAt.slice(0, 16)} ${p.title.slice(0, 50)} — ${p.platforms.map((x) => `${x.platform} ${x.views || x.impressions}`).join(', ')}`);
+    }
     return;
   }
 

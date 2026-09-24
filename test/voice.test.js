@@ -125,7 +125,7 @@ test('instagram never exceeds five hashtags', () => {
 test('a cap tighter than the always-on set truncates the set', () => {
   // X allows one tag. Truncating beats blowing the budget, and the first of
   // his three is the one that survives — he ordered them.
-  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#piyshow');
+  assert.strictEqual(voice.tagLine('twitter', ['A', 'B']), '#mwkshow');
 });
 
 /*
@@ -134,7 +134,7 @@ test('a cap tighter than the always-on set truncates the set', () => {
  * back as "piyshow #mwkshow #PromptItYourself ..." with the first # consumed.
  */
 test('threads gets one tag, because it only ever links one', () => {
-  assert.strictEqual(voice.tagLine('threads', ['A', 'B']), '#piyshow');
+  assert.strictEqual(voice.tagLine('threads', ['A', 'B']), '#mwkshow');
 });
 
 test('the brand tag is on every post that has room for it', () => {
@@ -148,8 +148,8 @@ test('the brand tag is on every post that has room for it', () => {
  * 2026-08 call and this test pinned it; he then named #PromptItYourself as one
  * of the three always-on tags outright. The spelling is his, CamelCase.
  */
-test('PromptItYourself is a tag again, spelled his way', () => {
-  assert.ok(voice.tagLine('facebook', ['Trading']).includes('#PromptItYourself'));
+test('promptityourself is a tag, spelled his way (lowercase since 2026-09-24)', () => {
+  assert.ok(voice.tagLine('facebook', ['Trading']).includes('#promptityourself'));
 });
 
 test('blocked tags never get through', () => {
@@ -190,12 +190,12 @@ test('pinning a variant that does not exist is refused', () => {
 
 test('the motto tag rides along wherever there is room', () => {
   for (const p of ['instagram', 'tiktok', 'facebook', 'youtube', 'linkedin']) {
-    assert.ok(voice.tagLine(p, ['VPN']).includes('#PromptItYourself'), `${p} lost the motto tag`);
+    assert.ok(voice.tagLine(p, ['VPN']).includes('#promptityourself'), `${p} lost the motto tag`);
   }
   // Instagram's budget is the binding one: three always-on leaves two topic
   // slots. That is the cost of his three, and he chose it.
   assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']).split(' ').length, 5);
-  assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']), '#piyshow #mwkshow #PromptItYourself #A #B');
+  assert.strictEqual(voice.tagLine('instagram', ['A', 'B', 'C', 'D']), '#mwkshow #piy #promptityourself #A #B');
 });
 
 /* ------------------------------------------------------- the short link -- */
@@ -401,9 +401,9 @@ test('no platform posts its link as a thread reply any more', () => {
 test('a platform carrying its own link gets tags under its own cap', () => {
   // TikTok has no meaningful cap: all three fixed tags plus everything given.
   assert.strictEqual(voice.tagLine('tiktok', ['Xero', 'Invoicing']),
-    '#piyshow #mwkshow #PromptItYourself #Xero #Invoicing');
+    '#mwkshow #piy #promptityourself #Xero #Invoicing');
   // X allows one, so the set is truncated rather than the budget blown.
-  assert.strictEqual(voice.tagLine('twitter', ['Xero', 'Invoicing']), '#piyshow');
+  assert.strictEqual(voice.tagLine('twitter', ['Xero', 'Invoicing']), '#mwkshow');
 });
 
 test('a platform that can be commented on keeps its caption clean', () => {
@@ -482,7 +482,7 @@ test('a comment does carry tags when its caption does not', () => {
   const ig = voice.firstComment('k', { platform: 'instagram', noEpisode: true,
     topicTags: ['Branding', 'SocialMedia', 'CreatingImages'] });
   // Three always-on plus three topics is six; Instagram's five drops the last topic.
-  assert.match(ig.text, /#piyshow #mwkshow #PromptItYourself #Branding #SocialMedia(?! #CreatingImages)/);
+  assert.match(ig.text, /#mwkshow #piy #promptityourself #Branding #SocialMedia(?! #CreatingImages)/);
   // Exactly five: Instagram's cap counts the caption too, and the caption is clean.
   assert.strictEqual((ig.text.match(/#\w+/g) || []).length, 5);
 });

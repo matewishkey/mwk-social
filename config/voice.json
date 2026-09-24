@@ -28,11 +28,11 @@
   "feed": "https://matewishkey.com/rss.xml",
   "tags": {
     "always": [
-      "#piyshow",
       "#mwkshow",
-      "#PromptItYourself"
+      "#piy",
+      "#promptityourself"
     ],
-    "_always": "Every post, in this order, spelled exactly as he typed them (mate, 2026-09-22: \"our new tags always have to be #piyshow #mwkshow #PromptItYourself\" — he is buying the domains). This REVERSES the 2026-08 pair (#MWKShow #PIY) and the earlier call that Prompt it Yourself is a sentence rather than a tag. Three always-on tags leave Instagram two topic slots, Pinterest none, and X and Threads carry only #piyshow — his cost, his call. Nothing re-tags what is already published.",
+    "_always": "Every post, in this order, spelled the way he typed them (mate, 2026-09-24: \"#mwkshow #pyi #promptityourself is important and that's it... we do not need to split\" — #pyi read as #piy, his spelling the day before and the piy.show domain). ONE set for both kinds of short, show and PIY. This REVERSES 2026-09-22's #piyshow #mwkshow #PromptItYourself, which reversed the 2026-08 pair #MWKShow #PIY. Three always-on tags leave Instagram two topic slots, Pinterest none, and X and Threads (cap 1) carry only #mwkshow. Nothing re-tags what is already published",
     "maxTopic": 4,
     "caps": {
       "instagram": 5,

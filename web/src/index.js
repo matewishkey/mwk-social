@@ -188,8 +188,9 @@ async function stats(env, tz, snapshots, email) {
    * per sync and the page only ever asks about a fortnight.
    */
   const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
-  const [daily, followers, clicks, targets, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince, website, revisions, funnel, course] = await Promise.all([
+  const [daily, followers, clicks, split, links,
+    followerHistory, clicksByDay, platformSince, accountSince, revisions, funnel, course,
+    postClicks] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -203,11 +204,6 @@ async function stats(env, tz, snapshots, email) {
       // attributed by where it came from — it is NOT evidence of a person.
       `SELECT l.platform, c.referer_host, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
         WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY l.platform, c.referer_host`).bind(from).all(),
-    // What people actually clicked, rather than only where from.
-    env.DB.prepare(
-      `SELECT l.target, COUNT(*) n, COUNT(DISTINCT l.code) codes
-         FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY l.target ORDER BY n DESC LIMIT 12`).bind(from).all(),
     /*
      * The honest denominator: how much of the traffic was not a person.
      *
@@ -251,12 +247,11 @@ async function stats(env, tz, snapshots, email) {
      */
     env.DB.prepare('SELECT platform, MIN(date) first FROM daily_metric GROUP BY platform').all(),
     env.DB.prepare('SELECT account_id, MIN(day) first FROM follower_point GROUP BY account_id').all(),
-    // The website's own codes, by code: button presses on the site itself.
     env.DB.prepare(
-      `SELECT l.code, l.note, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND l.platform = 'website' AND ${counted('c')} GROUP BY l.code ORDER BY n DESC`).bind(from).all(),
-    env.DB.prepare(
-      `SELECT date, platform, reach, impressions, views, likes, comments, shares, saves,
+      // post_count too: withoutOwnActions() deducts per post, and without the
+      // count it deducted nothing — the age-matched actions kept our own like,
+      // share and first comment for as long as this query lacked it (to 2026-09-24).
+      `SELECT date, platform, post_count, reach, impressions, views, likes, comments, shares, saves,
               written_at, superseded_at
          FROM daily_metric_revision WHERE date >= ? ORDER BY date, platform, superseded_at`)
       .bind(trendFrom).all(),
@@ -295,6 +290,15 @@ async function stats(env, tz, snapshots, email) {
          FROM click c JOIN link l ON l.code = c.code
         WHERE ${COURSE} AND ${counted('c')}
         GROUP BY l.code, tag ORDER BY all_time DESC`).bind(from).all(),
+    // Clicks per POST, for the latest-posts card: a code minted for a queue
+    // item carries its id as clip_id, and the item's body opens on the title
+    // line the snapshot is keyed on. Show and course kept apart.
+    env.DB.prepare(
+      `SELECT q.body, SUM(CASE WHEN ${COURSE} THEN 0 ELSE 1 END) show,
+              SUM(CASE WHEN ${COURSE} THEN 1 ELSE 0 END) course
+         FROM click c JOIN link l ON l.code = c.code JOIN queue_item q ON q.id = l.clip_id
+        WHERE ${counted('c')} AND q.status = 'posted' AND q.created_at >= ?
+        GROUP BY q.id`).bind(from).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -308,9 +312,10 @@ async function stats(env, tz, snapshots, email) {
 
   return statsPage({ email, tz, snapshots, days: STATS_DAYS,
     daily: daily.results || [], followers: followers.results || [], clicks: folded,
-    targets: targets.results || [], split: split.results || [], links: (links && links.n) || 0,
+    split: split.results || [], links: (links && links.n) || 0,
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
-    website: website.results || [], course: course.results || [], courseHost: env.COURSE_HOST,
+    course: course.results || [], courseHost: env.COURSE_HOST,
+    postClicks: postClicks.results || [],
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
     revisions: revisions.results || [], funnel: funnel.results || [] });

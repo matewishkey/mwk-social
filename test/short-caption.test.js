@@ -99,7 +99,7 @@ test('a short gets the title line and the tags, and nothing else of his', async 
   const opts = { text: BODY, topics: ['JobInterview'], probe: TALL };
 
   const tiktok = await captionForPlatform('tiktok', opts);
-  assert.equal(tiktok, `${TITLE}\n\n#piyshow #mwkshow #PromptItYourself #JobInterview\n\n${CREDIT}`);
+  assert.equal(tiktok, `${TITLE}\n\n#mwkshow #piy #promptityourself #JobInterview\n\n${CREDIT}`);
   assert.ok(!tiktok.includes('They wanted a CTO'), 'the story stays off the picture');
 
   // Instagram keeps its five hashtags for the comment, so the caption is the
@@ -115,7 +115,7 @@ test('the same clip landscape, and the same platform, gets all of his words', as
   // the always-on tags — the same rule Instagram's hashtagsInCaption: 0
   // answers differently.
   const tall = await captionForPlatform('facebook', { text: BODY, topics: [], probe: TALL });
-  assert.equal(tall, `${TITLE}\n\n#piyshow #mwkshow #PromptItYourself\n\n${CREDIT}`);
+  assert.equal(tall, `${TITLE}\n\n#mwkshow #piy #promptityourself\n\n${CREDIT}`);
 });
 
 test('a platform outside the set is untouched by the rule', async () => {
