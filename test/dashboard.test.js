@@ -1445,3 +1445,20 @@ test('the revision trail carries post_count, or our own actions stay in the matc
   const q = s.slice(s.indexOf('FROM daily_metric_revision WHERE date >= ?') - 400, s.indexOf('FROM daily_metric_revision WHERE date >= ?'));
   assert.match(q, /post_count/, 'withoutOwnActions() deducts per post and needs the count');
 });
+
+/*
+ * The admin mark (2026-09-24): each admin page wears its own colour as a FRAME
+ * round the RedBlock, never by recolouring it — the RedBlock is the only logo
+ * and it is always #e2342b (scripts/reality-check/brandkit.js).
+ */
+test('the admin mark frames the red block in the page colour and never recolours it', async () => {
+  const { adminMark, ADMIN_COLOR, layout } = await src('lib/html.js');
+  for (const color of [ADMIN_COLOR, '#0d9488']) {
+    const svg = adminMark(color);
+    assert.match(svg, new RegExp(`<rect width="64" height="64" fill="${color}"/>`));
+    assert.match(svg, /<rect x="8" y="8" width="48" height="48" fill="#e2342b"\/>/, 'the block stays brand red');
+  }
+  const page = layout({ title: 'Stats', path: '/stats', email: 'm', tz: TZ, body: '' });
+  assert.match(page, /<link rel="icon" type="image\/svg\+xml" href="data:image\/svg\+xml,/);
+  assert.match(page, new RegExp(`border-top:4px solid ${ADMIN_COLOR}`));
+});

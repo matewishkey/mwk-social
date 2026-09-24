@@ -111,11 +111,33 @@ export const card = (title, body, actions = '') => `
     <div class="card-body">${body}</div>
   </section>`;
 
+/*
+ * WHICH ADMIN PAGE THIS IS, AT A GLANCE (mate, 2026-09-24: "we can use MWK
+ * logo but use a different color... or MWK just use a border, maybe that is
+ * better with different color (I can have multiple admin pages)").
+ *
+ * The border, not a recoloured logo: the RedBlock is the ONLY logo, red
+ * #e2342b, square corners, white mark at 64%, and it is never recoloured
+ * (scripts/reality-check/brandkit.js, from matewishkey.com/design). So each
+ * admin page keeps the real block and wears its OWN colour as a frame round
+ * it — in the tab icon, next to the name, and as a stripe along the top.
+ * ADMIN_COLOR is the one line another admin page changes.
+ */
+export const ADMIN_COLOR = '#3d5afe';
+const BRAND_RED = '#e2342b';
+const MARK_PATHS = '<path d="M0 100 L23.09 0 L46.17 100 L69.26 0 L69.26 100" fill="none" stroke="#fff" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M69.26 100 L118.03 0" fill="none" stroke="#fff" stroke-width="9.5" stroke-linecap="round" stroke-linejoin="round"/>';
+// 64 units: an 8-unit frame, the 48-unit red block, the mark at 64% of it.
+export const adminMark = (color = ADMIN_COLOR) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">`
+  + `<rect width="64" height="64" fill="${color}"/><rect x="8" y="8" width="48" height="48" fill="${BRAND_RED}"/>`
+  + `<svg x="16.64" y="18.73" width="30.72" height="26.51" viewBox="-6.75 -6.75 131.53 113.5">${MARK_PATHS}</svg></svg>`;
+const ICON = `data:image/svg+xml,${encodeURIComponent(adminMark())}`;
+
 export function layout({ title, path, email, tz, body, wide = false }) {
   return `<!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} · mwk-social</title>
+<link rel="icon" type="image/svg+xml" href="${ICON}">
 <style>
 :root {
   color-scheme: light dark;
@@ -147,10 +169,13 @@ a { color:var(--accent); }
 /* ---- chrome ---- */
 .top {
   position:sticky; top:0; z-index:10; background:var(--panel);
-  border-bottom:1px solid var(--line); padding:0 1.25rem;
+  border-top:4px solid ${ADMIN_COLOR}; border-bottom:1px solid var(--line); padding:0 1.25rem;
 }
 .top-in { max-width:${wide ? '1400px' : '1120px'}; margin:0 auto; display:flex; align-items:center; gap:1.25rem; min-height:56px; flex-wrap:wrap; }
-.brand { font-weight:650; letter-spacing:-.01em; margin-right:.25rem; white-space:nowrap; }
+.brand { font-weight:650; letter-spacing:-.01em; margin-right:.25rem; white-space:nowrap;
+  display:flex; align-items:center; gap:.55rem; }
+.brand img { width:28px; height:28px; display:block; }
+.brand b { font-weight:650; }
 .brand span { color:var(--faint); font-weight:400; }
 nav { display:flex; gap:.15rem; flex:1; flex-wrap:wrap; }
 nav a {
@@ -240,7 +265,7 @@ button:hover, .btn:hover { filter:brightness(1.05); }
 footer { max-width:${wide ? '1400px' : '1120px'}; margin:0 auto; padding:0 1.25rem 3rem; font-size:.78rem; color:var(--faint); }
 </style></head><body>
 <header class="top"><div class="top-in">
-  <div class="brand">mwk<span>-social</span></div>
+  <div class="brand"><img src="${ICON}" alt=""><b>mwk<span>-social</span></b></div>
   <nav>${NAV.map(([href, label]) =>
     `<a href="${href}" class="${path === href ? 'on' : ''}">${esc(label)}</a>`).join('')}</nav>
   <div class="who">${esc(email)} · ${esc(tz)}</div>
