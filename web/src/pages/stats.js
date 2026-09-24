@@ -54,6 +54,7 @@
  * says so. It never draws an arrow it has not earned.
  */
 import { esc, card, layout, num, when } from '../lib/html.js';
+import { platformFromReferer } from '../links.js';
 
 const WINDOW_DAYS = 30;
 const TREND_DAYS = 7;
@@ -162,6 +163,93 @@ export function formatCard({ formats = null }) {
     <tbody>${body}</tbody></table></div>
   <p class="note">Last ${formats.days} days. Per post, so a format we post a lot does not win by count.
     YouTube does not say which videos are Shorts, so each one is checked once and remembered.</p>`;
+}
+
+/*
+ * THE TWO WEBSITES, WEEK BY WEEK, BESIDE WHAT OUR LINKS SENT (mate,
+ * 2026-09-25: "so we can see in relation these data how we are progressing").
+ *
+ * Visits come from Cloudflare Web Analytics (scripts/lib/site-visits.js has
+ * why that and not the request log). Clicks are our own counted short-link
+ * clicks. They are side by side and never divided: a visit is a browser page
+ * load on the site, a click is somebody leaving a post, and most social apps
+ * send no referrer, so no row here is a conversion rate.
+ *
+ * ⚠ Visits are SAMPLED 1 in 10 and read as estimates: a week of "30" is three
+ * page loads Cloudflare kept. Weeks, not days, for that reason. His own visits
+ * are in them too; nothing tells his browser from anyone else's.
+ */
+export const SITE_WEEKS = 8;
+export function weekBlocks(today, n = SITE_WEEKS) {
+  const out = [];
+  let to = shift(today, -1);
+  for (let i = 0; i < n; i++) { const from = shift(to, -6); out.push({ from, to }); to = shift(from, -1); }
+  return out;
+}
+
+export function websitesCard({ sites = null, clickDays = [], today = new Date().toISOString().slice(0, 10) }) {
+  const list = (sites && sites.sites) || [];
+  if (!list.length) return '<p class="empty">No website visits shipped yet.</p>';
+  const weeks = weekBlocks(today);
+  const sum = (rows, key, w) => rows.filter((r) => r.date >= w.from && r.date <= w.to).reduce((a, r) => a + (r[key] || 0), 0);
+  const clicks = clickDays.map((r) => ({ date: r.day, show: r.show, course: r.course }));
+  const rows = weeks.map((w) => `<tr>
+    <td class="nowrap">${esc(short(w.from))}–${esc(short(w.to))}</td>
+    ${list.map((x) => (x.since && w.to < x.since)
+      ? '<td class="num faint">not tracked</td>'
+      : `<td class="num"><b>${esc(num(sum(x.days, 'visits', w)))}</b></td>`).join('')}
+    <td class="num">${sum(clicks, 'show', w)}</td>
+    <td class="num">${sum(clicks, 'course', w)}</td>
+  </tr>`).join('');
+  const interval = list.map((x) => x.sampleInterval).find(Boolean);
+  return `<div class="wrap"><table>
+    <thead><tr><th>week</th>${list.map((x) => `<th class="num">${esc(x.host)} visits</th>`).join('')}
+      <th class="num">show link clicks</th><th class="num">course link clicks</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>
+  <p class="note">Visits are Cloudflare's estimate: it keeps ${interval ? `1 page load in ${esc(String(interval))}` : 'a sample'}
+    and multiplies, so a small week moves in tens. Your own visits are in them. Clicks are exact, people only,
+    and they are not a share of the visits: most apps send no referrer, so nobody can join the two.</p>`;
+}
+
+const SEARCH_ENGINE = /(^|\.)(google\.[a-z.]+|bing\.com|duckduckgo\.com|search\.yahoo\.com|yandex\.[a-z]+|ecosia\.org|search\.brave\.com)$/;
+const SOURCE_NAME = { facebook: 'Facebook', instagram: 'Instagram', threads: 'Threads', linkedin: 'LinkedIn',
+  youtube: 'YouTube', tiktok: 'TikTok', twitter: 'X' };
+/*
+ * Where a visit says it came from. `null` means one of his own tools on a
+ * subdomain (the editor, this dashboard), which is left out rather than
+ * called a source.
+ */
+export function sourceOf(referer, hosts) {
+  const h = String(referer || '').toLowerCase();
+  if (!h) return 'no referrer';
+  const social = platformFromReferer(h);
+  if (social) return SOURCE_NAME[social] || social;
+  if (SEARCH_ENGINE.test(h)) return 'search engines';
+  for (const site of hosts) {
+    if (h === site || h === `www.${site}`) return site;
+    if (h.endsWith(`.${site}`)) return null;
+  }
+  return h;
+}
+
+export function sourcesCard({ sites = null }) {
+  const list = (sites && sites.sites) || [];
+  if (!list.length) return '<p class="empty">No website visits shipped yet.</p>';
+  const hosts = list.map((x) => x.host);
+  const blocks = list.map((x) => {
+    const by = new Map();
+    for (const r of x.referrers || []) {
+      const name = sourceOf(r.host, hosts);
+      if (name === null || name === x.host) continue;
+      by.set(name, (by.get(name) || 0) + r.visits);
+    }
+    const rows = [...by].sort((a, b) => b[1] - a[1]);
+    return `<p class="sec">${esc(x.host)}</p>${rows.length ? `<dl class="kv">${rows.map(([k, v]) =>
+      `<div><dt>${esc(k)}</dt><dd>${esc(num(v))}</dd></div>`).join('')}</dl>` : '<p class="empty">Nothing yet.</p>'}`;
+  }).join('');
+  return `${blocks}
+  <p class="note">Last 28 days, estimated the same way. "No referrer" is most of it and is not one thing:
+    a typed address, a bookmark, and nearly every tap inside the Instagram, TikTok and Facebook apps look alike.</p>`;
 }
 
 export const POST_COLUMNS = ['facebook', 'tiktok', 'youtube', 'instagram', 'linkedin', 'threads', 'twitter', 'pinterest'];
@@ -407,7 +495,7 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
   split = [], links = 0, days = WINDOW_DAYS,
   followerHistory = [], clicksByDay = [], platformSince = {}, accountSince = {},
   revisions = [], funnel = [], course = [], courseHost = null, postClicks = [], siteLinks = [],
-  linkHost = null }) {
+  linkHost = null, siteClickDays = [] }) {
   // Before anything is summed: see OWN_ACTIONS.
   daily = withoutOwnActions(daily);
   revisions = withoutOwnActions(revisions);
@@ -893,10 +981,14 @@ ${funnelCard}
   ${card('The course', courseRows)}
 </div>
 
+${card('The websites, week by week', websitesCard({ sites: (snapshots.sites || {}).body || null, clickDays: siteClickDays }))}
+
 <div class="two">
+  ${card('Where website visitors came from', sourcesCard({ sites: (snapshots.sites || {}).body || null }))}
   ${card('Between the two sites', siteRows)}
-  ${card('Followers', followerRows)}
 </div>
+
+${card('Followers', followerRows)}
 
 <style>
 .sec { font-size:.82rem; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:1.6rem 0 .8rem; }

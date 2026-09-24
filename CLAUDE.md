@@ -847,6 +847,13 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   dropped the rows say *not enough history yet* instead of a number. **The revision query also
   lacked `post_count`**, so the matched actions never had our own hands taken off.
 
+- **THE WEBSITES CARD SETS SITE VISITS BESIDE OUR CLICKS, WEEK BY WEEK** (mate, 2026-09-25).
+  Visits are Cloudflare **Web Analytics**, not the zone log (500-900 "uniques" a day there
+  against 30-180 browser page loads). ⚠ **Sampled 1 in 10**, so weeks, never days. ⚠ **One site
+  tag covers every subdomain** (the editor, this dashboard), so every query filters
+  `requestHost`. Visits and clicks are never divided: most apps send no referrer. Detail in
+  `scripts/lib/site-visits.js`'s header.
+
 ## "Are we being suppressed?" — the seed test
 
 **A SHORT THAT UNDERPERFORMS IS ALMOST NEVER A PENALTY, AND `daily_metric_revision` CAN PROVE IT

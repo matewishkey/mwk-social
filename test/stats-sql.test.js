@@ -77,3 +77,38 @@ test('with no course configured, every click is the show again (the control)', a
   const tile = html.split('<div class="tile').find((t) => t.includes('<span>show link clicks</span>')) || '';
   assert.match(tile, /<b>4<\/b>/, 'if this read 1 the split above would be proving nothing (site links are website, so out either way)');
 });
+
+test('the websites card sets visits beside the week\'s clicks, show and course apart', async () => {
+  const { stats } = await import(path.join(__dirname, '..', 'web', 'src', 'index.js'));
+  const day = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+  const sites = { body: { sites: [
+    { host: 'matewishkey.com', since: day(100), sampleInterval: 10,
+      days: [{ date: day(2), visits: 30, views: 40 }, { date: day(3), visits: 20, views: 20 }, { date: day(9), visits: 70, views: 70 }],
+      referrers: [{ host: '', visits: 40 }, { host: 'm.facebook.com', visits: 10 }, { host: 'www.google.com', visits: 10 },
+        { host: 'editor.matewishkey.com', visits: 50 }] },
+    { host: 'promptityourself.com', since: day(4), sampleInterval: 10,
+      days: [{ date: day(2), visits: 10, views: 10 }], referrers: [] },
+  ] } };
+  const html = await stats({ ...ENV, DB: d1(seed()) }, 'Australia/Brisbane', { sites }, 'm@x.com');
+  const card = html.split('The websites, week by week')[1].split('</section>')[0];
+  const [thisWeek, lastWeek] = card.split('<tbody>')[1].split('</tr>');
+  const cells = (row) => [...row.matchAll(/<td class="num[^"]*">(?:<b>)?([^<]*)/g)].map((m) => m[1]);
+  // The seeded clicks are hours old, so whether each is in the newest block
+  // (which ends YESTERDAY, like every trend here) depends on the clock: work it
+  // out rather than assume it. 1 show click at 600 min, course at 1200/1800/2400;
+  // the booking press and the two site links are neither.
+  const inWeek = (mins) => { const d = new Date(Date.now() - mins * 60000).toISOString().slice(0, 10); return d >= day(7) && d <= day(1); };
+  const show = [600].filter(inWeek).length;
+  const course = [1200, 1800, 2400].filter(inWeek).length;
+  assert.ok(course > 0, 'the fixture must put at least one click in the block, or this proves nothing');
+  assert.deepStrictEqual(cells(thisWeek), ['50', '10', String(show), String(course)]);
+  assert.deepStrictEqual(cells(lastWeek), ['70', 'not tracked', '0', '0'],
+    'a week before the course site was tracked says so, rather than 0');
+  assert.match(card, /1 page load in 10/);
+
+  const sources = html.split('Where website visitors came from')[1].split('</section>')[0];
+  assert.match(sources, /no referrer<\/dt><dd>40/);
+  assert.match(sources, /Facebook<\/dt><dd>10/);
+  assert.match(sources, /search engines<\/dt><dd>10/);
+  assert.ok(!/editor/.test(sources), 'his own editor is not a source');
+});

@@ -33,6 +33,7 @@ const platforms = require('./lib/platforms');
 const pace = require('./lib/pace');
 const voice = require('./lib/voice');
 const events = require('./lib/events');
+const { siteVisits } = require('./lib/site-visits');
 
 const DEFAULT_DAYS = 45;
 
@@ -252,6 +253,16 @@ async function main() {
     voice: voiceSnapshot(),
     pace: pace.status(events.read()),
   };
+  /*
+   * The two websites' visits (lib/site-visits.js). Left OUT of the batch when
+   * Cloudflare cannot be read, rather than shipped empty: the far end upserts
+   * each snapshot by name, so omitting it keeps the last good one on the page.
+   */
+  try {
+    snapshots.sites = siteVisits();
+  } catch (err) {
+    console.error(`note: site visits not refreshed — ${String(err.message).split('\n')[0]}`);
+  }
 
   if (dryRun) {
     console.log(`would ship ${rows.length} daily row(s) and ${folk.length} follower count(s) to ${origin}`);
@@ -259,6 +270,9 @@ async function main() {
     console.log(`  blurb chosen: ${snapshots.voice && snapshots.voice.blurbChosen}`);
     for (const f of snapshots.formats.rows) {
       console.log(`  format ${f.platform}/${f.format}: ${f.posts} post(s), best ${f.best && f.best.seen}`);
+    }
+    for (const x of (snapshots.sites || {}).sites || []) {
+      console.log(`  site ${x.host}: ${x.days.reduce((a, d) => a + d.visits, 0)} visits over ${x.days.length} day(s), sampled 1 in ${x.sampleInterval}`);
     }
     for (const p of snapshots.posts) {
       console.log(`  post ${p.publishedAt.slice(0, 16)} ${p.title.slice(0, 50)} — ${p.platforms.map((x) => `${x.platform} ${x.views || x.impressions}`).join(', ')}`);

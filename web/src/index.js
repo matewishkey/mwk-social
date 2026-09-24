@@ -25,7 +25,7 @@ import { counted, automated } from './lib/clicks.js';
 import { api } from './api.js';
 import { redirect, platformFromReferer, courseSql, hostFor } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
-import { statsPage } from './pages/stats.js';
+import { statsPage, SITE_WEEKS } from './pages/stats.js';
 import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
 import { linksPage, linksAction } from './pages/links.js';
@@ -192,7 +192,7 @@ export async function stats(env, tz, snapshots, email) {
   const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
   const [daily, followers, clicks, split, links,
     followerHistory, clicksByDay, platformSince, accountSince, revisions, funnel, course,
-    postClicks, siteLinks] = await Promise.all([
+    postClicks, siteLinks, siteClickDays] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
@@ -313,6 +313,19 @@ export async function stats(env, tz, snapshots, email) {
               SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
          FROM link l LEFT JOIN click c ON c.code = l.code AND ${counted('c')}
         WHERE l.campaign = 'site-link' GROUP BY l.code ORDER BY l.code`).bind(from).all(),
+    /*
+     * Counted clicks per day, show and course apart, over the websites card's
+     * eight weeks (longer than the page's 30 days, hence its own window). The
+     * link between the two sites is neither: it is a visitor already there.
+     */
+    env.DB.prepare(
+      `SELECT substr(c.at, 1, 10) day,
+              SUM(CASE WHEN ${SOCIAL} THEN 1 ELSE 0 END) show,
+              SUM(CASE WHEN ${COURSE} THEN 1 ELSE 0 END) course
+         FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND ${counted('c')} AND l.campaign IS NOT 'site-link'
+        GROUP BY day ORDER BY day`)
+      .bind(new Date(Date.now() - (SITE_WEEKS * 7 + 1) * 86400_000).toISOString().slice(0, 10)).all(),
   ]);
   // Fold the two attribution routes together: the code's own platform first,
   // then where the click came from, and only then give up and say unattributed.
@@ -330,7 +343,7 @@ export async function stats(env, tz, snapshots, email) {
     followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
     course: course.results || [], courseHost: env.COURSE_HOST,
     postClicks: postClicks.results || [], siteLinks: siteLinks.results || [],
-    linkHost: env.LINK_HOST,
+    linkHost: env.LINK_HOST, siteClickDays: siteClickDays.results || [],
     platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
     revisions: revisions.results || [], funnel: funnel.results || [] });
