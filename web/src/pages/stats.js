@@ -754,16 +754,12 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
    */
   const matchedPair = (metrics) => pairedTotals({ daily, byKey, metrics,
     recentFrom, priorFrom, days: TREND_DAYS, ageDays: TREND_AGE_DAYS });
-  const seenM = matchedPair(['reach']);
-  const impM = matchedPair(['impressions']);
+  // No reach row since 2026-09-24: reach summed across platforms is not a
+  // count of anybody, and the page stopped showing it.
   const viewsM = matchedPair(['views']);
   const actM = matchedPair(['likes', 'comments', 'shares', 'saves']);
-  // Reach where we have it, impressions where we do not, the same way the
-  // unmatched row already chose.
-  const seenNow = seenM.now || impM.now;
-  const seenBefore = seenM.before || impM.before;
   // Same days for every metric, so the largest single count is the answer.
-  const matchedDropped = Math.max(seenM.dropped, viewsM.dropped, actM.dropped);
+  const matchedDropped = Math.max(viewsM.dropped, actM.dropped);
   /*
    * TOO LITTLE HISTORY IS A REASON, NOT A PERCENTAGE (2026-09-24). With the
    * revision trail starting mid-week, the pairs that survived were three quiet

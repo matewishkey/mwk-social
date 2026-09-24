@@ -135,11 +135,6 @@ test('the course SQL matches the course site and nothing else', async () => {
   assert.strictEqual(courseSql({}), '0', 'no course configured must match nothing, not everything');
 });
 
-test('the social numbers exclude the course, and the funnel gives it its own stage', () => {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
-  assert.match(src, /const SOCIAL = `l\.platform IS NOT 'website' AND NOT \$\{COURSE\}`/);
-  assert.match(src, /WHEN \$\{COURSE\} THEN 'course' ELSE 'social'/);
-});
 
 test('the stats page shows course clicks by profile ending', async () => {
   const { statsPage } = await import(path.join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'));

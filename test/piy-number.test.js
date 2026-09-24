@@ -89,8 +89,31 @@ test('--piy points the post at its prompt page, and refuses --link beside it', (
   assert.throws(() => parse(['--body', 'x', '--piy', 'Refund Page!']), /slug/);
 });
 
-test('the number is printed even where nothing is clickable', () => {
-  const src = require('fs').readFileSync(path.join(__dirname, '..', 'scripts', 'post.js'), 'utf8');
-  assert.match(src, /const typeable = shortlink\.isPromptLink\(opts\.link\);/);
-  assert.match(src, /linkLive: live \|\| typeable,/);
+test('the number is printed even where nothing is clickable', async () => {
+  const fs = require('fs'); const os = require('os');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piy-'));
+  const was = process.env.MWK_COMMENT_STATE;
+  process.env.MWK_COMMENT_STATE = path.join(dir, 'state.json');
+  process.env.MWK_LOG_URL = 'https://example.test/events';
+  process.env.MWK_LOG_TOKEN = 'x';
+  const realFetch = global.fetch;
+  global.fetch = async (_u, o) => {
+    const b = JSON.parse(o.body);
+    return { ok: true, json: async () => ({ ok: true, url: b.numbered ? 'https://piy.show/001' : 'https://mwk.show/zz9' }) };
+  };
+  try {
+    const { commentFor } = require('../scripts/post');
+    for (const platform of ['instagram', 'tiktok']) {
+      const piy = await commentFor(platform, 'Refund in one prompt', { link: REFUND, topics: [], postKey: `t:${platform}` });
+      assert.match(piy, /piy\.show\/001/, `${platform}: a PIY number is typed, so it is printed`);
+    }
+    // The control: the same platform with an ordinary post still says the bio.
+    const plain = await commentFor('instagram', 'An ordinary clip', { topics: [], postKey: 't:plain' });
+    assert.ok(!/mwk\.show|piy\.show/.test(plain), 'an ordinary Instagram comment carries no dead url');
+    assert.match(plain, /bio/);
+  } finally {
+    global.fetch = realFetch;
+    if (was === undefined) delete process.env.MWK_COMMENT_STATE; else process.env.MWK_COMMENT_STATE = was;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
 });

@@ -719,4 +719,4 @@ if (require.main === module) {
   main().catch((err) => { console.error(err.message); process.exit(1); });
 }
 
-module.exports = { publish, resolveAccounts, captionForPlatform, FIRST_COMMENT_PLATFORMS };
+module.exports = { publish, resolveAccounts, captionForPlatform, commentFor, FIRST_COMMENT_PLATFORMS };

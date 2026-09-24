@@ -162,7 +162,9 @@ async function overview(request, env, tz, snapshots, email, url) {
     queue: { waiting: (queue && queue.waiting) || 0, failed: (queue && queue.failed) || 0 } });
 }
 
-async function stats(env, tz, snapshots, email) {
+// Exported for test/stats-sql.test.js, which runs these queries against a real
+// SQLite built from schema.sql rather than reading their text.
+export async function stats(env, tz, snapshots, email) {
   const from = new Date(Date.now() - STATS_DAYS * 86400_000).toISOString().slice(0, 10);
   /*
    * SOCIAL clicks and WEBSITE clicks are two different things and were one
