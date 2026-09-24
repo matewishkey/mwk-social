@@ -742,6 +742,18 @@ table, on no page, and read by nothing without anything looking wrong.
     course site goes out as a `piy.show` code in the slots and the comment; a project or vendor
     page still goes out whole. `promptityourself.com/` is in `markers[]` so a comment carrying
     the plain url after a failed mint is still recognised as ours.
+- **A PIY SHORT GETS A NUMBER: `piy.show/007` → `promptityourself.com/prompts/<slug>`** (mate,
+  2026-09-24). Two kinds of short, the show's and PIY; **which is which is his to say**, and
+  `queue-add.js --piy <slug>` is how it is said. One number per PROMPT PAGE (not per placement:
+  it is burned into the video), taken at queue time and printed on the `queued` block, and
+  printed in the comment even on Instagram, TikTok and Shorts because it is typed, not tapped.
+  Plain numbers are reserved (`normaliseCode` refuses them, the random mint skips them).
+  - ⚠ **The sequence counts `campaign = 'piy'` only.** Two random codes minted before the
+    numbers existed are all digits (`43361`, `77235`); counting every all-digit code would have
+    made the first PIY short `piy.show/77236`. Caught live, before a number was taken.
+  - **The course (`/courses/…`) is not a prompt page**: it keeps its word code (`otd`).
+  - **Not built: a PIY number in the YouTube DESCRIPTION.** The tail's `{show}` slot is the
+    show's; a Short marked PIY still gets `mwk.show/sNN` there until that is decided.
 - **Short links, the rest:** A click stores the code, the time and the referring
   host: **no IP, no user agent, no cookie**, which keeps a redirect out of consent territory. A
   miss redirects to `LINK_FALLBACK` rather than 404ing — a link printed in a public comment must

@@ -206,7 +206,14 @@ async function commentFor(platform, text, opts) {
   // TikTok `live` is false and neither url can be followed, so the profile
   // phrase still stands in — an unclickable project page is no better than an
   // unclickable show page.
-  const linkUrl = live
+  /*
+   * A PIY SHORT'S NUMBER GOES IN THE COMMENT EVEN WHERE NOTHING IS CLICKABLE
+   * (2026-09-24). "link in my bio" is the answer for a url nobody could type;
+   * piy.show/007 is built to be typed, and it is the same number that is on the
+   * video, so on Instagram, TikTok and a Short it is printed as plain text.
+   */
+  const typeable = shortlink.isPromptLink(opts.link);
+  const linkUrl = (live || typeable)
     ? (commentLink(opts.link) ? await shortlink.destination(opts.link, where)
       : await shortlink.mint({ ...where, label: opts.title || null }))
     : null;
@@ -230,7 +237,7 @@ async function commentFor(platform, text, opts) {
     noTags: tagsInCaption(platform),
     variantIndex: opts.commentVariant,
     linkUrl,
-    linkLive: live,
+    linkLive: live || typeable,
     // The platform's cap on a COMMENT, not on a caption — the native path
     // hands this to Zernio to post, so it overflows exactly the same way the
     // watcher's did (2026-09-18, Threads 502 on 580 characters).

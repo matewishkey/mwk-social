@@ -17,7 +17,7 @@
  */
 
 import { tokenOk, ulid, shortCode } from './lib/access.js';
-import { hostFor } from './links.js';
+import { hostFor, onCourseSite } from './links.js';
 
 const json = (o, status = 200) => Response.json(o, { status });
 
@@ -399,9 +399,46 @@ export async function resolveClipId(env, postKey, postUrl = null) {
 export async function mint(env, {
   target, platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, createdBy = null, note = null, code: wanted = null,
-  codePrefix = null, postUrl = null,
+  codePrefix = null, postUrl = null, numbered = false,
 }) {
   clipId = clipId || await resolveClipId(env, postKey, postUrl);
+
+  /*
+   * A PIY SHORT'S NUMBER — piy.show/007 (mate, 2026-09-24: "if we are doing a
+   * piy it will always have a link piy.show/001 etc... that will lead to the
+   * prompt page"). ONE number per prompt page, whichever platform or placement
+   * asks, because it is burned into the video and typed off the screen: a
+   * per-placement code would print a different number under every post.
+   * Plain numbers are reserved for this — a chosen code may not be one
+   * (normaliseCode) and a random one is never one (the loop below) — and only
+   * a page on the course site may have one.
+   */
+  if (numbered) {
+    if (!onCourseSite(env, target)) throw new Error(`a numbered code is for a prompt page on the course site, not ${target}`);
+    const own = await env.DB.prepare(
+      "SELECT code FROM link WHERE target = ? AND campaign = 'piy' AND code NOT GLOB '*[^0-9]*' ORDER BY created_at",
+    ).bind(target).first();
+    if (own) return { code: own.code, url: linkUrl(env, own.code, target), reused: true };
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const top = await env.DB.prepare(
+        // campaign = 'piy', not "every all-digit code": two random codes minted
+        // before the numbers existed are all digits (77235 is a Reddit bio), and
+        // counting from them would have made the first PIY short piy.show/77236.
+        "SELECT MAX(CAST(code AS INTEGER)) n FROM link WHERE campaign = 'piy' AND code NOT GLOB '*[^0-9]*'",
+      ).first();
+      const code = String(((top && top.n) || 0) + 1).padStart(3, '0');
+      try {
+        await env.DB.prepare(
+          `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,
+             campaign, medium, created_by, note)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        ).bind(code, target, null, clipId, postKey, label, new Date().toISOString(),
+          'piy', null, createdBy, note).run();
+        return { code, url: linkUrl(env, code, target), reused: false };
+      } catch { /* two callers raced for the same number — take the next */ }
+    }
+    throw new Error('could not allocate a PIY number');
+  }
 
   /*
    * A named code is its own identity and does NOT go through the attribute
@@ -462,6 +499,9 @@ export async function mint(env, {
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const code = seq ? `${seq}${await nextInSequence(env, seq)}` : shortCode(5);
+    // Plain numbers are PIY numbers; a random code that happens to be all
+    // digits would sit in that namespace and move the next number on.
+    if (/^\d+$/.test(code)) continue;
     try {
       await env.DB.prepare(
         `INSERT INTO link (code, target, platform, clip_id, post_key, label, created_at,

@@ -104,9 +104,14 @@ use it themselves?** If they would have to look it up, it is wrong.
 - A product name is fine when ordinary people know the product. `#Xero` yes, `#Cloudflare` no.
   That distinction is the rule, not an exception to it.
 - **Fewer good tags beat more weak ones, and none is an acceptable answer.**
-- `#piyshow #mwkshow #PromptItYourself` lead every post automatically (his spelling, his order,
-  2026-09-22). Do not add them by hand. They take three of Instagram's five, all of Pinterest's
-  three, and X's one — so a topic tag reaches Instagram twice over at most.
+- `#mwkshow #piy #promptityourself` lead every post automatically, show or PIY alike (his order,
+  2026-09-24; he typed `#pyi` once, read as `#piy`). Do not add them by hand. They take three of
+  Instagram's five, all of Pinterest's three, and the one tag X and Threads get — so a topic tag
+  reaches Instagram twice over at most.
+- **A PIY short is queued with `--piy <slug>`** (2026-09-24): it points at
+  `promptityourself.com/prompts/<slug>` and takes the next number, `piy.show/007`, printed on the
+  `queued` block so it can go on the video. One number per prompt page, printed in every comment
+  even where nothing is clickable, because it is typed. **Which shorts are PIY is his to say.**
 - **No credit line unless he asks for one on THAT post.** The `@thechrisgoor #couchtocreator`
   example above is the shape, not a default: he stopped it on 2026-09-22 (*"you can stop
   posting to chris tag, so remove them"*).

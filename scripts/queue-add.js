@@ -52,9 +52,16 @@
  *                                    episode, a tool — and that page becomes
  *                                    the pin's destination, X's caption link
  *                                    and the link in the first comment. It
- *                                    goes out as the FULL url and is never
- *                                    shortened: mwk.show is the show's
- *                                    address (mate, 2026-09-22)
+ *                                    goes out as the FULL url: mwk.show is
+ *                                    the show's address (mate, 2026-09-22).
+ *                                    A course page is the exception and
+ *                                    becomes a piy.show code
+ *   --piy SLUG                       a PIY short (mate, 2026-09-24). Points it
+ *                                    at promptityourself.com/prompts/SLUG and
+ *                                    gives it the next NUMBER, piy.show/007,
+ *                                    printed here so it can go on the video.
+ *                                    One number per prompt page, the same in
+ *                                    every comment; not with --link
  *   --at YYYY-MM-DD                  hold it until that day. Stored as a full
                                    timestamp: a random instant inside the
                                    posting window (07:00-11:00 Brisbane),
@@ -89,6 +96,7 @@ const YOUTUBE_TITLE_MAX = 100;
 const { wordProblems } = require('./lib/words');
 // For links.show and the short-link host: the one place either is written down.
 const voice = require('./lib/voice');
+const shortlink = require('./lib/shortlink');
 
 const WEB = path.join(__dirname, '..', 'web');
 const BUCKET = 'mwk-social-media';
@@ -166,6 +174,7 @@ function parse(argv) {
       case '--topics': opt.topics = take(i).split(',').map((s) => s.trim().replace(/^#/, '')).filter(Boolean); i++; break;
       case '--comment': opt.comment = take(i); i++; break;
       case '--link': opt.link = take(i); i++; break;
+      case '--piy': opt.piy = take(i); i++; break;
       case '--at': opt.at = take(i); i++; break;
       case '--no-first-comment': opt.firstComment = 0; break;
       case '--no-reshare': opt.reshare = 0; break;
@@ -191,6 +200,14 @@ function parse(argv) {
    * make one: that host means the show, so a project pointed at it would say
    * the wrong thing however well it resolved.
    */
+  if (opt.piy !== undefined) {
+    if (opt.link !== undefined) throw new Error('--piy or --link, not both: a PIY short points at its prompt page');
+    const slug = String(opt.piy).trim().toLowerCase();
+    if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(slug)) throw new Error(`--piy wants the prompt page's slug (refund, dial-countdown), got ${JSON.stringify(opt.piy)}`);
+    const course = voice.config().links.course;
+    if (!course) throw new Error('voice.json has no links.course, so there is no prompt page to point at');
+    opt.link = `${new URL(course).origin}/prompts/${slug}`;
+  }
   if (opt.link !== undefined) {
     let u;
     try { u = new URL(opt.link); } catch { throw new Error(`--link wants a url, got ${JSON.stringify(opt.link)}`); }
@@ -310,6 +327,20 @@ function unlockAt(day, roll = Math.random()) {
 const AT_JITTER_MINUTES = pace.DEFAULTS.window
   ? (pace.DEFAULTS.window.to - pace.DEFAULTS.window.from) * 60 : 60;
 
+/*
+ * The PIY number, taken the moment the item is queued, so he has it before the
+ * video is finished. The publisher asks for the same page later and gets the
+ * same number back (one per prompt page). A failure is loud but not fatal: the
+ * item is already queued, and the publisher will take the number itself.
+ */
+async function piyLine(link, id) {
+  const url = await shortlink.mint({ target: link, numbered: true, postKey: `queue:${id}`,
+    clipId: id, campaign: 'piy', label: link });
+  return url
+    ? `PIY number: ${url.replace(/^https?:\/\//, '')} -> ${link} (put it on the video)`
+    : `PIY number: NOT TAKEN (dashboard unreachable?) — the publisher takes it at publish time; ${link}`;
+}
+
 /** The INSERT, as text. Separated out so a test can read it without a network. */
 function sqlFor(opt, id, media, mediaWide, now, extraKeys) {
   const [mediaKey, mediaType] = media;
@@ -377,7 +408,7 @@ function gateLine(opt) {
   return `held — ${s.why}; next slot ${s.nextAt}`;
 }
 
-function main() {
+async function main() {
   const opt = parse(process.argv.slice(2));
   if (opt.help) { console.log(usage()); return; }
 
@@ -418,6 +449,7 @@ function main() {
     console.log(sql);
     // A dry run is exactly when he wants to hear this, so it is not only on
     // the success path.
+    if (opt.piy) console.log('-- gets the next PIY number when it is really queued (a dry run does not take one)');
     console.log(`-- ${gateLine(opt)}`);
     const dryLine = captions.wontFitLine(opt.wontFit);
     if (dryLine) console.log(`-- ${dryLine}`);
@@ -443,6 +475,8 @@ function main() {
   // same failure as a line in the journal: true, and not looked at.
   const line = captions.wontFitLine(opt.wontFit);
   if (line) console.log(`  ${line}`);
+  // The number he has to put on the video, right under the line he reads.
+  if (opt.piy) console.log(`  ${await piyLine(opt.link, id)}`);
   // WHEN, off the pace at this instant — see gateLine() for the morning it
   // was quoted sixteen hours stale and the timer took a draft.
   console.log(`  ${gateLine(opt)}`);
@@ -457,7 +491,7 @@ function main() {
 }
 
 if (require.main === module) {
-  try { main(); } catch (e) { console.error(e.message); process.exit(1); }
+  main().catch((e) => { console.error(e.message); process.exit(1); });
 }
 
 module.exports = { lit, sqlFor, parse, unlockAt, gateLine, AT_JITTER_MINUTES };

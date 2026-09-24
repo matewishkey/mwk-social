@@ -52,10 +52,11 @@ carries the marker — whoever put it there.
 hashtag caps, the blocklist, the YouTube blurb, the feed URL. Change it there or you'll change it
 in the wrong place.
 
-- **`#piyshow #mwkshow #PromptItYourself` go on every post, in that order and spelled that way**
-  (mate, 2026-09-22 — he is buying the domains). A cap tighter than the three truncates from the
-  end, so X's one tag is `#piyshow`, Pinterest's three are these and no topic, and Instagram has
-  two topic slots left. Read `config/voice.json` → `tags._always` for what this reversed.
+- **`#mwkshow #piy #promptityourself` go on every post, in that order** (mate, 2026-09-24: one
+  set for the show and the PIY shorts, *"we do not need to split"*). A cap tighter than the three
+  truncates from the end, so X's and Threads' one tag is `#mwkshow`, Pinterest's three are these
+  and no topic, and Instagram has two topic slots. Read `config/voice.json` → `tags._always` for
+  what this reversed.
 - **Tags go in the CAPTION or the first COMMENT, never both.** `hashtagsInCaption` on the platform
   table decides: Facebook, YouTube, LinkedIn, TikTok, X and Pinterest take them in the caption;
   Instagram and Threads keep the caption clean, so Instagram's cap of 5 is never spent twice — a defensive

@@ -57,6 +57,17 @@ function isShowLink(url) {
  * worker prints it on piy.show (web/src/links.js hostFor). Everything that is
  * neither the show nor the course still goes out whole.
  */
+/*
+ * A PROMPT PAGE — promptityourself.com/prompts/<slug>, one per PIY short
+ * (mate, 2026-09-24). It gets a NUMBER, not a random code: piy.show/007 is
+ * burned into the video and typed off the screen, so it is one number for the
+ * page wherever it is printed (web/src/api.js, `numbered`).
+ */
+function isPromptLink(url) {
+  if (!isCourseLink(url)) return false;
+  try { return new URL(url).pathname.startsWith('/prompts/'); } catch { return false; }
+}
+
 function isCourseLink(url) {
   const course = voice.config().links.course;
   if (!course) return false;
@@ -70,7 +81,7 @@ function isCourseLink(url) {
  */
 async function destination(link, where = {}) {
   if (!link || !isCourseLink(link)) return link;
-  return (await mint({ ...where, target: link })) || link;
+  return (await mint({ ...where, target: link, numbered: isPromptLink(link) })) || link;
 }
 
 /**
@@ -97,7 +108,7 @@ async function destination(link, where = {}) {
  */
 async function mint({ platform = null, clipId = null, postKey = null, label = null,
   campaign = null, medium = null, target: wanted = null, codePrefix = null,
-  postUrl = null } = {}) {
+  postUrl = null, numbered = false } = {}) {
   const cfg = voice.shortLink();
   if (!cfg.enabled) return null;
 
@@ -115,7 +126,7 @@ async function mint({ platform = null, clipId = null, postKey = null, label = nu
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ target, platform, clipId, postKey, label, campaign, medium,
-        codePrefix, postUrl, createdBy: 'pipeline' }),
+        codePrefix, postUrl, numbered, createdBy: 'pipeline' }),
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) return null;
@@ -170,4 +181,4 @@ async function trackLinks(text, { platform = null, postKey = null, clipId = null
   return out;
 }
 
-module.exports = { mint, trackLinks, isShowLink, isCourseLink, destination, URL_RE };
+module.exports = { mint, trackLinks, isShowLink, isCourseLink, isPromptLink, destination, URL_RE };
