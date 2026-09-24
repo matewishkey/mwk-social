@@ -21,6 +21,9 @@
 'use strict';
 
 const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const { execFileSync } = require('child_process');
 
 const { cli } = require('./lib/api');
 const { endpoint, call } = require('./lib/dashboard');
@@ -98,6 +101,99 @@ function latestPosts(res) {
   return [...groups.values()].sort((a, b) => b.publishedAt.localeCompare(a.publishedAt)).slice(0, POSTS_SHOWN);
 }
 
+/*
+ * WHICH FORMAT A POST WAS (2026-09-24, mate: "I do not see any stats about
+ * reels shorts etc... for youtube for example"). Every table was per platform,
+ * so a Short and an hour-long live stream were one YouTube number.
+ *
+ * Facebook and Instagram say it in the URL (/reel/); the rest carry mediaType.
+ * YOUTUBE SAYS NOTHING: every video comes back as /watch, Short or live alike,
+ * with an empty media url. So yt-dlp is asked once per video — shape, length,
+ * live_status — and the answer is kept on disk, because a video's format never
+ * changes. The job has a 5-minute ceiling (install-timers.sh), so at most
+ * PROBES_PER_RUN new videos are asked about per run, inside PROBE_BUDGET_MS;
+ * the rest read "unknown" until a later run gets to them. A failed probe is
+ * not cached, so it is asked again rather than frozen as unknown.
+ */
+const FORMAT_CACHE = path.join(process.env.MWK_STATE_DIR || path.join(os.homedir(), '.local', 'state', 'mwk-social'), 'yt-formats.json');
+const PROBES_PER_RUN = 10;
+const PROBE_BUDGET_MS = 90_000;
+
+function youtubeFormats(ids) {
+  let cache = {};
+  try { cache = JSON.parse(fs.readFileSync(FORMAT_CACHE, 'utf8')); } catch { /* first run */ }
+  const started = Date.now();
+  let asked = 0;
+  for (const id of ids) {
+    if (cache[id] || asked >= PROBES_PER_RUN || Date.now() - started > PROBE_BUDGET_MS) continue;
+    asked += 1;
+    try {
+      const raw = execFileSync('yt-dlp', ['-q', '--no-warnings', '--print',
+        '%(width)s %(height)s %(duration)s %(live_status)s', '--', `https://www.youtube.com/watch?v=${id}`],
+      { encoding: 'utf8', timeout: 20_000, stdio: ['ignore', 'pipe', 'pipe'] }).trim().split('\n')[0];
+      const [w, h, dur, live] = raw.split(/\s+/);
+      const width = Number(w); const height = Number(h); const durationSec = Number(dur);
+      if (/^(was_live|is_live|post_live|is_upcoming)$/.test(live)) cache[id] = 'live';
+      else if (width > 0 && height > 0 && Number.isFinite(durationSec)) {
+        cache[id] = platforms.isShort({ aspect: width / height, durationSec }) ? 'short' : 'video';
+      }
+    } catch { /* not cached: asked again next run */ }
+  }
+  try { fs.mkdirSync(path.dirname(FORMAT_CACHE), { recursive: true }); fs.writeFileSync(FORMAT_CACHE, JSON.stringify(cache)); } catch { /* read-only is survivable */ }
+  return cache;
+}
+
+const ytId = (url) => { try { return new URL(url).searchParams.get('v'); } catch { return null; } };
+
+function formatOf(platform, url, mediaType, yt) {
+  if (platform === 'youtube') return yt[ytId(url)] || 'unknown';
+  if ((platform === 'facebook' || platform === 'instagram') && /\/reel\//.test(url || '')) return 'reel';
+  return mediaType || 'unknown';
+}
+
+/*
+ * Every post of the last FORMAT_DAYS days, by platform and format: how many,
+ * what they were seen by, and the best one. Paged, because a month is more
+ * than one page of analytics:posts.
+ */
+const FORMAT_DAYS = 30;
+function allRecentPosts(days) {
+  // A plain date: `--from` answers "Invalid ISO date" to a full timestamp.
+  const from = iso(new Date(Date.now() - days * 86400_000));
+  const out = [];
+  for (let page = 1; page <= 10; page++) {
+    const res = cli(['analytics:posts', '--from', from, '--limit', '100', '--page', String(page)]);
+    out.push(...(res.posts || []));
+    if (!res.pagination || page >= (res.pagination.pages || 1)) break;
+  }
+  return { posts: out };
+}
+
+function formatTable(res) {
+  const rows = [];
+  for (const p of res.posts || []) for (const pf of (p.platforms && p.platforms.length ? p.platforms : [p])) {
+    rows.push({ p, pf, platform: pf.platform || p.platform, url: pf.platformPostUrl || p.platformPostUrl || '' });
+  }
+  const yt = youtubeFormats([...new Set(rows.filter((r) => r.platform === 'youtube').map((r) => ytId(r.url)).filter(Boolean))]);
+  const groups = new Map();
+  for (const r of rows) {
+    const a = r.pf.analytics || r.p.analytics || {};
+    const format = formatOf(r.platform, r.url, r.p.mediaType, yt);
+    const key = `${r.platform}|${format}`;
+    const g = groups.get(key) || { platform: r.platform, format, posts: 0, views: 0, impressions: 0,
+      likes: 0, comments: 0, shares: 0, saves: 0, best: null };
+    const seen = a.views || a.impressions || 0;
+    g.posts += 1;
+    for (const k of ['views', 'impressions', 'likes', 'comments', 'shares', 'saves']) g[k] += a[k] || 0;
+    if (!g.best || seen > g.best.seen) {
+      g.best = { seen, url: r.url || null,
+        title: String(r.p.content || '').split('\n')[0].split(/\s[#@]/)[0].trim().slice(0, 80) || null };
+    }
+    groups.set(key, g);
+  }
+  return { days: FORMAT_DAYS, rows: [...groups.values()] };
+}
+
 async function followers() {
   const res = cli(['accounts:follower-stats']);
   const day = iso(new Date());
@@ -147,8 +243,11 @@ async function main() {
   const { origin } = endpoint();
 
   const [rows, folk] = await Promise.all([daily(days), followers()]);
+  // One read serves both the latest-posts card and the format table.
+  const recent = allRecentPosts(FORMAT_DAYS);
   const snapshots = {
-    posts: latestPosts(cli(['analytics:posts', '--limit', '40'])),
+    posts: latestPosts(recent),
+    formats: formatTable(recent),
     platforms: platformSnapshot(),
     voice: voiceSnapshot(),
     pace: pace.status(events.read()),
@@ -158,6 +257,9 @@ async function main() {
     console.log(`would ship ${rows.length} daily row(s) and ${folk.length} follower count(s) to ${origin}`);
     console.log(`  pace: ${snapshots.pace.today}/${snapshots.pace.perDay} today, next ${snapshots.pace.nextAt || '—'}`);
     console.log(`  blurb chosen: ${snapshots.voice && snapshots.voice.blurbChosen}`);
+    for (const f of snapshots.formats.rows) {
+      console.log(`  format ${f.platform}/${f.format}: ${f.posts} post(s), best ${f.best && f.best.seen}`);
+    }
     for (const p of snapshots.posts) {
       console.log(`  post ${p.publishedAt.slice(0, 16)} ${p.title.slice(0, 50)} — ${p.platforms.map((x) => `${x.platform} ${x.views || x.impressions}`).join(', ')}`);
     }
@@ -191,4 +293,7 @@ async function main() {
   }
 }
 
-main().catch((err) => { console.error(err.message); process.exit(1); });
+// The pure halves, for the tests; the job itself only runs as a script.
+module.exports = { latestPosts, formatOf, ytId };
+
+if (require.main === module) main().catch((err) => { console.error(err.message); process.exit(1); });

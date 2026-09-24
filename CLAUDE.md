@@ -818,6 +818,13 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   on the title line within a Brisbane day. **TikTok hands its caption back as ONE line, tags
   attached**, so the title is cut at the first ` #`/` @` and matched on its first 40 characters,
   or TikTok splits off as its own post. LinkedIn reposts (no content) are left out.
+- **BY FORMAT, BECAUSE A SHORT AND A LIVE STREAM WERE ONE YOUTUBE NUMBER** (mate, 2026-09-24).
+  Facebook and Instagram say Reel in the url; the rest carry `mediaType`; **YouTube says nothing**
+  (every video is `/watch`, media url empty), so `ship-stats.js` asks yt-dlp once per video for
+  shape, length and `live_status` and caches it in `yt-formats.json` in the state dir. At most 10
+  new probes per run inside 90 s, because the unit's ceiling is 5 minutes; an unprobed video reads
+  *not known yet*, never guessed. **`analytics:posts --from` wants a plain date** — a full ISO
+  timestamp answers `Invalid ISO date`.
 - **THE AGE-MATCHED TREND DID NOT PAIR ITS DAYS, AND PRINTED VIEWS +6,891%** (2026-09-24). The
   header promised that a day missing from one week is missing from the other; the code read each
   week on its own, so a week that had lost four days to a young revision trail was set against a

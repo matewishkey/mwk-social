@@ -126,6 +126,44 @@ export const YT_VIEW_UNIT_CHANGED = '2026-08-24';
  * and nothing here pretends they are. Clicks are counted people, show and
  * course apart. The snapshot is built on the box (ship-stats.js latestPosts).
  */
+/*
+ * BY FORMAT (2026-09-24, mate: "I do not see any stats about reels shorts
+ * etc... for youtube for example"). A Short and a three-hour live stream were
+ * one YouTube number. Per post, because the counts differ wildly between
+ * formats and a total would just rank whichever we made most of. Built on the
+ * box (ship-stats.js formatTable), where yt-dlp can tell a Short from a stream.
+ */
+const FORMAT_NAME = { short: 'Shorts', live: 'Live streams', video: 'Videos', reel: 'Reels',
+  image: 'Images', carousel: 'Carousels', text: 'Text posts', unknown: 'Not known yet' };
+export function formatCard({ formats = null }) {
+  const rows = (formats && formats.rows) || [];
+  if (!rows.length) return '<p class="empty">No posts shipped yet.</p>';
+  const order = POST_COLUMNS;
+  const byPlatform = [...new Set(rows.map((r) => r.platform))]
+    .sort((a, b) => (order.indexOf(a) + 99) % 99 - (order.indexOf(b) + 99) % 99);
+  const body = byPlatform.map((platform) => rows.filter((r) => r.platform === platform)
+    .sort((a, b) => b.posts - a.posts)
+    .map((r, i) => {
+      const [net] = withoutOwnActions([{ ...r, post_count: r.posts }]);
+      const seen = r.views || r.impressions || 0;
+      const did = (net.likes || 0) + (net.comments || 0) + (net.shares || 0) + (net.saves || 0);
+      return `<tr>
+        <td class="nowrap">${i === 0 ? `<b>${esc(platform === 'twitter' ? 'x' : platform)}</b>` : ''}</td>
+        <td>${esc(FORMAT_NAME[r.format] || r.format)}</td>
+        <td class="num">${r.posts}</td>
+        <td class="num"><b>${esc(num(Math.round(seen / r.posts)))}</b></td>
+        <td class="num">${(did / r.posts).toFixed(1)}</td>
+        <td class="trunc">${r.best && r.best.seen ? `${esc(num(r.best.seen))} <span class="faint">${esc(r.best.title || '')}</span>` : '<span class="faint">—</span>'}</td>
+      </tr>`;
+    }).join('')).join('');
+  return `<div class="wrap"><table>
+    <thead><tr><th>platform</th><th>format</th><th class="num">posts</th><th class="num">seen per post</th>
+      <th class="num">did per post</th><th>best</th></tr></thead>
+    <tbody>${body}</tbody></table></div>
+  <p class="note">Last ${formats.days} days. Per post, so a format we post a lot does not win by count.
+    YouTube does not say which videos are Shorts, so each one is checked once and remembered.</p>`;
+}
+
 export const POST_COLUMNS = ['facebook', 'tiktok', 'youtube', 'instagram', 'linkedin', 'threads', 'twitter', 'pinterest'];
 const postKey = (t) => String(t || '').split('\n')[0].split(/\s[#@]/)[0].trim().toLowerCase().slice(0, 40);
 const ageOf = (iso, now) => {
@@ -833,6 +871,8 @@ export function statsPage({ email, tz, daily, followers, clicks, snapshots,
 </div>
 
 ${card('Latest posts', latestPostsCard({ posts: ((snapshots.posts || {}).body) || [], postClicks, tz }))}
+
+${card('By format: Shorts, Reels, live', formatCard({ formats: (snapshots.formats || {}).body || null }))}
 
 ${card('Channels, side by side', channelTable)}
 
