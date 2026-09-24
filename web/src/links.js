@@ -140,6 +140,16 @@ export async function redirect(request, env, url, ctx) {
   // shared across hosts, so piy.show/<a show code> exists — and is sent to the
   // course rather than to the show, and not counted as a click on that code.
   if (row && isCourseHost(env, url.hostname) && !onCourseSite(env, row.target)) row = null;
+  /*
+   * A NUMBER WE HAVE NOT SEEN YET IS THE COURSE SITE'S TO RESOLVE (issue #46,
+   * 2026-09-24). promptityourself.com owns the PIY numbers and answers
+   * /p/<number> itself: 301 to the page, 404 for a number it has not published.
+   * So a new prompt works on piy.show the moment its page is live, with no sync
+   * here. Not counted: a click is recorded only on a code in our own table.
+   */
+  if (!row && isCourseHost(env, url.hostname) && /^\d{1,4}$/.test(code) && courseOrigin(env)) {
+    return Response.redirect(`${courseOrigin(env)}/p/${code}`, 302);
+  }
   // Straight through, byte for byte. The code already says which platform,
   // placement and campaign it belongs to — appending utm_ parameters would be
   // counting the same click twice, in somebody else's system, and would look

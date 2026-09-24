@@ -343,19 +343,25 @@ async function piyLine(link, id) {
 }
 
 /*
- * THE NUMBER IS THE ONE THE PAGE PRINTS (2026-09-24). He numbers the prompts
- * on the course site (#005) and each page prints its own piy.show/NNN, so that
- * is read, not chosen here. A page printing none, or two different ones, stops
- * the queue: a short with a number that leads nowhere is the thing to avoid.
- * `curl -4`: no IPv6 route on this box (CLAUDE.md, the Meta CDN trap).
+ * THE NUMBER IS THE COURSE SITE'S, AND ITS INDEX SAYS WHICH (issue #46, owner's
+ * decision 2026-09-24: "promptityourself.com owns the PIY numbers. A number is
+ * taken when its prompt page is written"). The site publishes /prompts.json —
+ * number, slug, url, and the shorts each page gathers — so the number is looked
+ * up there by slug, never counted or chosen here. A slug not in the index is a
+ * page that is not live yet, and the queue refuses it: a short whose number
+ * leads nowhere is the thing to avoid. `curl -4`: no IPv6 route on this box.
  */
-function pageNumber(link) {
-  const html = execFileSync('curl', ['-4', '-sL', '--max-time', '20', '--', link], { encoding: 'utf8', maxBuffer: 1 << 24 });
-  const found = [...new Set([...html.matchAll(/piy\.show\/(\d{3,4})\b/g)].map((m) => m[1]))];
-  if (found.length !== 1) {
-    throw new Error(`${link} prints ${found.length ? `several PIY numbers (${found.join(', ')})` : 'no piy.show number'} — put exactly one on the page first`);
+function pageNumber(link, { index = null } = {}) {
+  const u = new URL(link);
+  const slug = (u.pathname.match(/\/prompts\/([a-z0-9-]+)\/?$/) || [])[1];
+  if (!slug) throw new Error(`${link} is not a prompt page (/prompts/<slug>)`);
+  const src = index || `${u.origin}/prompts.json`;
+  const json = JSON.parse(execFileSync('curl', ['-4', '-sL', '--fail', '--max-time', '20', '--', src], { encoding: 'utf8', maxBuffer: 1 << 24 }));
+  const hit = (json.prompts || []).find((p) => p.slug === slug);
+  if (!hit || !/^\d{3,4}$/.test(String(hit.code || ''))) {
+    throw new Error(`${slug} is not in ${src} — the prompt page is not live yet, so it has no number`);
   }
-  return found[0];
+  return String(hit.code);
 }
 
 /** The INSERT, as text. Separated out so a test can read it without a network. */

@@ -123,13 +123,17 @@ test('the number is printed even where nothing is clickable', async () => {
   }
 });
 
-test('queue-add reads the number the page prints, and refuses a page with none or two', () => {
+test('queue-add looks the number up in the course site index, and refuses a page not in it', () => {
   const { pageNumber } = require('../scripts/queue-add');
   const fs = require('fs'); const os = require('os');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pn-'));
-  const page = (html) => { const f = path.join(dir, `${Math.random()}.html`); fs.writeFileSync(f, html); return `file://${f}`; };
-  assert.strictEqual(pageNumber(page('<p>Type <b>piy.show/005</b></p><a href="https://piy.show/005">x</a>')), '005');
-  assert.throws(() => pageNumber(page('<p>nothing</p>')), /no piy\.show number/);
-  assert.throws(() => pageNumber(page('piy.show/004 and piy.show/005')), /several/);
+  const f = path.join(dir, 'prompts.json');
+  fs.writeFileSync(f, JSON.stringify({ prompts: [
+    { number: 5, code: '005', slug: 'how-we-use-ai-in-2026' }, { number: 1, code: '001', slug: 'refund-request' }] }));
+  const index = `file://${f}`;
+  assert.strictEqual(pageNumber('https://promptityourself.com/prompts/how-we-use-ai-in-2026', { index }), '005');
+  assert.strictEqual(pageNumber('https://promptityourself.com/prompts/refund-request/', { index }), '001');
+  assert.throws(() => pageNumber('https://promptityourself.com/prompts/not-written-yet', { index }), /not live yet/);
+  assert.throws(() => pageNumber('https://promptityourself.com/courses/open-the-door', { index }), /not a prompt page/);
   fs.rmSync(dir, { recursive: true, force: true });
 });

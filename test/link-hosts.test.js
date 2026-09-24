@@ -106,6 +106,15 @@ test('a show code on piy.show lands on the course, not the show', async () => {
   assert.strictEqual(r.writes.length, 0, 'counted as a click on a show code');
 });
 
+test('a number piy.show has not seen goes to the course site to resolve (issue #46)', async () => {
+  const r = await hit('piy.show', '006', ROWS);
+  assert.strictEqual(r.to, 'https://promptityourself.com/p/006');
+  assert.strictEqual(r.writes.length, 0, 'not a code of ours, so not a click');
+  // The controls: a number is only forwarded on the course host, and a word is not a number.
+  assert.strictEqual((await hit('mwk.show', '006', ROWS)).to, 'https://matewishkey.com/show');
+  assert.strictEqual((await hit('piy.show', 'otd6', ROWS)).to, 'https://promptityourself.com/');
+});
+
 test('a miss on piy.show falls back to the course, and on mwk.show to the show', async () => {
   assert.strictEqual((await hit('piy.show', 'nope', ROWS)).to, 'https://promptityourself.com/');
   assert.strictEqual((await hit('piy.show', '', ROWS)).to, 'https://promptityourself.com/');

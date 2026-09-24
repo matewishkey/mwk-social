@@ -748,10 +748,13 @@ table, on no page, and read by nothing without anything looking wrong.
   it is burned into the video), connected at queue time and printed on the `queued` block, and
   printed in the comment even on Instagram, TikTok and Shorts because it is typed, not tapped.
   Plain numbers are reserved (`normaliseCode` refuses them, the random mint skips them).
-  - **THE NUMBER IS HIS, AND THE PAGE PRINTS IT.** The course site numbers its prompts (#001 …)
-    and each page prints its own `piy.show/NNN`; `queue-add.js` reads it off the page
-    (`pageNumber`) and nothing here allocates one. A counter was the first version and would
-    have called his fifth prompt 001. 001-005 were connected on 2026-09-24, each read off its page.
+  - **PROMPTITYOURSELF.COM OWNS THE NUMBERS** (owner's decision, issue #46): a number is taken
+    when its prompt page is written. `queue-add.js` looks it up by slug in the site's
+    **`/prompts.json`** (`pageNumber`) and refuses a slug not in it; nothing here allocates one.
+    A counter was the first version and would have called his fifth prompt 001.
+  - **A number piy.show has not seen goes to `promptityourself.com/p/<n>`**, which the site
+    resolves (301 to the page, 404 unknown). So a new prompt works the moment it is published,
+    with no sync; only codes in our table are counted. 001-005 are in the table (2026-09-24).
   - ⚠ Two random codes are all digits (`43361`, `77235`); only `campaign = 'piy'` is a PIY number.
   - **The course (`/courses/…`) is not a prompt page**: it keeps its word code (`otd`).
   - **Not built: a PIY number in the YouTube DESCRIPTION.** The tail's `{show}` slot is the
