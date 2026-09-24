@@ -145,13 +145,3 @@ test('the course SQL matches the course site and nothing else', async () => {
 });
 
 
-test('the stats page shows course clicks by profile ending', async () => {
-  const { statsPage } = await import(path.join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'));
-  const html = statsPage({ email: 'm@x.com', tz: 'Australia/Brisbane', daily: [], followers: [], clicks: [],
-    snapshots: {}, courseHost: 'piy.show',
-    course: [{ code: 'otd', tag: 'instagram', all_time: 3, recent: 2 }, { code: 'otd', tag: '', all_time: 1, recent: 1 }] });
-  const card = html.split('The course')[1] || '';
-  assert.match(card, /instagram/);
-  assert.match(card, /piy\.show\/otd\/instagram/);
-  assert.match(card, /generic link/);
-});

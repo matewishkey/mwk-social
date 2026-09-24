@@ -60,9 +60,18 @@ function properties(tok = token()) {
 }
 
 /*
- * { sites: [{ host, property, days: [{date, clicks, impressions}] }], missing: [host] }
+ * { sites: [{ host, property, days, pages, countries, devices, totals }], missing: [host] }
+ *   days      [{date, clicks, impressions, position}] over `days`
+ *   pages / countries / devices   top rows over the last 28 days
+ *   totals    {clicks, impressions, position} over the last 28 days
  * A site whose property the robot cannot see is named in `missing`, so the
  * page can say "not connected" rather than print zeros.
+ *
+ * ⚠ NO SEARCH TERMS, AND THAT IS GOOGLE'S RULE, NOT A GAP HERE. The `query`
+ * dimension returned no rows on either site (2026-09-25) while `page` returned
+ * eight: Google withholds any query too few people searched, and at our volume
+ * that is all of them. So the page never shows a "what people searched" table
+ * with nothing in it. Position is Google's average rank, 1 = top of the page.
  */
 function searchStats({ days = 56, now = new Date() } = {}) {
   const tok = token();
@@ -73,11 +82,19 @@ function searchStats({ days = 56, now = new Date() } = {}) {
     const property = visible.find((p) => p === `sc-domain:${host}`)
       || visible.find((p) => p.replace(/\/$/, '') === `https://${host}`);
     if (!property) { missing.push(host); continue; }
-    const res = api(tok, 'POST', `/webmasters/v3/sites/${encodeURIComponent(property)}/searchAnalytics/query`, {
-      startDate: iso(new Date(now - days * 86400_000)), endDate: iso(now), dimensions: ['date'], rowLimit: 500,
-    });
+    const q = (body) => api(tok, 'POST', `/webmasters/v3/sites/${encodeURIComponent(property)}/searchAnalytics/query`, body);
+    const recent = { startDate: iso(new Date(now - 28 * 86400_000)), endDate: iso(now) };
+    const rows = (res) => (res.rows || []).map((r) => ({ key: r.keys ? r.keys[0] : null,
+      clicks: r.clicks, impressions: r.impressions,
+      // Google answers position 0 for a site it never showed; 0 would read as "top".
+      position: r.impressions ? Math.round(r.position * 10) / 10 : null }));
+    const top = (dimension, rowLimit) => rows(q({ ...recent, dimensions: [dimension], rowLimit }));
+    const daily = rows(q({ startDate: iso(new Date(now - days * 86400_000)), endDate: iso(now), dimensions: ['date'], rowLimit: 500 }));
+    const [totals] = rows(q({ ...recent, dimensions: [] }));
     sites.push({ host, property,
-      days: (res.rows || []).map((r) => ({ date: r.keys[0], clicks: r.clicks, impressions: r.impressions })) });
+      days: daily.map(({ key, ...r }) => ({ date: key, ...r })),
+      pages: top('page', 10), countries: top('country', 8), devices: top('device', 3),
+      totals: totals ? { clicks: totals.clicks, impressions: totals.impressions, position: totals.position } : null });
   }
   return { fetchedAt: now.toISOString(), sites, missing };
 }

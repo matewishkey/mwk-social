@@ -790,22 +790,22 @@ table, on no page, and read by nothing without anything looking wrong.
 
 ## Numbers that would otherwise lie
 
-**The reasoning lives in the header of `web/src/pages/stats.js` — read it there, do not restate
-it.** That header owns: the `OWN_ACTIONS` deduction, that "seen" is three different measurements
-and can never be ranked across channels, the dead site-wide engagement rate, which columns are
-comparable, the age-matching rule and its three failure modes, the three trend guards, and the
-funnel's unmeasurable last stage. What is NOT there, and is why the header is trusted:
+**The reasoning lives in two headers — read them there, do not restate it.** `web/src/lib/weekly.js`
+owns what every series means (publish-day vs click-day, sampled visits, the four-week baseline,
+the gaps, the follower rule, why a rate is not a funnel); `web/src/pages/stats.js` owns the
+`OWN_ACTIONS` deduction, the YouTube unit change and the tabs. What is NOT there, and is why the
+headers are trusted:
 
 - **HIS OWN LIKE AND REPOST COME OFF EVERY POST** (mate, 2026-09-20) — 2 likes and 2 shares per
   platform-post, because no platform says who liked. **Our first comment comes off too**, one
   per post on the platforms the watcher comments on (2026-09-23) — the comments tile was our own CTA
   counted back as engagement. **The deduction is on the PAGE, not in the
   table**: `daily_metric` still holds what the platforms said, so the raw number is recoverable.
-- **A VIEW IS NOT A VIEW: YouTube changed the unit on 24 August 2026.** A YouTube views trend
-  crossing that date is refused with a reason rather than drawn (`viewsUnitBlocked`). ⚠ It
-  refuses the whole YouTube views trend and does NOT know about formats — Shorts had counted
-  from the first frame since March 2025 and were unaffected by the change, but their trend is
-  refused too.
+- **A VIEW IS NOT A VIEW: YouTube changed the unit on 24 August 2026.** Since the tabbed page
+  (2026-09-25) a "seen" chart whose usual weeks reach back before that date, with YouTube in
+  them, carries a line saying so (`viewsUnitBlocked`), rather than being refused. ⚠ It does NOT
+  know about formats — Shorts had counted from the first frame since March 2025 and were
+  unaffected.
 - **THE RAW NUMBERS WERE NOT A SMALL OVERSTATEMENT.** Measured 2026-09-15, before age-matching:
   raw reach read **+495%** week on week where the matched figure was **+51%**, and views
   **+4864%** against **+238%**. And summing drops across four action columns reported **44**
@@ -817,16 +817,17 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   booking-button codes on matewishkey.com were **56 of 91** counted hits all-time and **16 of
   16** in the week the tile read "16 link clicks (people)". Also: "people reached" is *reach,
   summed* — three platforms' unique reach added up is not a count of anyone.
-- **THE FUNNEL'S LAST STAGE IS UNMEASURED, NOT ZERO.** What happens inside Google's calendar is
+- **THE JOURNEY'S LAST STAGE IS UNMEASURED, NOT ZERO.** What happens inside Google's calendar is
   not instrumented and will not be. **Writing 0 there would be inventing a measurement to
-  complete a picture** — "nobody booked" is his to say, "we cannot see bookings" is ours. And
-  the social row is NOT a parent of the booking rows: the buttons are on his own site, so 57
-  presses over 38 social clicks is not a conversion rate and the page carries no percentage
-  between the stages.
+  complete a picture** — "nobody booked" is his to say, "we cannot see bookings" is ours.
+- **THE JOURNEY HAS PERCENTAGES BECAUSE HE ASKED, AND THEY ARE RATES, NOT A FUNNEL** (mate,
+  2026-09-25: *"I need percentages and I need baseline data"*). This reverses the old "no
+  percentage between stages". Each step divides two counts from the same week and says "per
+  100"; none follows a person (the booking buttons are on his own site, so most presses never
+  came through our links). A test pins every label and the sentence saying so.
 - **A LINK'S CLICK COUNT IS ALL TIME AND GETS READ AS "RECENTLY"**, so `/links` carries both
   columns. ⚠ **Two nearly identical columns are a short record, not a finding** — the first
-  click ever recorded is 2026-08-21. The caveat and the control that removes it once the record
-  outgrows the window are on the stats funnel card, not on `/links`.
+  click ever recorded is 2026-08-21.
 
 - **THE LATEST-POSTS CARD IS THE ANSWER TO "HOW IS THE LAST POST DOING"** (2026-09-24). Every
   table here is per DAY, so `ship-stats.js` ships a `posts` snapshot: one row per post, joined
@@ -840,14 +841,14 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   new probes per run inside 90 s, because the unit's ceiling is 5 minutes; an unprobed video reads
   *not known yet*, never guessed. **`analytics:posts --from` wants a plain date** — a full ISO
   timestamp answers `Invalid ISO date`.
-- **THE AGE-MATCHED TREND DID NOT PAIR ITS DAYS, AND PRINTED VIEWS +6,891%** (2026-09-24). The
-  header promised that a day missing from one week is missing from the other; the code read each
-  week on its own, so a week that had lost four days to a young revision trail was set against a
-  full one. `pairedTotals()` pairs day i with day i per platform, and past a quarter of pairs
-  dropped the rows say *not enough history yet* instead of a number. **The revision query also
-  lacked `post_count`**, so the matched actions never had our own hands taken off.
+- **THE AGE-MATCHED WEEK ON WEEK IS GONE; A WEEK IS NOW SET AGAINST ITS FOUR PREDECESSORS**
+  (design 07, 2026-09-25). The age-matching (`pairedTotals`, in git) mostly printed *not enough
+  history yet*, and once printed views +6,891% from unpaired days. Its replacement reads seen and
+  actions by PUBLISH week, so the newest week is always the youngest: it is drawn "still
+  growing" and its error runs the CONSERVATIVE way (young against settled understates it).
+  Do not read a red dot on a still-growing series as a finding.
 
-- **THE WEBSITES CARD SETS SITE VISITS BESIDE OUR CLICKS, WEEK BY WEEK** (mate, 2026-09-25).
+- **THE WEBSITES & GOOGLE TAB SETS SITE VISITS BESIDE OUR CLICKS, WEEK BY WEEK** (mate, 2026-09-25).
   Visits are Cloudflare **Web Analytics**, not the zone log (500-900 "uniques" a day there
   against 30-180 browser page loads). ⚠ **Sampled 1 in 10**, so weeks, never days. ⚠ **One site
   tag covers every subdomain** (the editor, this dashboard), so every query filters
@@ -860,6 +861,10 @@ funnel's unmeasurable last stage. What is NOT there, and is why the header is tr
   resource id from Search Console's own url) answers **400 invalid argument**. The control: a
   property it cannot see answers **403 insufficient permission**, so this is the API not
   knowing the resource type, not access. Re-test before telling him it has changed.
+  - **What the websites DO give: pages, countries, devices and average position; never search
+    terms.** `query` returns no rows while `page` returns them: Google withholds a term too few
+    people searched, and at our volume that is every term. Position 0 means never shown, and
+    `search-console.js` turns it into null so it cannot read as "top".
 
 ## "Are we being suppressed?" — the seed test
 

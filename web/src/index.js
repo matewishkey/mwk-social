@@ -23,16 +23,16 @@ import { accessIdentity, tokenOk } from './lib/access.js';
 import { pageOf } from './lib/html.js';
 import { counted, automated } from './lib/clicks.js';
 import { api } from './api.js';
-import { redirect, platformFromReferer, courseSql, hostFor } from './links.js';
+import { redirect, platformFromReferer, courseSql, courseOrigin, hostFor } from './links.js';
 import { overviewPage, overviewAction } from './pages/overview.js';
-import { statsPage, SITE_WEEKS } from './pages/stats.js';
+import { statsPage, withoutOwnActions } from './pages/stats.js';
+import { weekly, weekBlocks } from './lib/weekly.js';
 import { configPage } from './pages/config.js';
 import { queuePage, queueAction } from './pages/queue.js';
 import { linksPage, linksAction } from './pages/links.js';
 
 const EVENT_PAGE = 100;
 const HISTORY_PAGE = 25;
-const STATS_DAYS = 30;
 
 export default {
   async fetch(request, env, ctx) {
@@ -165,188 +165,82 @@ async function overview(request, env, tz, snapshots, email, url) {
 // Exported for test/stats-sql.test.js, which runs these queries against a real
 // SQLite built from schema.sql rather than reading their text.
 export async function stats(env, tz, snapshots, email) {
-  const from = new Date(Date.now() - STATS_DAYS * 86400_000).toISOString().slice(0, 10);
   /*
-   * SOCIAL clicks and WEBSITE clicks are two different things and were one
-   * number until 2026-09-14. The two booking-calendar codes live on his own
-   * site, so a hit on them is a button press by somebody already there — it
-   * says nothing about whether any post brought anyone anywhere. They were 56
-   * of 91 counted hits all-time, and 16 of 16 in the week the tile read "16 link
-   * clicks (people)" with the social number underneath at zero. Every social
-   * figure below excludes platform = 'website'; the website gets its own card.
+   * The stats page (design 07) is drawn from WEEKS (lib/weekly.js): eight
+   * blocks of seven days ending yesterday, each against the four before it.
+   * These queries fetch only what those weeks need, plus the 30-day link
+   * tables. Everything is counted people (lib/clicks.js).
+   *
+   * THE KIND OF A CLICK decides which series it joins, and they are never
+   * added together:
+   *   booking   a press on one of the booking buttons on his own site
+   *   sitelink  the one link each way between his two sites
+   *   website   any other code on his site (not social, not counted here)
+   *   course    a code whose TARGET is on the course site (courseSql)
+   *   show      everything else: somebody leaving a post
+   * A show click whose code carries no platform (minted before codes were per
+   * platform) is attributed by its referer, and only then left unattributed.
    */
-  /*
-   * And the COURSE is a third thing (2026-09-23): piy.show/otd has no platform,
-   * so without this every course click would have been added to the social
-   * number and to the show's guest funnel. It gets its own card, by profile.
-   */
+  const today = new Date().toISOString().slice(0, 10);
+  const weeks = weekBlocks(today);
+  const from = weeks[0].from;
+  const month = new Date(Date.now() - 30 * 86400_000).toISOString().slice(0, 10);
   const COURSE = courseSql(env);
-  const SOCIAL = `l.platform IS NOT 'website' AND NOT ${COURSE}`;
-  /*
-   * The revision trail, for the two trend windows only. It is what lets seen
-   * and actions be compared at a matched age instead of young-against-settled
-   * (stats.js, `THE SETTLE TABLE WAS RECORDED FOR THREE WEEKS`). Bounded to 16
-   * days rather than the whole table: it grows by roughly a row per platform
-   * per sync and the page only ever asks about a fortnight.
-   */
-  const trendFrom = new Date(Date.now() - 16 * 86400_000).toISOString().slice(0, 10);
-  const [daily, followers, clicks, split, links,
-    followerHistory, clicksByDay, platformSince, accountSince, revisions, funnel, course,
-    postClicks, siteLinks, siteClickDays] = await Promise.all([
+  const [daily, clicks, followersNow, followerHistory, platformSince, accountSince, course, postClicks, siteLinks] = await Promise.all([
     env.DB.prepare('SELECT * FROM daily_metric WHERE date >= ? ORDER BY date').bind(from).all(),
+    env.DB.prepare(
+      `SELECT substr(c.at, 1, 10) day, l.platform, c.referer_host,
+              CASE WHEN l.platform = 'website' AND l.campaign = 'book' THEN 'booking'
+                   WHEN l.campaign = 'site-link' THEN 'sitelink'
+                   WHEN l.platform = 'website' THEN 'website'
+                   WHEN ${COURSE} THEN 'course' ELSE 'show' END kind
+         FROM click c JOIN link l ON l.code = c.code
+        WHERE c.at >= ? AND ${counted('c')}`).bind(from).all(),
     // The newest point per account, which is what "followers today" means.
     env.DB.prepare(
       `SELECT f.* FROM follower_point f
         JOIN (SELECT account_id, MAX(day) d FROM follower_point GROUP BY account_id) m
           ON m.account_id = f.account_id AND m.d = f.day`).all(),
-    env.DB.prepare(
-      // Counted clicks only: a link-preview fetch is not a click, and half of
-      // them do not admit to being one (lib/clicks.js). The referer is kept so
-      // a click on a code minted before codes were per-platform can still be
-      // attributed by where it came from — it is NOT evidence of a person.
-      `SELECT l.platform, c.referer_host, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY l.platform, c.referer_host`).bind(from).all(),
-    /*
-     * The honest denominator: how much of the traffic was not a person.
-     *
-     * A hit that was flagged human but arrived inside a fetch wave is folded
-     * into the crawler bucket, where it belongs — otherwise this tile would say
-     * one thing about how much of the traffic is real and every other number on
-     * the page would say another.
-     */
-    env.DB.prepare(
-      `SELECT CASE WHEN c.bot <> 0 THEN c.bot WHEN ${counted('c')} THEN 0 ELSE 1 END bot,
-              COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${SOCIAL} GROUP BY 1`).bind(from).all(),
-    env.DB.prepare('SELECT COUNT(*) n FROM link').first(),
-
-    /*
-     * The three queries below exist only for the trends, and each one answers a
-     * question the snapshot queries above cannot.
-     *
-     * followerHistory is the SERIES, not the latest point: a follower count is
-     * a level, so the only way to say whether it moved is to hold two of them.
-     */
-    env.DB.prepare(
-      `SELECT day, account_id, platform, username, followers FROM follower_point
-        WHERE day >= ? ORDER BY day`).bind(from).all(),
-    // Clicks per day, so the scoreboard has a shape and not only a total.
-    env.DB.prepare(
-      `SELECT substr(c.at, 1, 10) day, COUNT(*) n FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${SOCIAL} AND ${counted('c')} GROUP BY day ORDER BY day`).bind(from).all(),
-    /*
-     * When each platform and each account was FIRST seen — over the whole table,
-     * not the rendered window, which is the point of a separate query.
-     *
-     * Without it every trend lies in the same direction. TikTok's first row is
-     * 17 Aug: compare its last seven days against the seven before and the
-     * denominator is one day of data, so a channel that did nothing new reads as
-     * several hundred percent up. Same shape on the follower side and worse —
-     * a third LinkedIn account was connected on 22 Aug carrying 5,040 followers,
-     * so a summed total jumps +5,043 overnight and calls an integration growth.
-     * A platform with no history behind the comparison window gets its start
-     * date shown instead of a percentage.
-     */
+    // A week before the first block too: a week's end reads the last point at or before it.
+    env.DB.prepare('SELECT day, account_id, platform, username, followers FROM follower_point WHERE day >= ? ORDER BY day')
+      .bind(new Date(Date.parse(`${from}T00:00:00Z`) - 7 * 86400_000).toISOString().slice(0, 10)).all(),
+    // Over the WHOLE table, not the window: a platform older than the page
+    // must not be called new because the page happens to start here.
     env.DB.prepare('SELECT platform, MIN(date) first FROM daily_metric GROUP BY platform').all(),
     env.DB.prepare('SELECT account_id, MIN(day) first FROM follower_point GROUP BY account_id').all(),
-    env.DB.prepare(
-      // post_count too: withoutOwnActions() deducts per post, and without the
-      // count it deducted nothing — the age-matched actions kept our own like,
-      // share and first comment for as long as this query lacked it (to 2026-09-24).
-      `SELECT date, platform, post_count, reach, impressions, views, likes, comments, shares, saves,
-              written_at, superseded_at
-         FROM daily_metric_revision WHERE date >= ? ORDER BY date, platform, superseded_at`)
-      .bind(trendFrom).all(),
-    /*
-     * THE FUNNEL, and it is the only query on this page that answers the
-     * question the whole project exists for: does any of this produce a guest.
-     *
-     * Three stages we can see and one we cannot. A social click is somebody
-     * leaving a post; a press on one of the two `campaign = 'book'` codes is
-     * somebody already on /show opening the booking calendar. What happens in
-     * Google's calendar after that is not ours and is not instrumented, so the
-     * last stage is reported as unmeasured rather than as zero — 'nobody booked'
-     * and 'we cannot see bookings' are different claims and only one is ours to
-     * make.
-     *
-     * Both columns are counted clicks, so a preview fetch is not a person.
-     * all_time is genuinely all of it; `recent` is the same 30 days the rest of
-     * the page uses, which for clicks is currently almost the same window --
-     * the first click ever recorded is 21 Aug. The page says so rather than
-     * printing two identical numbers and letting them look like a finding.
-     */
-    env.DB.prepare(
-      `SELECT CASE WHEN l.platform = 'website' THEN l.code WHEN ${COURSE} THEN 'course' ELSE 'social' END stage,
-              COUNT(*) all_time,
-              SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent,
-              MIN(substr(c.at, 1, 10)) first_seen, MAX(substr(c.at, 1, 10)) last_seen,
-              COUNT(DISTINCT substr(c.at, 1, 10)) days
-         FROM click c JOIN link l ON l.code = c.code
-        WHERE ${counted('c')}
-        GROUP BY stage`).bind(from).all(),
-    // The course, by the ending on the url: piy.show/otd/instagram says the
-    // Instagram profile sent them. No ending is the generic link.
+    // The course, by the ending on the url: piy.show/otd/instagram says the Instagram profile sent them.
     env.DB.prepare(
       `SELECT l.code, COALESCE(c.tag, '') tag, COUNT(*) all_time,
               SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
          FROM click c JOIN link l ON l.code = c.code
         WHERE ${COURSE} AND l.campaign IS NOT 'site-link' AND ${counted('c')}
-        GROUP BY l.code, tag ORDER BY all_time DESC`).bind(from).all(),
-    // Clicks per POST, for the latest-posts card: a code minted for a queue
-    // item carries its id as clip_id, and the item's body opens on the title
-    // line the snapshot is keyed on. Show and course kept apart.
+        GROUP BY l.code, tag ORDER BY all_time DESC`).bind(month).all(),
+    // Clicks per POST: a code minted for a queue item carries its id as clip_id.
     env.DB.prepare(
       `SELECT q.body, SUM(CASE WHEN ${COURSE} THEN 0 ELSE 1 END) show,
               SUM(CASE WHEN ${COURSE} THEN 1 ELSE 0 END) course
          FROM click c JOIN link l ON l.code = c.code JOIN queue_item q ON q.id = l.clip_id
         WHERE ${counted('c')} AND q.status = 'posted' AND q.created_at >= ?
-        GROUP BY q.id`).bind(from).all(),
-    /*
-     * BETWEEN THE TWO SITES (mate, 2026-09-24: "we can have one generic
-     * links, we do not have to overcomplicate"). One code each way — mwk.show/piy
-     * on the course site, piy.show/mwk on the show's — `campaign = 'site-link'`,
-     * and out of the course card and the social numbers: a visitor already on
-     * one of his sites is not somebody a post brought.
-     */
+        GROUP BY q.id`).bind(month).all(),
+    // BETWEEN THE TWO SITES (mate, 2026-09-24): one code each way, campaign 'site-link'.
     env.DB.prepare(
       `SELECT l.code, l.target, l.note, COUNT(c.id) all_time,
               SUM(CASE WHEN c.at >= ?1 THEN 1 ELSE 0 END) recent
          FROM link l LEFT JOIN click c ON c.code = l.code AND ${counted('c')}
-        WHERE l.campaign = 'site-link' GROUP BY l.code ORDER BY l.code`).bind(from).all(),
-    /*
-     * Counted clicks per day, show and course apart, over the websites card's
-     * eight weeks (longer than the page's 30 days, hence its own window). The
-     * link between the two sites is neither: it is a visitor already there.
-     */
-    env.DB.prepare(
-      `SELECT substr(c.at, 1, 10) day,
-              SUM(CASE WHEN ${SOCIAL} THEN 1 ELSE 0 END) show,
-              SUM(CASE WHEN ${COURSE} THEN 1 ELSE 0 END) course
-         FROM click c JOIN link l ON l.code = c.code
-        WHERE c.at >= ? AND ${counted('c')} AND l.campaign IS NOT 'site-link'
-        GROUP BY day ORDER BY day`)
-      .bind(new Date(Date.now() - (SITE_WEEKS * 7 + 1) * 86400_000).toISOString().slice(0, 10)).all(),
+        WHERE l.campaign = 'site-link' GROUP BY l.code ORDER BY l.code`).bind(month).all(),
   ]);
-  // Fold the two attribution routes together: the code's own platform first,
-  // then where the click came from, and only then give up and say unattributed.
-  const byChannel = new Map();
-  for (const r of clicks.results || []) {
-    const name = r.platform || platformFromReferer(r.referer_host);
-    const key = name || 'unattributed';
-    byChannel.set(key, (byChannel.get(key) || 0) + r.n);
-  }
-  const folded = [...byChannel].map(([platform, n]) => ({ platform, n })).sort((a, b) => b.n - a.n);
-
-  return statsPage({ email, tz, snapshots, days: STATS_DAYS,
-    daily: daily.results || [], followers: followers.results || [], clicks: folded,
-    split: split.results || [], links: (links && links.n) || 0,
-    followerHistory: followerHistory.results || [], clicksByDay: clicksByDay.results || [],
-    course: course.results || [], courseHost: env.COURSE_HOST,
-    postClicks: postClicks.results || [], siteLinks: siteLinks.results || [],
-    linkHost: env.LINK_HOST, siteClickDays: siteClickDays.results || [],
-    platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])),
+  const clickRows = (clicks.results || []).map((r) => ({ day: r.day, kind: r.kind,
+    platform: r.platform || platformFromReferer(r.referer_host) || null }));
+  const w = weekly({ today, daily: withoutOwnActions(daily.results || []), clicks: clickRows,
+    followers: followerHistory.results || [],
+    sites: (snapshots.sites || {}).body || null, search: (snapshots.search || {}).body || null,
+    platformSince: Object.fromEntries((platformSince.results || []).map((r) => [r.platform, r.first])) });
+  return statsPage({ email, tz, snapshots, w,
+    course: course.results || [], siteLinks: siteLinks.results || [],
+    followersNow: followersNow.results || [], followerHistory: followerHistory.results || [],
     accountSince: Object.fromEntries((accountSince.results || []).map((r) => [r.account_id, r.first])),
-    revisions: revisions.results || [], funnel: funnel.results || [] });
+    postClicks: postClicks.results || [], courseHost: env.COURSE_HOST, linkHost: env.LINK_HOST,
+    courseSite: courseOrigin(env) ? new URL(courseOrigin(env)).hostname.replace(/^www\./, '') : null });
 }
 
 // What is still waiting is never paged — it is short, and it is the half he

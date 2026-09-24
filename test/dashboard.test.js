@@ -282,190 +282,6 @@ const DAILY = [
     views: 50, likes: 2, comments: 1, shares: 0, saves: 0, clicks: 0 },
 ];
 
-// One channel's row out of the side-by-side table.
-const chanRow = (html, platform) => {
-  const at = html.indexOf(`<b>${platform}</b>`);
-  return at < 0 ? '' : html.slice(at, html.indexOf('</tr>', at));
-};
-
-/*
- * Each channel's "seen" number is whichever measurement it actually reports,
- * and the row has to SAY which — reach counts unique accounts, impressions
- * count every appearance on a screen, and a play is neither. Naming the
- * denominator inline is the whole defence against ranking them against each
- * other.
- */
-test('every channel names the measurement its own number is', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const { flows } = require('../scripts/lib/platforms.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: DAILY, followers: [], clicks: [],
-    snapshots: { platforms: { body: { flows: flows() } } } });
-
-  // YouTube reports no reach at all, so calling its number reach would be a
-  // structural zero pretending to be a measurement.
-  const youtube = chanRow(html, 'youtube');
-  assert.ok(youtube, 'youtube should have a row');
-  assert.match(youtube, /plays/, "youtube's number is plays, and must say so");
-  assert.ok(!/unique people|of reach/.test(youtube), 'youtube must not claim reach');
-
-  // Facebook does report reach, and its row must name that instead.
-  const facebook = chanRow(html, 'facebook');
-  assert.match(facebook, /unique people/, "facebook's number is reach, and must say so");
-  assert.match(facebook, /of reach/);
-});
-
-/*
- * The two comparable columns have to stay marked as the comparable ones. They
- * are the answer to "which of these numbers can I put side by side" — every
- * other column on the row is on a scale of its own.
- */
-test('the table marks which columns actually compare across channels', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: DAILY, followers: [], clicks: [],
-    snapshots: {} });
-  assert.match(html, /class="cmp">per post/);
-  assert.match(html, /class="cmp">clicks \(our links\)/);
-  assert.match(html, /Posts, per post and clicks compare across channels/);
-  assert.match(html, /Seen does not/, 'and the reason has to travel with them, or it is decoration');
-});
-
-test('channels with almost no followers are left off the trend on purpose', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: DAILY, clicks: [],
-    followers: [{ platform: 'linkedin', username: 'matevisky', followers: 2151 },
-      { platform: 'threads', username: 'mwk', followers: 0 }],
-    snapshots: {} });
-  assert.match(html, /2\.2k|2151/);
-  assert.match(html, /under ten followers/);
-  assert.match(html, /threads/);
-});
-
-
-// A gap day is still a day that went by; the divisor is the span, not the
-// number of dates carrying data.
-test('the window is the real span, gaps included', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const rows = [
-    { date: '2026-08-01', platform: 'facebook', post_count: 1, impressions: 5, reach: 5,
-      views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 },
-    { date: '2026-08-15', platform: 'facebook', post_count: 1, impressions: 5, reach: 5,
-      views: 0, likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0 },
-  ];
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [], snapshots: {} });
-  assert.match(html, /Last 15 days/, 'two dates a fortnight apart is 15 days, not 2');
-});
-
-test('with no clicks the page says why there is nothing to show', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [], snapshots: {} });
-  assert.match(html, /Only Facebook reports clicks natively/);
-  assert.match(html, /none have been minted/, 'with no links at all, say so');
-});
-
-/* ------------------------------------------------------- stats: trends -- */
-
-/*
- * Every one of these three lies in the FLATTERING direction, which is why each
- * gets a positive control: a guard that cannot fail is not a guard, and the
- * cheapest way to prove one works is to break it and watch the test go red.
- */
-
-// The day the page is rendered, and the days either side of it.
-const isoDay = (n) => new Date(Date.now() + n * 86400_000).toISOString().slice(0, 10);
-const row = (date, over = {}) => ({
-  date, platform: 'facebook', post_count: 1, impressions: 0, reach: 0, views: 0,
-  likes: 0, comments: 0, shares: 0, saves: 0, clicks: 0, ...over,
-});
-// The whole tile block, found by its label — the value sits BEFORE the label
-// and the trend pill AFTER it, so either half alone finds only one of them.
-const tileFor = (html, label) => (html.split('<div class="tile')
-  .find((part) => part.includes(`<span>${label}</span>`)) || '');
-// The clicks tile is the observable for the window logic since 2026-09-14:
-// reach and actions no longer carry an arrow at all (they keep settling for
-// weeks), and a click is stamped the moment it happens, so its arrow is real.
-const clicksPill = (html) => {
-  const pills = tileFor(html, 'show link clicks').match(/<span class="pill [^"]*">([^<]*)<\/span>/g) || [];
-  return pills.length ? pills[pills.length - 1] : '';
-};
-const clicksOn = (pairs) => pairs.map(([d, n]) => ({ day: d, n }));
-
-/*
- * A morning is not a week. Today's numbers are still arriving, so putting them
- * against seven complete days draws a change that is only the clock — and it
- * would read as a collapse every morning and a recovery every night.
- */
-test('today is in neither comparison window', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const steady = [[isoDay(-8), 10], [isoDay(-1), 10]];
-  const daily = [row(isoDay(-8)), row(isoDay(-1))];
-
-  const withToday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily, split: [{ bot: 0, n: 1 }], clicksByDay: clicksOn([...steady, [isoDay(0), 1000]]) });
-  assert.match(clicksPill(withToday), /about the same/,
-    'a huge partial day must not move a week-on-week figure');
-
-  // Positive control: the SAME spike one day earlier is a complete day, and it
-  // must move the number. Without this the assertion above would also pass on a
-  // page that had simply stopped comparing anything.
-  const withYesterday = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily, split: [{ bot: 0, n: 1 }], clicksByDay: clicksOn([...steady, [isoDay(-2), 1000]]) });
-  assert.doesNotMatch(clicksPill(withYesterday), /about the same/,
-    'a complete day inside the window must still count');
-});
-
-/*
- * TikTok's first row is 17 Aug. Compare its last seven days against the seven
- * before and the denominator is one day of data, so a channel that did nothing
- * new reads as several hundred percent up.
- */
-test('a channel with no history behind the older window shows its start date, not a percentage', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const daily = [row(isoDay(-8), { reach: 10 }), row(isoDay(-2), { reach: 400 })];
-
-  const young = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily, platformSince: { facebook: isoDay(-3) } });
-  assert.match(chanRow(young, 'facebook'), /since /, 'name the start date');
-  assert.doesNotMatch(chanRow(young, 'facebook'), /[+-]\d+%/,
-    'a channel younger than the comparison must not be given a percentage');
-
-  // Positive control: the same numbers from a channel that WAS reporting before
-  // the older window opened get the OTHER reason — "still settling" — and no
-  // percentage either. Since 2026-09-14 no channel row carries an arrow on seen:
-  // daily_metric is lifetime accrual by publish date and a Facebook day is
-  // three-quarters of its final number at midnight, so every arrow pointed down.
-  const old = statsPage({ email: 'm@x.com', tz: TZ, clicks: [], followers: [], snapshots: {},
-    daily, platformSince: { facebook: isoDay(-60) } });
-  assert.match(chanRow(old, 'facebook'), /still settling/,
-    'a channel with history says why it has no arrow');
-  assert.doesNotMatch(chanRow(old, 'facebook'), /[+-]\d+%/,
-    'seen never gets a percentage — it is not settled for weeks');
-  assert.doesNotMatch(chanRow(young, 'facebook'), /still settling/,
-    '"too new" beats "still settling": a channel with no older window has nothing to settle against');
-});
-
-/*
- * The one that would have been believed. A third LinkedIn account was connected
- * on 22 Aug carrying 5,040 followers — summed, that is +5,043 overnight and the
- * best week the show has ever had. It is an integration, not an audience.
- */
-test('an account connected part-way through is not counted as growth', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const followerHistory = [
-    { day: isoDay(-3), account_id: 'a', platform: 'facebook', username: 'mwk', followers: 89 },
-    { day: isoDay(-1), account_id: 'a', platform: 'facebook', username: 'mwk', followers: 91 },
-    // Connected on the last day only, bringing an audience with it.
-    { day: isoDay(-1), account_id: 'b', platform: 'linkedin', username: 'Zsuzsanna', followers: 5040 },
-  ];
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], clicks: [], snapshots: {},
-    followers: [], followerHistory, accountSince: { a: isoDay(-3), b: isoDay(-1) } });
-
-  const tile = tileFor(html, 'followers');
-  assert.match(tile, /<b>91<\/b>/, 'the total must be the accounts held throughout, not 5,131');
-  assert.ok(!/5131|5\.1k/.test(tile), 'a connection must never be folded into the total');
-  assert.match(html, /Zsuzsanna/, 'and the account left out has to be named, not silently dropped');
-  assert.match(html, /connected part-way through/);
-});
-
 
 /* ---------------------------------------------------------------- queue -- */
 
@@ -731,21 +547,6 @@ test('the vertical surfaces are exactly the ones that reject a landscape cut', a
   }
 });
 
-// The click card must never present crawler traffic as people. It said "18
-// clicks" on the first live post when every one of them was a preview fetch.
-test('the stats page counts people only, and does not talk about the robots', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    targets: [{ target: 'https://github.com/matewishkey/mwk-og-image-generator', n: 0, codes: 3 }],
-    split: [{ bot: 1, n: 1 }, { bot: 2, n: 37 }], links: 9, snapshots: {} });
-
-  assert.match(html, /<b>0<\/b>\s*<span>show link clicks<\/span>/, 'zero people is what to show');
-  // mate, 2026-09-25: "i do not care about robot visits, can we remove it" --
-  // filtered, and no longer named.
-  assert.ok(!/crawler/.test(html), 'robot traffic is not mentioned');
-  assert.ok(!/<b>38<\/b>\s*<span>link clicks/.test(html), 'the total must never be shown as clicks');
-});
-
 
 /*
  * "unattributed" on the links table. A code minted before codes were
@@ -853,46 +654,6 @@ const PROP = (over = {}) => ({ video_id: 'abc', title: 'A video', state: 'propos
   proposed_at: new Date().toISOString(), current_text: 'one\ntwo\nthree',
   proposed: 'one\nTWO\nthree', ...over });
 
-/*
- * The site-wide "engagement rate" divided actions from every channel by reach
- * from the three that report it — seven channels on top, three underneath. On
- * the real window that read 5.5% where the same-set figure was 3.8%, and even
- * that mixes unique-accounts with plays.
- *
- * Actions per post divides two numbers that mean the same thing on every
- * channel, so it is the one headline that survives being compared over time.
- */
-test('the headline quality number cannot mix denominators', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  // Two channels: one reports reach, one reports nothing but views. Both earn
-  // actions. Ten platform-posts, twenty actions => 2.0 per post, whatever each
-  // channel happens to expose. The actions are SAVES here on purpose: likes, comments
-  // and shares all carry the own-hands deduction (next test), and this test is
-  // about denominators, not about that.
-  const rows = [
-    { date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
-      views: 0, likes: 0, comments: 0, shares: 0, saves: 10, clicks: 0 },
-    { date: isoDay(-3), platform: 'youtube', post_count: 5, reach: 0, impressions: 0,
-      views: 9999, likes: 0, comments: 0, shares: 0, saves: 10, clicks: 0 },
-  ];
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: rows, followers: [], clicks: [],
-    snapshots: {} });
-
-  const tile = tileFor(html, 'actions per post, last 7 days');
-  assert.ok(tile, 'the headline tile should be actions per post');
-  assert.match(tile, /<b>2\.0<\/b>/, '20 actions over 10 posts is 2.0, whatever the reach was');
-
-  // YouTube's 9,999 views must not touch it. Under the old formula the
-  // denominator was facebook's reach alone and youtube's actions still counted.
-  const noViews = statsPage({ email: 'm@x.com', tz: TZ, followers: [], clicks: [], snapshots: {},
-    daily: rows.map((r) => ({ ...r, views: r.views ? 1 : 0 })) });
-  assert.match(tileFor(noViews, 'actions per post, last 7 days'), /<b>2\.0<\/b>/,
-    'changing a denominator nothing should depend on moved the headline');
-
-  // And the page must not still be claiming a site-wide percentage.
-  assert.ok(!/<span>engagement rate<\/span>/.test(html),
-    'the mixed-denominator rate is back on the page');
-});
 
 /*
  * HIS OWN LIKE AND REPOST COME OFF EVERY POST (mate, 2026-09-20). No platform
@@ -902,7 +663,7 @@ test('the headline quality number cannot mix denominators', async () => {
  * untouched — a deduction on a day nothing was posted would invent a debt.
  */
 test('two likes and two shares per post are his own and come off, never below zero', async () => {
-  const { withoutOwnActions, statsPage } = await src('pages/stats.js');
+  const { withoutOwnActions } = await src('pages/stats.js');
   const rows = withoutOwnActions([
     { date: '2026-09-01', platform: 'facebook', post_count: 3, likes: 10, shares: 7, comments: 4, saves: 1 },
     { date: '2026-09-02', platform: 'facebook', post_count: 2, likes: 1, shares: 0, comments: 2, saves: 0 },
@@ -910,12 +671,6 @@ test('two likes and two shares per post are his own and come off, never below ze
   ]);
   assert.deepEqual(rows.map((r) => [r.likes, r.shares, r.comments, r.saves]),
     [[4, 1, 1, 1], [0, 0, 0, 0], [5, 5, 0, 0]]);
-
-  // And the page inherits it: 5 posts carrying 20 likes read 10, so 2.0 a post.
-  const html = statsPage({ email: 'm@x.com', tz: TZ, followers: [], clicks: [], snapshots: {},
-    daily: [{ date: isoDay(-3), platform: 'facebook', post_count: 5, reach: 100, impressions: 0,
-      views: 0, likes: 20, comments: 0, shares: 0, saves: 0, clicks: 0 }] });
-  assert.match(tileFor(html, 'actions per post, last 7 days'), /<b>2\.0<\/b>/, '20 likes over 5 posts is 10 net, 2.0 a post');
 });
 
 test('our first comment comes off exactly where the watcher writes one', async () => {
@@ -994,55 +749,6 @@ test('a views trend that crosses the 24 Aug unit change is refused, not drawn', 
   assert.strictEqual(viewsUnitBlocked('2026-09-20'), null, 'a window wholly after it must compare normally');
 });
 
-/*
- * The site-wide "video views" total sums YouTube and TikTok, so it carries
- * YouTube's unit change even though the tile never says YouTube. It must be
- * wired to the same guard — and only when YouTube actually contributed to the
- * older window, or the caveat would sit on a number YouTube had no part in.
- */
-test('the site-wide views tile is wired to the same guard, and only when youtube is in it', () => {
-  const s = require('node:fs').readFileSync(
-    require('node:path').join(__dirname, '..', 'web', 'src', 'pages', 'stats.js'), 'utf8');
-  assert.match(s, /ytViewsBlocked/, 'the site-wide total needs its own blocked value');
-  assert.match(s, /r\.platform === 'youtube' && r\.views/,
-    'it must check youtube actually reported views in the older window');
-  // The week-on-week row is where the guard lives. Since 2026-09-15 the views
-  // row is AGE-MATCHED rather than blocked as "still settling", so the unit
-  // change is the only thing left that can block it — and it still must, because
-  // age-matching fixes a maturity difference and cannot fix a change of unit.
-  // Those are two different lies and only one of them has been dealt with.
-  assert.match(s, /'video views', viewsM\.now, viewsM\.before, num, ytViewsBlocked \|\| thinHistory\)/,
-    'the views row must still pass the unit guard first, on the age-matched numbers');
-  assert.ok(!/ytViewsBlocked \|\| SETTLING/.test(s),
-    'the generic settling note no longer applies to views — the age match replaced it');
-  assert.ok(!/change\(recent\.views, prior\.views/.test(s),
-    'the views tile no longer draws a trend at all');
-});
-
-/*
- * THE SOCIAL CLICK NUMBERS EXCLUDE THE WEBSITE'S OWN CODES (2026-09-14). The two
- * booking buttons on matewishkey.com were 56 of 91 counted hits all-time and
- * 16 of 16 in a week the tile read "16 link clicks (people)" — every one a
- * press by somebody already on the site, none brought there by a post. They
- * get their own card, called what they are.
- */
-test('website button presses are never in the social click numbers', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    split: [{ bot: 0, n: 2 }], snapshots: {},
-    website: [{ code: '30zc4', note: 'Public Show pre-talk', n: 40 }] });
-  assert.match(html, /<b>2<\/b>\s*<span>show link clicks<\/span>/,
-    'the social tile shows the social count, not 42');
-
-  // And the queries that feed the social numbers all say so. Positive control:
-  // the website card's own query names platform = 'website' the other way.
-  const src_ = require('node:fs').readFileSync(
-    require('node:path').join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
-  const block = src_.slice(src_.indexOf('const SOCIAL ='), src_.indexOf('// Fold the two attribution routes'));
-  const social = (block.match(/\$\{SOCIAL\}/g) || []).length;
-  assert.ok(social >= 3, `clicks, split and clicksByDay must all exclude the website (found ${social})`);
-  assert.match(block, /l\.platform = 'website'/, 'the funnel reads the other side of the same line');
-});
 
 /* ------------------------------------------------- auto-approved proposals -- */
 
@@ -1169,118 +875,6 @@ const settling = (date, finalValue) => ({
   ],
 });
 
-test('a value is read at the age asked for, not at its final level', async () => {
-  const { valueAtAge, cutFor } = await src('pages/stats.js');
-  const s = settling('2026-09-01', 100);
-  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 0.1), 'reach'), 0,
-    'six hours in it was still zero');
-  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 1), 'reach'), 60,
-    'at one day old it stood at 60');
-  assert.equal(valueAtAge(s.revisions, s.current, cutFor('2026-09-01', 9), 'reach'), 100,
-    'nothing superseded it after that, so the current row is the answer');
-});
-
-test('a day that did not exist yet is unknown, never zero', async () => {
-  const { valueAtAge, cutFor } = await src('pages/stats.js');
-  const s = settling('2026-09-01', 100);
-  // The whole trail was written from 00:00:01 onward; ask before that.
-  assert.equal(valueAtAge(s.revisions, s.current, '2026-08-31T12:00:00Z', 'reach'), null,
-    'nothing had been written yet, so there is no value to report');
-  // And a never-superseded row we only learned about later is unknown too.
-  assert.equal(valueAtAge([], { reach: 5, updated_at: '2026-09-05T00:00:00Z' },
-    cutFor('2026-09-01', 1), 'reach'), null,
-    'the only write we know of is after the cut, so it cannot be claimed for then');
-  assert.equal(valueAtAge([], { reach: 5, updated_at: '2026-09-01T00:30:00Z' },
-    cutFor('2026-09-01', 1), 'reach'), 5,
-    'written before the cut and never moved since — that IS the value at that age');
-});
-
-test('age-matching removes the settle artefact that killed the seen trend', async () => {
-  const { ageMatchedTotal, TREND_AGE_DAYS } = await src('pages/stats.js');
-
-  // Two weeks, identical in truth: every day really did 100 reach.
-  const recent = ['2026-09-08', '2026-09-09', '2026-09-10'];
-  const prior  = ['2026-09-01', '2026-09-02', '2026-09-03'];
-  const byKey = {};
-  for (const d of [...recent, ...prior]) byKey[`${d}|facebook`] = settling(d, 100);
-
-  // The PRIOR week has had time to settle; the RECENT week has not. Simulate
-  // exactly that by reading prior at its final level and recent at one day.
-  const naiveRecent = recent.reduce((n, d) => n + 60, 0);   // what a young read sees
-  const naivePrior  = prior.reduce((n) => n + 100, 0);      // what a settled read sees
-  const naivePct = ((naiveRecent - naivePrior) / naivePrior) * 100;
-  assert.ok(naivePct < -30,
-    `the artefact is real: a flat channel reads ${naivePct.toFixed(0)}% without age-matching`);
-
-  // Age-matched: both weeks read at the same age.
-  const days = (list) => list.map((date) => ({ date, platform: 'facebook' }));
-  const r = ageMatchedTotal(days(recent), byKey, 'reach', TREND_AGE_DAYS);
-  const p = ageMatchedTotal(days(prior), byKey, 'reach', TREND_AGE_DAYS);
-  assert.equal(r.total, p.total, 'read at the same age, a flat channel is flat');
-  assert.equal(r.usedDays, 3);
-  assert.equal(p.usedDays, 3);
-  assert.equal(r.droppedDays, 0);
-});
-
-test('a day it cannot answer is dropped and counted, not silently summed as nothing', async () => {
-  const { ageMatchedTotal } = await src('pages/stats.js');
-  const byKey = {
-    '2026-09-08|facebook': settling('2026-09-08', 100),
-    // present in the table but first written days later — unknowable at age 1
-    '2026-09-09|facebook': { current: { reach: 500, updated_at: '2026-09-20T00:00:00Z' }, revisions: [] },
-    // not in the table at all
-  };
-  const out = ageMatchedTotal(
-    [{ date: '2026-09-08', platform: 'facebook' },
-     { date: '2026-09-09', platform: 'facebook' },
-     { date: '2026-09-10', platform: 'facebook' }], byKey, 'reach', 1);
-  assert.equal(out.total, 60, 'only the day it could actually read');
-  assert.equal(out.usedDays, 1);
-  assert.equal(out.droppedDays, 2, 'both the unknowable one and the missing one are counted');
-});
-
-/*
- * A CAVEAT WITH THE WRONG NUMBER IN IT IS STILL WRONG. Whether a platform-day
- * can be read at an age is a fact about the row existing, not about which
- * column you ask for — so counting it once per metric reported 44 missing days
- * where there were 11, and a page claiming to have dropped 44 of 50 days looks
- * broken. This reads the source, because the bug was in how the caller folded
- * four identical counts together and the function itself was right all along.
- */
-test('dropped days are counted once, not once per metric', async () => {
-  const { pairedTotals } = await src('pages/stats.js');
-  // Day 0 of the older week cannot be read at 1 day old (first written later).
-  const byKey = {
-    '2026-09-10|facebook': { current: { views: 50, likes: 5, updated_at: '2026-09-20T00:00:00Z' }, revisions: [] },
-    '2026-09-17|facebook': { current: { views: 80, likes: 8, updated_at: '2026-09-17T12:00:00Z' }, revisions: [] },
-  };
-  const daily = [{ date: '2026-09-10', platform: 'facebook' }, { date: '2026-09-17', platform: 'facebook' }];
-  const one = pairedTotals({ daily, byKey, metrics: ['views'], recentFrom: '2026-09-17', priorFrom: '2026-09-10', days: 7, ageDays: 1 });
-  const four = pairedTotals({ daily, byKey, metrics: ['views', 'likes', 'comments', 'shares'], recentFrom: '2026-09-17', priorFrom: '2026-09-10', days: 7, ageDays: 1 });
-  assert.equal(one.dropped, 1);
-  assert.equal(four.dropped, 1, 'a platform-day is one day however many metrics are asked of it');
-});
-
-/*
- * THE PAIRING (2026-09-24): an unreadable day on ONE side takes its partner on
- * the other side out too. Without it the page compared 7 days against 3 and
- * printed video views +6,891%.
- */
-test('a day unreadable in one week is left out of the other week too', async () => {
-  const { pairedTotals } = await src('pages/stats.js');
-  const at = (date, views, written) => ({ current: { views, updated_at: written }, revisions: [] });
-  const byKey = {
-    '2026-09-10|tiktok': at('2026-09-10', 500, '2026-09-20T00:00:00Z'),  // first written too late
-    '2026-09-17|tiktok': at('2026-09-17', 900, '2026-09-17T06:00:00Z'),
-    '2026-09-11|tiktok': at('2026-09-11', 100, '2026-09-11T06:00:00Z'),
-    '2026-09-18|tiktok': at('2026-09-18', 120, '2026-09-18T06:00:00Z'),
-  };
-  const daily = Object.keys(byKey).map((k) => ({ date: k.split('|')[0], platform: 'tiktok' }));
-  const r = pairedTotals({ daily, byKey, metrics: ['views'], recentFrom: '2026-09-17', priorFrom: '2026-09-10', days: 7, ageDays: 1 });
-  assert.equal(r.now, 120, 'the 17th has no readable partner, so its 900 is out');
-  assert.equal(r.before, 100);
-  assert.equal(r.dropped, 1);
-});
 
 /* ------------------------------------------------------------- the funnel -- */
 
@@ -1303,29 +897,6 @@ const FUNNEL = [
   { stage: 'g9q8j', all_time: 14, recent: 14, first_seen: '2026-08-24', last_seen: '2026-09-13', days: 9 },
 ];
 
-test('the booking stage reads as unmeasured, never as zero', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    snapshots: {}, funnel: FUNNEL });
-  assert.match(html, /booked a slot/, 'the stage is shown at all');
-  assert.match(html, /nothing reports back/, 'and says why it cannot be counted');
-  assert.match(html, /not measured/, 'the cell says unmeasured');
-  // The row must not carry a number. Pull the booking row out and check it.
-  const row = html.slice(html.indexOf('booked a slot'), html.indexOf('booked a slot') + 400);
-  assert.ok(!/>0</.test(row), 'a zero in that row would be a measurement we invented');
-});
-
-test('the funnel counts the presses and never divides one stage by another', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    snapshots: {}, funnel: FUNNEL });
-  assert.match(html, /57 presses on a booking button/, '43 + 14, counted, stated plainly');
-  assert.match(html, /over 19 days/, 'spread matters: one burst is not the same as steady traffic');
-  assert.match(html, /counts, not a funnel/,
-    'it must say why there is no conversion rate between the rows');
-  // A conversion rate between social clicks and presses would be this number.
-  assert.ok(!/150%|150 %/.test(html), '43 presses over 38 clicks is not a conversion rate');
-});
 
 /*
  * RELATIVE FIXTURE, DELIBERATELY. This test read a hard-coded 2026-08-21 as
@@ -1336,23 +907,6 @@ test('the funnel counts the presses and never divides one stage by another', asy
  */
 const daysAgo = (n) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
 
-test('two identical columns are called a short record, not a finding', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  // EVERY stage anchored to today: the page takes the earliest first_seen of
-  // all of them, so one literal date left in a sibling row ages the test out
-  // exactly as the first version did (red again on 2026-09-24).
-  const recent = FUNNEL.map((f) => ({ ...f, first_seen: daysAgo(5) }));
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    snapshots: {}, funnel: recent });
-  assert.match(html, /nearly the same window right now/,
-    'all-time and last-30 are the same while the record is this short, and the page must say so');
-  // The positive control: with a click older than the window, the note goes away.
-  const older = [{ ...FUNNEL[0], first_seen: '2020-01-01' }, FUNNEL[1], FUNNEL[2]];
-  const html2 = statsPage({ email: 'm@x.com', tz: TZ, daily: [], followers: [], clicks: [],
-    snapshots: {}, funnel: older });
-  assert.ok(!/nearly the same window right now/.test(html2),
-    'once the record is longer than the window the caveat must disappear on its own');
-});
 
 /*
  * A LINK'S CLICK COUNT IS ALL TIME, AND THAT IS RIGHT, BUT IT GETS READ AS
@@ -1427,26 +981,6 @@ test('a TikTok title arriving with its tags attached still finds its clicks', as
   assert.match(html, /<td class="num">4<\/td>/);
 });
 
-test('a comparison built on too few matched days says so instead of a percentage', async () => {
-  const { statsPage } = await src('pages/stats.js');
-  // Every platform-day readable only in the newer week: the older side is all unknown.
-  const daily = []; const revisions = [];
-  for (let d = 1; d <= 14; d++) {
-    daily.push({ date: isoDay(-d), platform: 'tiktok', post_count: 1, reach: 0, impressions: 0, views: 100,
-      likes: 1, comments: 0, shares: 0, saves: 0, clicks: 0,
-      updated_at: d <= 7 ? `${isoDay(-d)}T06:00:00Z` : new Date().toISOString() });
-  }
-  const html = statsPage({ email: 'm@x.com', tz: TZ, daily, revisions, followers: [], clicks: [], snapshots: {} });
-  const wow = html.split('Week on week')[1].split('</table>')[0];
-  assert.match(wow, /not enough history yet/);
-  assert.ok(!/\+\d+%/.test(wow.split('clicks on show links')[0]), 'no percentage on the matched rows');
-});
-
-test('the revision trail carries post_count, or our own actions stay in the matched numbers', () => {
-  const s = fs.readFileSync(path.join(__dirname, '..', 'web', 'src', 'index.js'), 'utf8');
-  const q = s.slice(s.indexOf('FROM daily_metric_revision WHERE date >= ?') - 400, s.indexOf('FROM daily_metric_revision WHERE date >= ?'));
-  assert.match(q, /post_count/, 'withoutOwnActions() deducts per post and needs the count');
-});
 
 /*
  * The admin mark (2026-09-24): each admin page wears its own colour as a FRAME
