@@ -342,6 +342,14 @@ had already published were jargon the rule rejects.
   a rebuild hands him rewritten summaries to re-approve — words he already said yes to. Two tests
   pin that the plain and tracked blurbs differ on exactly ONE line, or the "one-line change" the
   dashboard shows him is a lie.
+- ⚠ **A PIPELINE-PUBLISHED VIDEO GOES OUT WITH HIS CAPTION AND NO TAIL, SO THE NIGHTLY SYNC
+  TAKES THE REBUILD PATH OVER HIS WORDS — AND WITH EVERY PROPOSAL APPROVING ITSELF, NOBODY SEES
+  IT.** (#47) Found 2026-09-25 on `FOx9kNbdnuU`: the dry run drafted a model summary ("Greg wanted
+  to...") to replace his two sentences. The fix used there was writing his words + the current
+  blurb by hand (`posts:update-metadata --description`), after which `findBlurb()` matches and
+  sync has nothing to do. **After any `run-queue` YouTube publish, read the description back.**
+  ⚠ `yt-description.js <id>` (print mode) ALWAYS drafts a rebuild; it is not what `--sync` would
+  do, so it proves nothing about the nightly run.
 - **EDITING THE BLURB'S PROSE RETIRES IT — push the old text to `showBlurbPast` or every video
   gets rebuilt.** The wording *around* the slot is part of the key, and nothing is ever deleted
   from that list. `voice.findBlurb()` matches the constant halves either side of `{show}`; its
@@ -665,6 +673,9 @@ table, on no page, and read by nothing without anything looking wrong.
   every other platform published the same file; it gets in through yt-dlp if you constrain the
   video codec and leave `+ba` free. `check('twitter', …)` refuses it before the bytes are paid
   for.
+- **X takes a 4-minute video through the API** — exercised 2026-09-25 (243 s, 1080p, 221 MB).
+  The account is Premium (`accounts:list` → `extraData.isPremium`); that is the length limit,
+  not the API access, which is Zernio's app.
 - **TikTok settings go in `tiktokSettings` at the TOP LEVEL**, not `platformSpecificData` —
   getting it wrong is silent, because `platformSpecificData` echoes any key. Six keys, all
   required; `post.js`'s `tiktokSettings()` reads the three interaction flags off
