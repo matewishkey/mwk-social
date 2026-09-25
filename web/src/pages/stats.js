@@ -51,8 +51,8 @@ import { baseline, status, per100, THIS } from '../lib/weekly.js';
  * shared, so his own like and repost from his personal account are
  * indistinguishable from a stranger's. So it is the flat deduction he named,
  * applied per platform-post to every row before anything on this page adds
- * them up — the tiles, the channel table, the age-matched trend and the
- * revision trail all inherit it. Clamped at zero: a post nobody but him
+ * them up: the weekly series, the journey and the latest-posts table all
+ * inherit it. Clamped at zero: a post nobody but him
  * touched reads 0, never negative.
  *
  * OUR FIRST COMMENT COMES OFF TOO (2026-09-23). This header used to say the

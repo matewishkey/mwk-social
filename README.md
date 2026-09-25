@@ -49,8 +49,8 @@ Six systemd `--user` timers run it (`scripts/install-timers.sh`): the queue ever
 the comment watcher hourly, events every two minutes, analytics hourly, show notes daily, and a
 nightly copy of the box's state to the backed-up share. Three Healthchecks dead-man checks
 (`scripts/lib/health.js`) are wired for the heartbeat stopping, nothing posting for a day, and an
-account needing reconnection — **wired but unconfigured**: they no-op until `MWK_HC_*_URL` is set,
-and nothing is set today.
+account needing reconnection, and they stay unconfigured by decision: mate declined alerting on
+2026-09-25, and the `mwk-status` sweep at the start of a session is the alert.
 
 ## Reproduce it
 
@@ -93,13 +93,12 @@ backups would be gone.
 ## What's worth measuring
 
 At this size followers are not the scoreboard — most of the connected channels are in single
-digits and one holds nearly all the audience. What the stats page shows instead:
-
-1. **Posts and actions per post** — the only two numbers measured the same way everywhere
-2. **Tracked clicks** — one redirect hit with crawlers filtered, identical on all eight channels
-3. **Cadence** — the biggest lever fully within our control
-4. **"Seen"** — kept because it is what we have, but **never ranked across channels**: three of
-   ours report reach, two report views and one reports impressions, and those are different things
+digits and one holds nearly all the audience. The stats page (five tabs since 2026-09-25) sets
+every week against the four before it: the **Journey** from seen to a press on the booking button
+with a per-100 rate on each step, **Trends**, **Platforms** ranked by clicks per 100 seen,
+**Websites & Google**, and the latest **Posts**. What each number means is in the headers of
+`web/src/lib/weekly.js` and `web/src/pages/stats.js`. "Seen" is **never compared as a size across
+channels**: some report reach, some views and some impressions, and those are different things.
 
 There was a site-wide engagement rate. It counted actions from seven channels over a denominator
 covering three, and read half again as high as the truth. It was deleted rather than caveated.
